@@ -4,6 +4,7 @@ import { useEffect, useCallback, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import useAppStore from "@/store/useAppStore";
+import { useRequireUser } from "@/lib/useRequireUser";
 import TopicDashboard from "@/components/TopicDashboard";
 import ConveyorBelt from "@/components/ConveyorBelt";
 import QuestionCard from "@/components/QuestionCard";
@@ -18,6 +19,7 @@ interface XPPopup {
 }
 
 export default function SessionPage() {
+  const { loading: authLoading } = useRequireUser();
   const router = useRouter();
   const {
     currentTopic,

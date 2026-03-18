@@ -3,10 +3,14 @@
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import useAppStore from "@/store/useAppStore";
+import { useRequireUser } from "@/lib/useRequireUser";
 
 export default function SettingsPage() {
+  const { loading: authLoading } = useRequireUser();
   const router = useRouter();
   const { settings, setSettings, currentTopic } = useAppStore();
+
+  if (authLoading) return null;
 
   return (
     <div

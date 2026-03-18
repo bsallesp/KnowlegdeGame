@@ -57,6 +57,12 @@ interface AppState {
   // Lives actions
   loseLife: () => void;
   resetLives: () => void;
+
+  // User identity
+  userId: string | null;
+  userEmail: string | null;
+  setUser: (id: string, email: string) => void;
+  clearUser: () => void;
 }
 
 const useAppStore = create<AppState>()(
@@ -85,6 +91,10 @@ const useAppStore = create<AppState>()(
       // Lives
       lives: 3,
       maxLives: 3,
+
+      // User identity
+      userId: null,
+      userEmail: null,
 
       setCurrentTopic: (topic) => set({ currentTopic: topic }),
 
@@ -233,6 +243,10 @@ const useAppStore = create<AppState>()(
 
       resetLives: () =>
         set((state) => ({ lives: state.maxLives })),
+
+      setUser: (id, email) => set({ userId: id, userEmail: email }),
+
+      clearUser: () => set({ userId: null, userEmail: null }),
     }),
     {
       name: "dystoppia-store",
@@ -247,6 +261,8 @@ const useAppStore = create<AppState>()(
         lastActiveDate: state.lastActiveDate,
         lives: state.lives,
         maxLives: state.maxLives,
+        userId: state.userId,
+        userEmail: state.userEmail,
       }),
     }
   )

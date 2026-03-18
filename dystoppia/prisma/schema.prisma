@@ -55,6 +55,13 @@ model Question {
   answers     UserAnswer[]
 }
 
+model User {
+  id        String       @id @default(cuid())
+  email     String       @unique
+  createdAt DateTime     @default(now())
+  answers   UserAnswer[]
+}
+
 model UserAnswer {
   id         String   @id @default(cuid())
   questionId String
@@ -62,6 +69,8 @@ model UserAnswer {
   subItemId  String
   subItem    SubItem  @relation(fields: [subItemId], references: [id])
   sessionId  String
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
   correct    Boolean
   timeSpent  Int
   createdAt  DateTime @default(now())

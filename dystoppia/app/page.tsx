@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import NeuralTransition from "@/components/NeuralTransition";
 import useAppStore from "@/store/useAppStore";
+import { useRequireUser } from "@/lib/useRequireUser";
 import type { Item } from "@/types";
 
 interface TopicHistory {
@@ -17,6 +18,7 @@ interface TopicHistory {
 }
 
 export default function SearchPage() {
+  const { loading: authLoading } = useRequireUser();
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -25,6 +27,8 @@ export default function SearchPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { setCurrentTopic, addItemToCurrentTopic, resetSession } = useAppStore();
+
+  if (authLoading) return null;
 
   useEffect(() => {
     fetch("/api/topics")
