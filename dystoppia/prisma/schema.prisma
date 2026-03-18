@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Topic {
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  createdAt       DateTime @default(now())
+  teachingProfile String?  // JSON: TeachingProfile
+  items           Item[]
+}
+
+model Item {
+  id       String    @id @default(cuid())
+  topicId  String
+  topic    Topic     @relation(fields: [topicId], references: [id])
+  name     String
+  order    Int
+  muted    Boolean   @default(false)
+  subItems SubItem[]
+}
+
+model SubItem {
+  id             String       @id @default(cuid())
+  itemId         String
+  item           Item         @relation(fields: [itemId], references: [id])
+  name           String
+  order          Int
+  muted          Boolean      @default(false)
+  difficulty     Int          @default(1)
+  easeFactor     Float        @default(2.5)
+  reviewInterval Int          @default(1)
+  nextReviewAt   DateTime?
+  questions      Question[]
+  answers        UserAnswer[]
+}
+
+model Question {
+  id          String       @id @default(cuid())
+  subItemId   String
+  subItem     SubItem      @relation(fields: [subItemId], references: [id])
+  type        String
+  content     String
+  options     String?
+  answer      String
+  explanation String
+  difficulty  Int
+  timeLimit   Int?
+  createdAt   DateTime     @default(now())
+  answers     UserAnswer[]
+}
+
+model UserAnswer {
+  id         String   @id @default(cuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id])
+  subItemId  String
+  subItem    SubItem  @relation(fields: [subItemId], references: [id])
+  sessionId  String
+  correct    Boolean
+  timeSpent  Int
+  createdAt  DateTime @default(now())
+}
