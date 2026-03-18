@@ -69,7 +69,7 @@ const useAppStore = create<AppState>()(
       subItemStats: {},
       settings: {
         queueDepth: 5,
-        refillTrigger: 2,
+        refillTrigger: 3,
       },
       isGenerating: false,
       answerShown: false,

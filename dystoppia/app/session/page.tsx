@@ -132,7 +132,7 @@ export default function SessionPage() {
       const subItemId = selectNextSubItem(activeSubItems, subItemStats);
       if (!subItemId) return;
 
-      await generateQuestionsForSubItem(subItemId, Math.min(needed, 3));
+      await generateQuestionsForSubItem(subItemId, Math.min(needed, 5));
     } finally {
       generatingRef.current = false;
     }
@@ -172,7 +172,10 @@ export default function SessionPage() {
 
   // Auto-advance to first question when queue fills
   useEffect(() => {
-    if (!currentQuestion && questionQueue.length > 0) {
+    // Read from store directly to avoid stale closure issues with React StrictMode
+    // (StrictMode runs effects twice; reading getState() ensures we only advance once)
+    const state = useAppStore.getState();
+    if (!state.currentQuestion && state.questionQueue.length > 0) {
       advanceQueue();
     }
   }, [currentQuestion, questionQueue.length, advanceQueue]);

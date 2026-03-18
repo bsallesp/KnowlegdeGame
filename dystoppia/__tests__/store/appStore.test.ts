@@ -200,7 +200,7 @@ describe("setSettings", () => {
     useAppStore.getState().setSettings({ queueDepth: 8 });
     const { settings } = useAppStore.getState();
     expect(settings.queueDepth).toBe(8);
-    expect(settings.refillTrigger).toBe(2); // unchanged default
+    expect(settings.refillTrigger).toBe(3); // unchanged default
   });
 
   test("updates both settings at once", () => {

@@ -53,10 +53,15 @@ export async function POST(req: NextRequest) {
     const resolvedDifficulty = difficulty || subItem.difficulty;
     logger.info("generate-questions", `SubItem "${subItem.name}" — found ${existingQuestions.length} cached, need ${count}`, { subItemId, difficulty: resolvedDifficulty });
 
+    // Filter out malformed questions (fill_blank without options breaks the UI)
+    const validQuestions = existingQuestions.filter(
+      (q) => q.type !== "fill_blank" || (q.options && q.options !== "[]" && q.options !== "null")
+    );
+
     // If we have enough cached questions, return them
-    if (existingQuestions.length >= count) {
+    if (validQuestions.length >= count) {
       logger.debug("generate-questions", `Cache hit — returning ${count} questions from DB`);
-      const shuffled = existingQuestions.sort(() => Math.random() - 0.5).slice(0, count);
+      const shuffled = validQuestions.sort(() => Math.random() - 0.5).slice(0, count);
       return NextResponse.json({
         questions: shuffled.map((q) => ({
           ...q,
@@ -179,7 +184,7 @@ Rules:
 - Answer must exactly match one of the options (for choice questions)`;
 
     const message = await client.messages.create({
-      model: "claude-opus-4-5",
+      model: "claude-sonnet-4-6",
       max_tokens: 3000,
       messages: [{ role: "user", content: prompt }],
     });
