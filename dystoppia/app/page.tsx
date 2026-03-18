@@ -28,14 +28,15 @@ export default function SearchPage() {
   const router = useRouter();
   const { setCurrentTopic, addItemToCurrentTopic, resetSession } = useAppStore();
 
-  if (authLoading) return null;
-
   useEffect(() => {
+    if (authLoading) return;
     fetch("/api/topics")
       .then((r) => r.json())
       .then((data) => setHistory(data.topics || []))
       .catch(() => {});
-  }, []);
+  }, [authLoading]);
+
+  if (authLoading) return null;
 
   const handleSearch = async (e?: React.FormEvent, topicOverride?: string) => {
     if (e) e.preventDefault();

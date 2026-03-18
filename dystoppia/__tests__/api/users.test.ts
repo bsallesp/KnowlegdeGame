@@ -1,0 +1,171 @@
+import { describe, test, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
+
+// ─── Prisma mock ──────────────────────────────────────────────────────────────
+const mockFindUnique = vi.hoisted(() => vi.fn());
+const mockCreate = vi.hoisted(() => vi.fn());
+const mockUpdateMany = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    user: {
+      findUnique: mockFindUnique,
+      create: mockCreate,
+    },
+    userAnswer: {
+      updateMany: mockUpdateMany,
+    },
+  },
+}));
+
+vi.mock("next/headers", () => ({
+  cookies: () =>
+    Promise.resolve({
+      set: vi.fn(),
+      get: vi.fn(() => undefined),
+    }),
+}));
+
+vi.mock("@/lib/logger", () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+import { POST } from "@/app/api/users/route";
+
+function makeRequest(body: Record<string, unknown>) {
+  return new NextRequest("http://localhost/api/users", {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+beforeEach(() => {
+  mockFindUnique.mockReset();
+  mockCreate.mockReset();
+  mockUpdateMany.mockReset();
+  mockUpdateMany.mockResolvedValue({ count: 0 });
+});
+
+describe("POST /api/users — validation", () => {
+  test("returns 400 when email is missing", async () => {
+    const res = await POST(makeRequest({ sessionId: "sess_1" }));
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/invalid email/i);
+  });
+
+  test("returns 400 for invalid email format", async () => {
+    const res = await POST(makeRequest({ email: "notanemail", sessionId: "sess_1" }));
+    expect(res.status).toBe(400);
+  });
+
+  test("returns 400 for email missing @", async () => {
+    const res = await POST(makeRequest({ email: "userexample.com" }));
+    expect(res.status).toBe(400);
+  });
+
+  test("returns 400 for email missing domain", async () => {
+    const res = await POST(makeRequest({ email: "user@" }));
+    expect(res.status).toBe(400);
+  });
+
+  test("returns 400 for empty string email", async () => {
+    const res = await POST(makeRequest({ email: "" }));
+    expect(res.status).toBe(400);
+  });
+
+  test("returns 400 for whitespace-only email", async () => {
+    const res = await POST(makeRequest({ email: "   " }));
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/users — new user creation", () => {
+  test("creates a new user when not existing", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue({ id: "user-1", email: "test@example.com" });
+
+    const res = await POST(makeRequest({ email: "test@example.com", sessionId: "sess_1" }));
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.id).toBe("user-1");
+    expect(data.isNew).toBe(true);
+  });
+
+  test("normalizes email to lowercase", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue({ id: "user-1", email: "test@example.com" });
+
+    await POST(makeRequest({ email: "TEST@EXAMPLE.COM", sessionId: "sess_1" }));
+    expect(mockCreate).toHaveBeenCalledWith({ data: { email: "test@example.com" } });
+  });
+
+  test("trims whitespace from email before saving", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue({ id: "user-1", email: "test@example.com" });
+
+    await POST(makeRequest({ email: "  test@example.com  " }));
+    expect(mockCreate).toHaveBeenCalledWith({ data: { email: "test@example.com" } });
+  });
+
+  test("backfills anonymous answers when sessionId present", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue({ id: "user-1", email: "test@example.com" });
+
+    await POST(makeRequest({ email: "test@example.com", sessionId: "sess_abc" }));
+    expect(mockUpdateMany).toHaveBeenCalledWith({
+      where: { sessionId: "sess_abc", userId: null },
+      data: { userId: "user-1" },
+    });
+  });
+
+  test("does not call backfill when sessionId is absent", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue({ id: "user-1", email: "test@example.com" });
+
+    await POST(makeRequest({ email: "test@example.com" }));
+    expect(mockUpdateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/users — existing user", () => {
+  test("returns existing user without creating new one", async () => {
+    const existing = { id: "user-existing", email: "old@example.com" };
+    mockFindUnique.mockResolvedValue(existing);
+
+    const res = await POST(makeRequest({ email: "old@example.com", sessionId: "sess_1" }));
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.isNew).toBe(false);
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  test("returns existing user id", async () => {
+    const existing = { id: "user-existing", email: "old@example.com" };
+    mockFindUnique.mockResolvedValue(existing);
+
+    const res = await POST(makeRequest({ email: "old@example.com" }));
+    const data = await res.json();
+    expect(data.id).toBe("user-existing");
+  });
+});
+
+describe("POST /api/users — error handling", () => {
+  test("returns 500 when prisma throws", async () => {
+    mockFindUnique.mockRejectedValue(new Error("DB connection failed"));
+
+    const res = await POST(makeRequest({ email: "test@example.com" }));
+    expect(res.status).toBe(500);
+    const data = await res.json();
+    expect(data.error).toBe("Failed to create user");
+  });
+
+  test("includes error details in 500 response", async () => {
+    mockFindUnique.mockRejectedValue(new Error("unique constraint failed"));
+
+    const res = await POST(makeRequest({ email: "test@example.com" }));
+    const data = await res.json();
+    expect(data.details).toContain("unique constraint failed");
+  });
+});

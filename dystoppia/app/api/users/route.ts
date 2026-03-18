@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ id: user.id, email: user.email, isNew });
   } catch (error) {
+    logger.error("users", "Failed to create user", { error: String(error) });
     return NextResponse.json(
       { error: "Failed to create user", details: String(error) },
       { status: 500 }

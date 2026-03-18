@@ -1,0 +1,227 @@
+import { describe, test, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
+
+// ─── Prisma mock ──────────────────────────────────────────────────────────────
+const mockTopicFindUnique = vi.hoisted(() => vi.fn());
+const mockTopicCreate = vi.hoisted(() => vi.fn());
+const mockItemCreate = vi.hoisted(() => vi.fn());
+const mockSubItemCreate = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    topic: { findUnique: mockTopicFindUnique, create: mockTopicCreate },
+    item: { create: mockItemCreate },
+    subItem: { create: mockSubItemCreate },
+  },
+}));
+
+vi.mock("@/lib/logger", () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+// ─── Anthropic mock ───────────────────────────────────────────────────────────
+const mockStream = vi.hoisted(() => vi.fn());
+
+vi.mock("@anthropic-ai/sdk", () => ({
+  default: class {
+    messages = { stream: mockStream };
+  },
+}));
+
+import { POST } from "@/app/api/generate-structure/route";
+
+function makeRequest(body: Record<string, unknown>) {
+  return new NextRequest("http://localhost/api/generate-structure", {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function makeNdjsonStream(lines: string[]) {
+  let index = 0;
+  return {
+    [Symbol.asyncIterator]() {
+      return {
+        next: async () => {
+          if (index < lines.length) {
+            return { done: false, value: { type: "text", text: lines[index++] + "\n" } };
+          }
+          return { done: true, value: undefined };
+        },
+      };
+    },
+  };
+}
+
+beforeEach(() => {
+  mockTopicFindUnique.mockReset();
+  mockTopicCreate.mockReset();
+  mockItemCreate.mockReset();
+  mockSubItemCreate.mockReset();
+  mockStream.mockReset();
+});
+
+const profileLine = JSON.stringify({
+  type: "profile",
+  data: {
+    style: "scenario_based",
+    register: "technical_professional",
+    questionPatterns: ["What happens when..."],
+    contextHint: "Focus on practical scenarios",
+    exampleDomain: "Azure portal",
+    assessmentFocus: "application",
+  },
+});
+
+const itemLine = JSON.stringify({
+  type: "item",
+  data: {
+    name: "Cloud Concepts",
+    subItems: [{ name: "IaaS" }, { name: "PaaS" }],
+  },
+});
+
+describe("POST /api/generate-structure — validation", () => {
+  test("returns 400 when topic is missing", async () => {
+    const res = await POST(makeRequest({}));
+    expect(res.status).toBe(400);
+  });
+
+  test("returns 400 when topic is not a string", async () => {
+    const res = await POST(makeRequest({ topic: 123 }));
+    expect(res.status).toBe(400);
+  });
+
+  test("returns 400 when topic is empty string", async () => {
+    const res = await POST(makeRequest({ topic: "" }));
+    expect(res.status).toBe(400);
+  });
+
+  test("returns error message for missing topic", async () => {
+    const res = await POST(makeRequest({}));
+    const data = await res.json();
+    expect(data.error).toMatch(/topic is required/i);
+  });
+});
+
+describe("POST /api/generate-structure — cache hit", () => {
+  test("returns SSE stream on cache hit", async () => {
+    const existingTopic = {
+      id: "topic-1",
+      name: "AZ-900",
+      slug: "az-900",
+      teachingProfile: null,
+      items: [
+        {
+          id: "item-1",
+          name: "Cloud Concepts",
+          order: 0,
+          subItems: [{ id: "sub-1", name: "IaaS", order: 0 }],
+        },
+      ],
+    };
+    mockTopicFindUnique.mockResolvedValue(existingTopic);
+
+    const res = await POST(makeRequest({ topic: "AZ-900" }));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("text/event-stream");
+  });
+
+  test("streams item events from cached topic", async () => {
+    const existingTopic = {
+      id: "topic-1",
+      slug: "az-900",
+      teachingProfile: null,
+      items: [
+        { id: "item-1", name: "Cloud Concepts", order: 0, subItems: [] },
+      ],
+    };
+    mockTopicFindUnique.mockResolvedValue(existingTopic);
+
+    const res = await POST(makeRequest({ topic: "AZ-900" }));
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let fullText = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      fullText += decoder.decode(value);
+    }
+    expect(fullText).toContain('"type":"item"');
+  });
+
+  test("streams done event from cached topic", async () => {
+    const existingTopic = {
+      id: "topic-1",
+      slug: "az-900",
+      teachingProfile: null,
+      items: [],
+    };
+    mockTopicFindUnique.mockResolvedValue(existingTopic);
+
+    const res = await POST(makeRequest({ topic: "AZ-900" }));
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let fullText = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      fullText += decoder.decode(value);
+    }
+    expect(fullText).toContain('"type":"done"');
+  });
+
+  test("parses teachingProfile JSON when cached", async () => {
+    const profile = { style: "scenario_based", register: "technical_professional" };
+    const existingTopic = {
+      id: "topic-1",
+      slug: "az-900",
+      teachingProfile: JSON.stringify(profile),
+      items: [],
+    };
+    mockTopicFindUnique.mockResolvedValue(existingTopic);
+
+    const res = await POST(makeRequest({ topic: "AZ-900" }));
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let fullText = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      fullText += decoder.decode(value);
+    }
+    expect(fullText).toContain('"style":"scenario_based"');
+  });
+
+  test("does not call LLM on cache hit", async () => {
+    mockTopicFindUnique.mockResolvedValue({ id: "topic-1", slug: "az-900", teachingProfile: null, items: [] });
+    await POST(makeRequest({ topic: "AZ-900" }));
+    expect(mockStream).not.toHaveBeenCalled();
+  });
+
+  test("uses slugified topic to query cache", async () => {
+    mockTopicFindUnique.mockResolvedValue(null);
+    mockStream.mockReturnValue(makeNdjsonStream([]));
+    mockTopicCreate.mockResolvedValue({ id: "t1", slug: "car-mechanics" });
+
+    await POST(makeRequest({ topic: "Car Mechanics" }));
+    expect(mockTopicFindUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { slug: "car-mechanics" } })
+    );
+  });
+});
+
+describe("POST /api/generate-structure — SSE headers", () => {
+  test("sets Cache-Control: no-cache on cache hit", async () => {
+    mockTopicFindUnique.mockResolvedValue({ id: "t1", slug: "az-900", teachingProfile: null, items: [] });
+    const res = await POST(makeRequest({ topic: "AZ-900" }));
+    expect(res.headers.get("Cache-Control")).toBe("no-cache");
+  });
+
+  test("sets Connection: keep-alive on cache hit", async () => {
+    mockTopicFindUnique.mockResolvedValue({ id: "t1", slug: "az-900", teachingProfile: null, items: [] });
+    const res = await POST(makeRequest({ topic: "AZ-900" }));
+    expect(res.headers.get("Connection")).toBe("keep-alive");
+  });
+});

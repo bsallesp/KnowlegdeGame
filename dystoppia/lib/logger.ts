@@ -1,3 +1,6 @@
+import fs from "fs";
+import path from "path";
+
 type Level = "info" | "warn" | "error" | "debug";
 
 const COLORS: Record<Level, string> = {
@@ -8,6 +11,24 @@ const COLORS: Record<Level, string> = {
 };
 const RESET = "\x1b[0m";
 
+const LOG_DIR = path.resolve(process.cwd(), "logs");
+const LOG_FILE = path.join(LOG_DIR, "app.log");
+const MAX_LOG_BYTES = 10 * 1024 * 1024; // 10 MB
+
+function writeToFile(level: Level, context: string, message: string, ts: string, data?: unknown) {
+  try {
+    if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
+    // Rotate if over limit
+    if (fs.existsSync(LOG_FILE) && fs.statSync(LOG_FILE).size > MAX_LOG_BYTES) {
+      fs.renameSync(LOG_FILE, LOG_FILE.replace(".log", `.${Date.now()}.log`));
+    }
+    const entry = JSON.stringify({ ts, level, context, message, ...(data !== undefined ? { data } : {}) });
+    fs.appendFileSync(LOG_FILE, entry + "\n", "utf8");
+  } catch {
+    // File logging must never crash the app
+  }
+}
+
 function log(level: Level, context: string, message: string, data?: unknown) {
   if (level === "debug" && process.env.NODE_ENV !== "development") return;
 
@@ -15,6 +36,7 @@ function log(level: Level, context: string, message: string, data?: unknown) {
   const isServer = typeof window === "undefined";
 
   if (isServer) {
+    writeToFile(level, context, message, ts, data);
     const color = COLORS[level];
     const prefix = `${color}[${ts}] [${level.toUpperCase()}] [${context}]${RESET}`;
     if (data !== undefined) {
