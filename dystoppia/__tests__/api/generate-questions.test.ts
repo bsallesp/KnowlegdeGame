@@ -3,9 +3,9 @@ import { NextRequest } from "next/server";
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 
-const mockCreate = vi.fn();
-const mockFindMany = vi.fn();
-const mockFindUnique = vi.fn();
+const mockCreate = vi.hoisted(() => vi.fn());
+const mockFindMany = vi.hoisted(() => vi.fn());
+const mockFindUnique = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -16,7 +16,7 @@ vi.mock("@/lib/prisma", () => ({
 
 // ─── Anthropic mock ───────────────────────────────────────────────────────────
 
-const mockCreate_llm = vi.fn();
+const mockCreate_llm = vi.hoisted(() => vi.fn());
 
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class {
@@ -113,10 +113,16 @@ describe("input validation", () => {
 
 describe("cache hit", () => {
   test("returns cached questions without calling the LLM", async () => {
+    // Provide >= 8 questions so background refill doesn't trigger (REFILL_THRESHOLD = 8)
     mockFindMany.mockResolvedValue([
       makeDbQuestion({ id: "q-1" }),
       makeDbQuestion({ id: "q-2" }),
       makeDbQuestion({ id: "q-3" }),
+      makeDbQuestion({ id: "q-4" }),
+      makeDbQuestion({ id: "q-5" }),
+      makeDbQuestion({ id: "q-6" }),
+      makeDbQuestion({ id: "q-7" }),
+      makeDbQuestion({ id: "q-8" }),
     ]);
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
@@ -131,6 +137,11 @@ describe("cache hit", () => {
       makeDbQuestion({ id: "q-1", options: '["A","B","C","D"]' }),
       makeDbQuestion({ id: "q-2", options: '["True","False"]' }),
       makeDbQuestion({ id: "q-3", options: '["X","Y"]' }),
+      makeDbQuestion({ id: "q-4" }),
+      makeDbQuestion({ id: "q-5" }),
+      makeDbQuestion({ id: "q-6" }),
+      makeDbQuestion({ id: "q-7" }),
+      makeDbQuestion({ id: "q-8" }),
     ]);
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
@@ -160,6 +171,11 @@ describe("cache hit", () => {
       makeDbQuestion({ id: "q-1", type: "fill_blank", options: '["photosynthesis","respiration","fermentation"]' }),
       makeDbQuestion({ id: "q-2", type: "fill_blank", options: '["TCP","UDP","HTTP"]' }),
       makeDbQuestion({ id: "q-3", type: "fill_blank", options: '["malware","spyware","adware"]' }),
+      makeDbQuestion({ id: "q-4" }),
+      makeDbQuestion({ id: "q-5" }),
+      makeDbQuestion({ id: "q-6" }),
+      makeDbQuestion({ id: "q-7" }),
+      makeDbQuestion({ id: "q-8" }),
     ]);
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
@@ -178,7 +194,8 @@ describe("generation path", () => {
   test("calls the LLM when cache is insufficient", async () => {
     mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
     await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
-    expect(mockCreate_llm).toHaveBeenCalledOnce();
+    // Background warmup may also call LLM, so just verify at least once
+    expect(mockCreate_llm).toHaveBeenCalled();
   });
 
   test("saves generated questions to DB via prisma.question.create", async () => {
@@ -188,7 +205,8 @@ describe("generation path", () => {
     ]));
 
     await POST(makeRequest({ subItemId: "sub-1", count: 2 }));
-    expect(mockCreate).toHaveBeenCalledTimes(2);
+    // Background warmup may also save questions, so verify at least the main 2
+    expect(mockCreate.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   // ── Bug regression: timeLimit field was unknown in Prisma client ───────────

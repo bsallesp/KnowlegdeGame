@@ -10,6 +10,8 @@ interface QuestionCardProps {
   answerShown: boolean;
   lastAnswerCorrect: boolean | null;
   userAnswer?: string;
+  onHintUsed?: () => void;
+  xp?: number;
 }
 
 function AnswerFeedback({ correct }: { correct: boolean }) {
@@ -49,17 +51,25 @@ export default function QuestionCard({
   answerShown,
   lastAnswerCorrect,
   userAnswer,
+  onHintUsed,
+  xp = 0,
 }: QuestionCardProps) {
   const [selectedAnswer, setSelectedAnswer] = useState<string>("");
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
+  const [hintLoading, setHintLoading] = useState(false);
+  const [hintUsed, setHintUsed] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const HINT_COST = 5;
+
   useEffect(() => {
     setSelectedAnswer("");
+    setHint(null);
+    setHintUsed(false);
     startTimeRef.current = Date.now();
 
-    // Set up timer if question has a time limit
     if (question.timeLimit && question.timeLimit > 0) {
       setTimeLeft(question.timeLimit);
     } else {
@@ -103,6 +113,34 @@ export default function QuestionCard({
     onAnswer(selectedAnswer, timeSpent);
   };
 
+  const handleHint = async () => {
+    if (hintUsed || hintLoading || xp < HINT_COST) return;
+    setHintLoading(true);
+    try {
+      const res = await fetch("/api/hint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionContent: question.content,
+          options: question.options,
+          answer: question.answer,
+          subItemName: question.subItem?.name ?? "",
+          topicName: question.subItem?.name ?? "",
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setHint(data.hint);
+        setHintUsed(true);
+        onHintUsed?.();
+      }
+    } catch {
+      // silent
+    } finally {
+      setHintLoading(false);
+    }
+  };
+
   const options = question.options || [];
 
   const getOptionStyle = (option: string) => {
@@ -117,29 +155,9 @@ export default function QuestionCard({
     }
     const isCorrect = option === question.answer;
     const isUserAnswer = option === userAnswer;
-
-    if (isCorrect) {
-      return {
-        backgroundColor: "rgba(96, 165, 250, 0.15)",
-        border: "1px solid #60A5FA",
-        color: "#60A5FA",
-        cursor: "default",
-      };
-    }
-    if (isUserAnswer && !isCorrect) {
-      return {
-        backgroundColor: "rgba(249, 115, 22, 0.1)",
-        border: "1px solid #F97316",
-        color: "#F97316",
-        cursor: "default",
-      };
-    }
-    return {
-      backgroundColor: "#12121A",
-      border: "1px solid #1C1C28",
-      color: "#9494B8",
-      cursor: "default",
-    };
+    if (isCorrect) return { backgroundColor: "rgba(96, 165, 250, 0.15)", border: "1px solid #60A5FA", color: "#60A5FA", cursor: "default" };
+    if (isUserAnswer && !isCorrect) return { backgroundColor: "rgba(249, 115, 22, 0.1)", border: "1px solid #F97316", color: "#F97316", cursor: "default" };
+    return { backgroundColor: "#12121A", border: "1px solid #1C1C28", color: "#9494B8", cursor: "default" };
   };
 
   const typeLabel: Record<string, string> = {
@@ -151,12 +169,14 @@ export default function QuestionCard({
 
   const difficultyColor = ["", "#60A5FA", "#38BDF8", "#818CF8", "#F97316", "#EF4444"][question.difficulty] || "#818CF8";
 
-  const timerPct = question.timeLimit && timeLeft !== null
-    ? (timeLeft / question.timeLimit) * 100
-    : null;
-  const timerColor = timerPct !== null
-    ? timerPct > 30 ? "#FACC15" : "#F97316"
-    : "#FACC15";
+  const timerPct = question.timeLimit && timeLeft !== null ? (timeLeft / question.timeLimit) * 100 : null;
+  const timerColor = timerPct !== null ? (timerPct > 50 ? "#60A5FA" : timerPct > 20 ? "#FACC15" : "#F97316") : "#60A5FA";
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return m > 0 ? `${m}:${sec.toString().padStart(2, "0")}` : `${s}s`;
+  };
 
   return (
     <motion.div
@@ -169,30 +189,40 @@ export default function QuestionCard({
     >
       {/* Question header */}
       <div className="flex items-center gap-3 mb-2">
-        <span
-          className="text-xs px-2 py-1 rounded font-medium"
-          style={{ backgroundColor: "#1C1C28", color: "#9494B8" }}
-        >
+        <span className="text-xs px-2 py-1 rounded font-medium" style={{ backgroundColor: "#1C1C28", color: "#9494B8" }}>
           {typeLabel[question.type] || question.type}
         </span>
         {question.subItem && (
-          <span
-            className="text-xs px-2 py-1 rounded"
-            style={{ backgroundColor: "#1C1C28", color: "#818CF8" }}
-          >
+          <span className="text-xs px-2 py-1 rounded" style={{ backgroundColor: "#1C1C28", color: "#818CF8" }}>
             {question.subItem.name}
           </span>
         )}
-        <div className="ml-auto flex items-center gap-1">
-          <span className="text-xs" style={{ color: "#9494B8" }}>Difficulty</span>
-          <div className="flex gap-0.5">
-            {[1, 2, 3, 4, 5].map((d) => (
-              <div
-                key={d}
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: d <= question.difficulty ? difficultyColor : "#2E2E40" }}
-              />
-            ))}
+        <div className="ml-auto flex items-center gap-3">
+          {/* Hint button */}
+          {!answerShown && question.type !== "fill_blank" && (
+            <button
+              onClick={handleHint}
+              disabled={hintUsed || hintLoading || xp < HINT_COST}
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors"
+              style={{
+                backgroundColor: hintUsed ? "#1C1C28" : "rgba(250,204,21,0.1)",
+                border: `1px solid ${hintUsed ? "#2E2E40" : "rgba(250,204,21,0.3)"}`,
+                color: hintUsed ? "#9494B8" : xp < HINT_COST ? "#9494B8" : "#FACC15",
+                cursor: hintUsed || xp < HINT_COST ? "not-allowed" : "pointer",
+              }}
+              title={xp < HINT_COST ? `Precisa de ${HINT_COST} XP para usar hint` : `Hint (-${HINT_COST} XP)`}
+            >
+              {hintLoading ? "..." : hintUsed ? "✓ Hint" : `💡 -${HINT_COST} XP`}
+            </button>
+          )}
+
+          <div className="flex items-center gap-1">
+            <span className="text-xs" style={{ color: "#9494B8" }}>Difficulty</span>
+            <div className="flex gap-0.5">
+              {[1, 2, 3, 4, 5].map((d) => (
+                <div key={d} className="w-2 h-2 rounded-full" style={{ backgroundColor: d <= question.difficulty ? difficultyColor : "#2E2E40" }} />
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -200,30 +230,36 @@ export default function QuestionCard({
       {/* Timer bar */}
       {timerPct !== null && !answerShown && (
         <div className="mb-3 relative">
-          <div
-            className="h-1 rounded-full overflow-hidden"
-            style={{ backgroundColor: "#2E2E40" }}
-          >
+          <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: "#2E2E40" }}>
             <motion.div
               className="h-full rounded-full"
               style={{ backgroundColor: timerColor, width: `${timerPct}%` }}
               transition={{ duration: 0.9, ease: "linear" }}
             />
           </div>
-          <span
-            className="absolute right-0 -top-4 text-xs font-mono font-semibold"
-            style={{ color: timerColor }}
-          >
-            {timeLeft}s
+          <span className="absolute right-0 -top-4 text-xs font-mono font-semibold" style={{ color: timerColor }}>
+            {timeLeft !== null ? formatTime(timeLeft) : ""}
           </span>
         </div>
       )}
 
+      {/* Hint display */}
+      <AnimatePresence>
+        {hint && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mb-3 px-4 py-2 rounded-lg text-sm"
+            style={{ backgroundColor: "rgba(250,204,21,0.08)", border: "1px solid rgba(250,204,21,0.25)", color: "#FACC15" }}
+          >
+            💡 {hint}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Question content */}
-      <div
-        className="rounded-xl p-6 mb-4"
-        style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}
-      >
+      <div className="rounded-xl p-6 mb-4" style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}>
         <p className="text-lg font-medium leading-relaxed" style={{ color: "#EEEEFF" }}>
           {question.type === "fill_blank"
             ? question.content.split("___").map((part, i, arr) => (
@@ -257,7 +293,6 @@ export default function QuestionCard({
               const isSelected = selectedAnswer === option;
               const isCorrect = option === question.answer;
               const isUserWrong = answerShown && option === userAnswer && !isCorrect;
-
               return (
                 <motion.button
                   key={i}
@@ -266,35 +301,9 @@ export default function QuestionCard({
                   whileTap={!answerShown ? { scale: 0.96 } : {}}
                   className="px-4 py-2 rounded-full text-sm font-medium transition-all"
                   style={{
-                    backgroundColor: answerShown
-                      ? isCorrect
-                        ? "rgba(96, 165, 250, 0.15)"
-                        : isUserWrong
-                        ? "rgba(249, 115, 22, 0.1)"
-                        : "#1C1C28"
-                      : isSelected
-                      ? "rgba(129, 140, 248, 0.2)"
-                      : "#1C1C28",
-                    border: `1px solid ${
-                      answerShown
-                        ? isCorrect
-                          ? "#60A5FA"
-                          : isUserWrong
-                          ? "#F97316"
-                          : "#2E2E40"
-                        : isSelected
-                        ? "#818CF8"
-                        : "#2E2E40"
-                    }`,
-                    color: answerShown
-                      ? isCorrect
-                        ? "#60A5FA"
-                        : isUserWrong
-                        ? "#F97316"
-                        : "#9494B8"
-                      : isSelected
-                      ? "#818CF8"
-                      : "#9494B8",
+                    backgroundColor: answerShown ? (isCorrect ? "rgba(96,165,250,0.15)" : isUserWrong ? "rgba(249,115,22,0.1)" : "#1C1C28") : isSelected ? "rgba(129,140,248,0.2)" : "#1C1C28",
+                    border: `1px solid ${answerShown ? (isCorrect ? "#60A5FA" : isUserWrong ? "#F97316" : "#2E2E40") : isSelected ? "#818CF8" : "#2E2E40"}`,
+                    color: answerShown ? (isCorrect ? "#60A5FA" : isUserWrong ? "#F97316" : "#9494B8") : isSelected ? "#818CF8" : "#9494B8",
                     cursor: answerShown ? "default" : "pointer",
                   }}
                 >
@@ -308,15 +317,10 @@ export default function QuestionCard({
             const style = getOptionStyle(option);
             const isSelected = selectedAnswer === option;
             const isCorrectOption = option === question.answer;
-
             return (
               <motion.button
                 key={i}
-                onClick={() => {
-                  if (!answerShown) {
-                    setSelectedAnswer(option);
-                  }
-                }}
+                onClick={() => { if (!answerShown) setSelectedAnswer(option); }}
                 whileHover={!answerShown ? { scale: 1.01 } : {}}
                 whileTap={!answerShown ? { scale: 0.99 } : {}}
                 className="w-full text-left px-4 py-3 rounded-lg text-sm transition-all flex items-center gap-3"
@@ -325,15 +329,7 @@ export default function QuestionCard({
                 <span
                   className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
                   style={{
-                    backgroundColor: answerShown
-                      ? isCorrectOption
-                        ? "#60A5FA"
-                        : option === userAnswer
-                        ? "#F97316"
-                        : "#2E2E40"
-                      : isSelected
-                      ? "#818CF8"
-                      : "#2E2E40",
+                    backgroundColor: answerShown ? (isCorrectOption ? "#60A5FA" : option === userAnswer ? "#F97316" : "#2E2E40") : isSelected ? "#818CF8" : "#2E2E40",
                     color: answerShown ? (isCorrectOption || option === userAnswer ? "white" : "#9494B8") : isSelected ? "white" : "#9494B8",
                   }}
                 >
@@ -375,15 +371,9 @@ export default function QuestionCard({
             className="space-y-3"
           >
             <AnswerFeedback correct={lastAnswerCorrect} />
-
-            {/* Explanation */}
             <div
               className="p-4 rounded-lg text-sm leading-relaxed"
-              style={{
-                backgroundColor: "#1C1C28",
-                border: "1px solid #2E2E40",
-                color: "#9494B8",
-              }}
+              style={{ backgroundColor: "#1C1C28", border: "1px solid #2E2E40", color: "#9494B8" }}
             >
               <span className="font-semibold" style={{ color: "#EEEEFF" }}>Explanation: </span>
               {question.explanation}

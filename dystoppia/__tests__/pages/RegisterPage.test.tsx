@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
@@ -112,7 +112,8 @@ describe("RegisterPage — validation", () => {
     render(<RegisterPage />);
     const inputs = screen.getAllByRole("textbox");
     await userEvent.type(inputs[0], "notanemail");
-    await userEvent.click(screen.getByRole("button", { name: /Enter Dystoppia/i }));
+    // fireEvent.submit bypasses HTML5 email validation in jsdom so the JS handler runs
+    fireEvent.submit(document.querySelector("form")!);
     await waitFor(() => expect(screen.getByText("That doesn't look like a valid email.")).toBeTruthy());
   });
 
@@ -125,13 +126,12 @@ describe("RegisterPage — validation", () => {
     await waitFor(() => expect(screen.getByText("Emails don't match. Try again.")).toBeTruthy());
   });
 
-  test("clears error after valid input attempt", async () => {
+  test("error persists while user types (not auto-cleared until next submit)", async () => {
     render(<RegisterPage />);
     await userEvent.click(screen.getByRole("button", { name: /Enter Dystoppia/i }));
     await waitFor(() => screen.getByText("Please enter your email."));
     const inputs = screen.getAllByRole("textbox");
     await userEvent.type(inputs[0], "test@example.com");
-    // Error should still show (not auto-cleared until submit)
     expect(screen.queryByText("Please enter your email.")).toBeTruthy();
   });
 });

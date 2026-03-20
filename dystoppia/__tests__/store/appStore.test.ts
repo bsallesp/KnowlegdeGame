@@ -271,6 +271,221 @@ describe("toggleItemMute", () => {
   });
 });
 
+// ─── checkAchievements ────────────────────────────────────────────────────────
+
+describe("checkAchievements", () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      achievements: useAppStore.getState().achievements.map((a) => ({ ...a, unlockedAt: null })),
+      pendingAchievements: [],
+      consecutiveCorrect: 0,
+      consecutiveNoHint: 0,
+      xp: 0,
+      streak: 0,
+      subItemStats: {},
+    });
+  });
+
+  test("unlocks first_answer after first correct answer with totalCount >= 1", () => {
+    useAppStore.setState({ subItemStats: { "sub-1": { correctCount: 1, totalCount: 1, difficulty: 1 } } });
+    useAppStore.getState().checkAchievements({ correct: true });
+    const a = useAppStore.getState().achievements.find((a) => a.id === "first_answer");
+    expect(a?.unlockedAt).not.toBeNull();
+  });
+
+  test("adds unlocked achievement to pendingAchievements", () => {
+    useAppStore.setState({ subItemStats: { "sub-1": { correctCount: 1, totalCount: 1, difficulty: 1 } } });
+    useAppStore.getState().checkAchievements({ correct: true });
+    expect(useAppStore.getState().pendingAchievements).toContain("first_answer");
+  });
+
+  test("does NOT re-unlock an already unlocked achievement", () => {
+    const now = new Date().toISOString();
+    useAppStore.setState({
+      achievements: useAppStore.getState().achievements.map((a) =>
+        a.id === "first_answer" ? { ...a, unlockedAt: now } : a
+      ),
+      subItemStats: { "sub-1": { correctCount: 2, totalCount: 2, difficulty: 1 } },
+    });
+    useAppStore.getState().checkAchievements({ correct: true });
+    const pending = useAppStore.getState().pendingAchievements;
+    expect(pending.filter((id) => id === "first_answer")).toHaveLength(0);
+  });
+
+  test("unlocks perfect_10 after 10 consecutive correct answers", () => {
+    useAppStore.setState({ consecutiveCorrect: 9 });
+    useAppStore.getState().checkAchievements({ correct: true });
+    const a = useAppStore.getState().achievements.find((a) => a.id === "perfect_10");
+    expect(a?.unlockedAt).not.toBeNull();
+  });
+
+  test("resets consecutiveCorrect to 0 on wrong answer", () => {
+    useAppStore.setState({ consecutiveCorrect: 5 });
+    useAppStore.getState().checkAchievements({ correct: false });
+    expect(useAppStore.getState().consecutiveCorrect).toBe(0);
+  });
+
+  test("increments consecutiveCorrect on correct answer", () => {
+    useAppStore.setState({ consecutiveCorrect: 3 });
+    useAppStore.getState().checkAchievements({ correct: true });
+    expect(useAppStore.getState().consecutiveCorrect).toBe(4);
+  });
+
+  test("unlocks xp_100 when xp >= 100", () => {
+    useAppStore.setState({ xp: 100 });
+    useAppStore.getState().checkAchievements({});
+    const a = useAppStore.getState().achievements.find((a) => a.id === "xp_100");
+    expect(a?.unlockedAt).not.toBeNull();
+  });
+
+  test("unlocks speed_demon on correct answer under 10s", () => {
+    useAppStore.getState().checkAchievements({ correct: true, timeSpent: 8000 });
+    const a = useAppStore.getState().achievements.find((a) => a.id === "speed_demon");
+    expect(a?.unlockedAt).not.toBeNull();
+  });
+
+  test("does NOT unlock speed_demon if answer is wrong", () => {
+    useAppStore.getState().checkAchievements({ correct: false, timeSpent: 5000 });
+    const a = useAppStore.getState().achievements.find((a) => a.id === "speed_demon");
+    expect(a?.unlockedAt).toBeNull();
+  });
+
+  test("does NOT unlock speed_demon if time > 10s", () => {
+    useAppStore.getState().checkAchievements({ correct: true, timeSpent: 15000 });
+    const a = useAppStore.getState().achievements.find((a) => a.id === "speed_demon");
+    expect(a?.unlockedAt).toBeNull();
+  });
+
+  test("unlocks streak_7 when streak >= 7", () => {
+    useAppStore.setState({ streak: 7 });
+    useAppStore.getState().checkAchievements({});
+    const a = useAppStore.getState().achievements.find((a) => a.id === "streak_7");
+    expect(a?.unlockedAt).not.toBeNull();
+  });
+
+  test("unlocks topic_master when a subItem has 80%+ in 20+ questions", () => {
+    useAppStore.setState({
+      subItemStats: { "sub-1": { correctCount: 18, totalCount: 20, difficulty: 3 } },
+    });
+    useAppStore.getState().checkAchievements({});
+    const a = useAppStore.getState().achievements.find((a) => a.id === "topic_master");
+    expect(a?.unlockedAt).not.toBeNull();
+  });
+
+  test("resets consecutiveNoHint to 0 when hint is used", () => {
+    useAppStore.setState({ consecutiveNoHint: 10 });
+    useAppStore.getState().checkAchievements({ usedHint: true });
+    expect(useAppStore.getState().consecutiveNoHint).toBe(0);
+  });
+
+  test("unlocks no_hints after 20 answers without hint", () => {
+    useAppStore.setState({ consecutiveNoHint: 19 });
+    useAppStore.getState().checkAchievements({ correct: true, usedHint: false });
+    const a = useAppStore.getState().achievements.find((a) => a.id === "no_hints");
+    expect(a?.unlockedAt).not.toBeNull();
+  });
+});
+
+// ─── dismissAchievement ───────────────────────────────────────────────────────
+
+describe("dismissAchievement", () => {
+  test("removes the achievement id from pendingAchievements", () => {
+    useAppStore.setState({ pendingAchievements: ["first_answer", "xp_100"] });
+    useAppStore.getState().dismissAchievement("first_answer");
+    expect(useAppStore.getState().pendingAchievements).toEqual(["xp_100"]);
+  });
+
+  test("is a no-op when id is not in pending", () => {
+    useAppStore.setState({ pendingAchievements: ["xp_100"] });
+    useAppStore.getState().dismissAchievement("nonexistent");
+    expect(useAppStore.getState().pendingAchievements).toEqual(["xp_100"]);
+  });
+});
+
+// ─── incrementDailyProgress ───────────────────────────────────────────────────
+
+describe("incrementDailyProgress", () => {
+  const today = new Date().toISOString().split("T")[0];
+
+  beforeEach(() => {
+    useAppStore.setState({ dailyGoal: { target: 20, progress: 0, date: today } });
+  });
+
+  test("increments progress by 1", () => {
+    useAppStore.getState().incrementDailyProgress();
+    expect(useAppStore.getState().dailyGoal.progress).toBe(1);
+  });
+
+  test("accumulates across multiple calls", () => {
+    useAppStore.getState().incrementDailyProgress();
+    useAppStore.getState().incrementDailyProgress();
+    useAppStore.getState().incrementDailyProgress();
+    expect(useAppStore.getState().dailyGoal.progress).toBe(3);
+  });
+
+  test("resets progress to 1 when date is different from today", () => {
+    useAppStore.setState({ dailyGoal: { target: 20, progress: 15, date: "2020-01-01" } });
+    useAppStore.getState().incrementDailyProgress();
+    expect(useAppStore.getState().dailyGoal.progress).toBe(1);
+    expect(useAppStore.getState().dailyGoal.date).toBe(today);
+  });
+
+  test("preserves target when resetting for new day", () => {
+    useAppStore.setState({ dailyGoal: { target: 30, progress: 15, date: "2020-01-01" } });
+    useAppStore.getState().incrementDailyProgress();
+    expect(useAppStore.getState().dailyGoal.target).toBe(30);
+  });
+});
+
+// ─── saveSessionEntry ─────────────────────────────────────────────────────────
+
+describe("saveSessionEntry", () => {
+  beforeEach(() => {
+    useAppStore.setState({ sessionHistory: [] });
+  });
+
+  test("saves a new entry", () => {
+    useAppStore.getState().saveSessionEntry({ correctCount: 5, totalCount: 10, xpEarned: 50, topicId: "t1" });
+    expect(useAppStore.getState().sessionHistory).toHaveLength(1);
+    expect(useAppStore.getState().sessionHistory[0].correctCount).toBe(5);
+  });
+
+  test("sets date to today", () => {
+    const today = new Date().toISOString().split("T")[0];
+    useAppStore.getState().saveSessionEntry({ correctCount: 5, totalCount: 10, xpEarned: 50, topicId: "t1" });
+    expect(useAppStore.getState().sessionHistory[0].date).toBe(today);
+  });
+
+  test("merges entry when same date and topicId already exist", () => {
+    const today = new Date().toISOString().split("T")[0];
+    useAppStore.setState({
+      sessionHistory: [{ date: today, correctCount: 3, totalCount: 5, xpEarned: 30, topicId: "t1" }],
+    });
+    useAppStore.getState().saveSessionEntry({ correctCount: 2, totalCount: 5, xpEarned: 20, topicId: "t1" });
+    const history = useAppStore.getState().sessionHistory;
+    expect(history).toHaveLength(1);
+    expect(history[0].correctCount).toBe(5);
+    expect(history[0].totalCount).toBe(10);
+    expect(history[0].xpEarned).toBe(50);
+  });
+
+  test("keeps different topicIds as separate entries on same day", () => {
+    useAppStore.getState().saveSessionEntry({ correctCount: 5, totalCount: 10, xpEarned: 50, topicId: "t1" });
+    useAppStore.getState().saveSessionEntry({ correctCount: 3, totalCount: 6, xpEarned: 30, topicId: "t2" });
+    expect(useAppStore.getState().sessionHistory).toHaveLength(2);
+  });
+
+  test("caps history at 90 entries", () => {
+    const old = Array.from({ length: 90 }, (_, i) => ({
+      date: `2020-01-${String(i + 1).padStart(2, "0")}`,
+      correctCount: 1, totalCount: 2, xpEarned: 10, topicId: "t1",
+    }));
+    useAppStore.setState({ sessionHistory: old });
+    useAppStore.getState().saveSessionEntry({ correctCount: 1, totalCount: 2, xpEarned: 10, topicId: "t99" });
+    expect(useAppStore.getState().sessionHistory).toHaveLength(90);
+  });
+});
+
 // ─── toggleSubItemMute ────────────────────────────────────────────────────────
 
 describe("toggleSubItemMute", () => {

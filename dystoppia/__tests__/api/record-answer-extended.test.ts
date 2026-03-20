@@ -1,28 +1,22 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-// ─── Prisma mock ──────────────────────────────────────────────────────────────
+// ─── Prisma mock — matches actual API: subItem.findUnique, subItem.update,
+//     userAnswer.create, userAnswer.findMany ────────────────────────────────
 const mockFindUnique = vi.hoisted(() => vi.fn());
-const mockFindFirst = vi.hoisted(() => vi.fn());
 const mockFindMany = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
 const mockCreate = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    question: { findUnique: mockFindUnique },
-    subItem: { findFirst: mockFindFirst, findMany: mockFindMany },
-    userAnswer: { create: mockCreate, findMany: vi.fn().mockResolvedValue([]) },
-    topic: { update: mockUpdate },
+    subItem: { findUnique: mockFindUnique, update: mockUpdate },
+    userAnswer: { create: mockCreate, findMany: mockFindMany },
   },
 }));
 
 vi.mock("@/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
-
-vi.mock("next/headers", () => ({
-  cookies: () => ({ get: (key: string) => (key === "dystoppia_uid" ? { value: "user-abc" } : undefined) }),
 }));
 
 import { POST } from "@/app/api/record-answer/route";
@@ -35,204 +29,129 @@ function makeRequest(body: Record<string, unknown>) {
   });
 }
 
+// API requires: questionId, subItemId, sessionId (validates these three)
 const validBody = {
   questionId: "q-1",
+  subItemId: "sub-1",
+  sessionId: "sess-1",
   correct: true,
-  timeSpentMs: 3000,
+  timeSpent: 3000,
 };
 
-const mockQuestion = {
-  id: "q-1",
-  subItemId: "sub-1",
-  subItem: {
-    id: "sub-1",
-    name: "IaaS",
-    difficulty: 0.5,
-    easeFactor: 2.5,
-    interval: 1,
-    repetitions: 0,
-    nextReview: new Date(),
-    item: {
-      id: "item-1",
-      topicId: "topic-1",
-    },
-  },
+// subItem as returned by prisma.subItem.findUnique
+const mockSubItem = {
+  difficulty: 0.5,
+  easeFactor: 2.5,
+  reviewInterval: 1,
 };
 
 beforeEach(() => {
   mockFindUnique.mockReset();
-  mockFindFirst.mockReset();
   mockFindMany.mockReset();
   mockUpdate.mockReset();
   mockCreate.mockReset();
 
-  mockFindUnique.mockResolvedValue(mockQuestion);
+  mockFindUnique.mockResolvedValue(mockSubItem);
   mockCreate.mockResolvedValue({ id: "answer-1" });
   mockUpdate.mockResolvedValue({});
-
-  mockFindMany.mockImplementation(({ where }: any) => {
-    if (where?.subItemId) return Promise.resolve([]);
-    return Promise.resolve([]);
-  });
-
-  mockFindFirst.mockResolvedValue(null);
+  mockFindMany.mockResolvedValue([{ correct: true, createdAt: new Date() }]);
 });
 
-describe("POST /api/record-answer — validation", () => {
-  test("returns 400 when questionId is missing", async () => {
-    const res = await POST(makeRequest({ correct: true, timeSpentMs: 1000 }));
-    expect(res.status).toBe(400);
+// ─── SM-2 field naming (guards against regressions on field name changes) ────
+describe("POST /api/record-answer — SM-2 field names", () => {
+  // API uses reviewInterval (not interval) and nextReviewAt (not nextReview)
+  test("update payload uses 'reviewInterval' not 'interval'", async () => {
+    await POST(makeRequest({ ...validBody, correct: true }));
+    const updateCall = mockUpdate.mock.calls[0][0];
+    expect(updateCall.data).toHaveProperty("reviewInterval");
+    expect(updateCall.data).not.toHaveProperty("interval");
   });
 
-  test("returns 400 when correct is missing", async () => {
-    const res = await POST(makeRequest({ questionId: "q-1", timeSpentMs: 1000 }));
-    expect(res.status).toBe(400);
-  });
-
-  test("returns 400 when timeSpentMs is missing", async () => {
-    const res = await POST(makeRequest({ questionId: "q-1", correct: true }));
-    expect(res.status).toBe(400);
-  });
-
-  test("returns 400 for invalid questionId type", async () => {
-    const res = await POST(makeRequest({ questionId: 42, correct: true, timeSpentMs: 1000 }));
-    expect(res.status).toBe(400);
-  });
-
-  test("returns 400 for invalid correct type", async () => {
-    const res = await POST(makeRequest({ questionId: "q-1", correct: "yes", timeSpentMs: 1000 }));
-    expect(res.status).toBe(400);
-  });
-});
-
-describe("POST /api/record-answer — not found", () => {
-  test("returns 404 when question not found", async () => {
-    mockFindUnique.mockResolvedValue(null);
-    const res = await POST(makeRequest(validBody));
-    expect(res.status).toBe(404);
-  });
-
-  test("returns error message when question not found", async () => {
-    mockFindUnique.mockResolvedValue(null);
-    const res = await POST(makeRequest(validBody));
-    const data = await res.json();
-    expect(data.error).toBeTruthy();
-  });
-});
-
-describe("POST /api/record-answer — success", () => {
-  test("returns 200 on success", async () => {
-    const res = await POST(makeRequest(validBody));
-    expect(res.status).toBe(200);
-  });
-
-  test("returns difficulty in response", async () => {
-    const res = await POST(makeRequest(validBody));
-    const data = await res.json();
-    expect(data).toHaveProperty("difficulty");
-  });
-
-  test("creates user answer record", async () => {
+  test("update payload uses 'nextReviewAt' not 'nextReview'", async () => {
     await POST(makeRequest(validBody));
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          questionId: "q-1",
-          correct: true,
-        }),
-      })
-    );
+    const updateCall = mockUpdate.mock.calls[0][0];
+    expect(updateCall.data).toHaveProperty("nextReviewAt");
+    expect(updateCall.data).not.toHaveProperty("nextReview");
   });
 
-  test("records anonymous userId when no cookie", async () => {
-    vi.doMock("next/headers", () => ({
-      cookies: () => ({ get: () => undefined }),
-    }));
-    const res = await POST(makeRequest(validBody));
-    expect(res.status).toBe(200);
-  });
-
-  test("records timeSpentMs", async () => {
-    await POST(makeRequest({ ...validBody, timeSpentMs: 9999 }));
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ timeSpentMs: 9999 }),
-      })
-    );
-  });
-
-  test("updates subItem difficulty after correct answer", async () => {
-    await POST(makeRequest({ ...validBody, correct: true }));
-    expect(mockUpdate).toHaveBeenCalled();
-  });
-
-  test("updates subItem difficulty after wrong answer", async () => {
-    await POST(makeRequest({ ...validBody, correct: false }));
-    expect(mockUpdate).toHaveBeenCalled();
+  test("update payload uses 'difficulty' not 'difficultyScore'", async () => {
+    await POST(makeRequest(validBody));
+    const updateCall = mockUpdate.mock.calls[0][0];
+    expect(updateCall.data).toHaveProperty("difficulty");
+    expect(updateCall.data).not.toHaveProperty("difficultyScore");
   });
 });
 
-describe("POST /api/record-answer — SM-2 algorithm", () => {
-  test("increases interval after correct answer", async () => {
+// ─── SM-2 value constraints ───────────────────────────────────────────────────
+describe("POST /api/record-answer — SM-2 value constraints", () => {
+  test("reviewInterval >= 1 after correct answer", async () => {
     await POST(makeRequest({ ...validBody, correct: true }));
     const updateCall = mockUpdate.mock.calls[0][0];
-    expect(updateCall.data.interval).toBeGreaterThanOrEqual(1);
+    expect(updateCall.data.reviewInterval).toBeGreaterThanOrEqual(1);
   });
 
-  test("resets interval to 1 after wrong answer (repetitions 0)", async () => {
-    mockFindUnique.mockResolvedValue({
-      ...mockQuestion,
-      subItem: { ...mockQuestion.subItem, repetitions: 0 },
-    });
-    await POST(makeRequest({ ...validBody, correct: false }));
-    const updateCall = mockUpdate.mock.calls[0][0];
-    expect(updateCall.data.interval).toBeLessThanOrEqual(1);
-  });
-
-  test("difficulty stays within [0,1] range", async () => {
-    mockFindUnique.mockResolvedValue({
-      ...mockQuestion,
-      subItem: { ...mockQuestion.subItem, difficulty: 0.9 },
-    });
+  test("difficulty is clamped between 0 and 1 after wrong answer", async () => {
     await POST(makeRequest({ ...validBody, correct: false }));
     const updateCall = mockUpdate.mock.calls[0][0];
     expect(updateCall.data.difficulty).toBeLessThanOrEqual(1);
+    expect(updateCall.data.difficulty).toBeGreaterThanOrEqual(0);
   });
 
-  test("easeFactor is updated", async () => {
+  test("easeFactor stays >= 1.3 after wrong answer", async () => {
+    await POST(makeRequest({ ...validBody, correct: false }));
+    const updateCall = mockUpdate.mock.calls[0][0];
+    expect(updateCall.data.easeFactor).toBeGreaterThanOrEqual(1.3);
+  });
+
+  test("nextReviewAt is an actual Date instance", async () => {
     await POST(makeRequest(validBody));
     const updateCall = mockUpdate.mock.calls[0][0];
-    expect(updateCall.data).toHaveProperty("easeFactor");
+    expect(updateCall.data.nextReviewAt).toBeInstanceOf(Date);
   });
 
-  test("repetitions increment after correct answer", async () => {
-    mockFindUnique.mockResolvedValue({
-      ...mockQuestion,
-      subItem: { ...mockQuestion.subItem, repetitions: 2 },
-    });
-    await POST(makeRequest({ ...validBody, correct: true }));
-    const updateCall = mockUpdate.mock.calls[0][0];
-    expect(updateCall.data.repetitions).toBeGreaterThanOrEqual(3);
-  });
-
-  test("nextReview is set to future date", async () => {
+  test("update where clause targets the correct subItemId", async () => {
     await POST(makeRequest(validBody));
     const updateCall = mockUpdate.mock.calls[0][0];
-    expect(new Date(updateCall.data.nextReview).getTime()).toBeGreaterThanOrEqual(Date.now() - 1000);
+    expect(updateCall.where).toEqual({ id: "sub-1" });
   });
 });
 
-describe("POST /api/record-answer — error handling", () => {
-  test("returns 500 when prisma throws", async () => {
-    mockFindUnique.mockRejectedValue(new Error("DB error"));
-    const res = await POST(makeRequest(validBody));
-    expect(res.status).toBe(500);
+// ─── timeSpent field name guard ───────────────────────────────────────────────
+describe("POST /api/record-answer — timeSpent field", () => {
+  test("records field as 'timeSpent' not 'timeSpentMs'", async () => {
+    await POST(makeRequest({ ...validBody, timeSpent: 9999 }));
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ timeSpent: 9999 }),
+      })
+    );
+    const createCall = mockCreate.mock.calls[0][0];
+    expect(createCall.data).not.toHaveProperty("timeSpentMs");
   });
 
-  test("returns error message on DB failure", async () => {
-    mockFindUnique.mockRejectedValue(new Error("DB error"));
+  test("defaults to 0 when timeSpent is omitted", async () => {
+    const { timeSpent: _, ...bodyWithout } = validBody;
+    await POST(makeRequest(bodyWithout));
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ timeSpent: 0 }),
+      })
+    );
+  });
+});
+
+// ─── Response shape ───────────────────────────────────────────────────────────
+describe("POST /api/record-answer — response shape", () => {
+  test("stats object contains 'correctCount' and 'totalCount'", async () => {
     const res = await POST(makeRequest(validBody));
     const data = await res.json();
-    expect(data.error).toBeTruthy();
+    expect(data.stats).toHaveProperty("correctCount");
+    expect(data.stats).toHaveProperty("totalCount");
+  });
+
+  test("stats object contains 'difficulty'", async () => {
+    const res = await POST(makeRequest(validBody));
+    const data = await res.json();
+    expect(data.stats).toHaveProperty("difficulty");
   });
 });

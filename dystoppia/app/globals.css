@@ -71,7 +71,7 @@ body {
 }
 
 /* Focus visible */
-:focus-visible {
+:focus-visible:not(input):not(textarea) {
   outline: 2px solid #818CF8;
   outline-offset: 2px;
 }

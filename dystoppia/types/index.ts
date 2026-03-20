@@ -71,3 +71,25 @@ export interface Settings {
 }
 
 export type QuestionType = "multiple_choice" | "single_choice" | "fill_blank" | "true_false";
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  unlockedAt: string | null;
+}
+
+export interface DailyGoal {
+  target: number;
+  progress: number;
+  date: string;
+}
+
+export interface SessionHistoryEntry {
+  date: string;
+  correctCount: number;
+  totalCount: number;
+  xpEarned: number;
+  topicId: string;
+}

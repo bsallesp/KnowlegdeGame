@@ -166,12 +166,19 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute }: To
                           transition={{ delay: subIndex * 0.04 }}
                           className="ml-4 mb-1 group"
                         >
+                          {/* Weak spot / mastery indicator */}
+                          {(() => {
+                            const rate = stats && stats.totalCount >= 3 ? stats.correctCount / stats.totalCount : null;
+                            const isWeak = rate !== null && rate < 0.5;
+                            const isMastered = rate !== null && rate >= 0.8 && stats!.totalCount >= 10;
+                            const borderColor = sub.muted ? "#2E2E40" : isWeak ? "#F97316" : isMastered ? "#60A5FA" : "#818CF8";
+                            return (
                           <div
                             className="flex items-start gap-2 px-3 py-2 rounded-lg"
                             style={{
-                              backgroundColor: sub.muted ? "transparent" : "rgba(28,28,40,0.5)",
+                              backgroundColor: sub.muted ? "transparent" : isWeak ? "rgba(249,115,22,0.05)" : "rgba(28,28,40,0.5)",
                               opacity: sub.muted ? 0.4 : 1,
-                              borderLeft: `2px solid ${sub.muted ? "#2E2E40" : "#818CF8"}`,
+                              borderLeft: `2px solid ${borderColor}`,
                             }}
                           >
                             <div className="flex-1 min-w-0">
@@ -180,7 +187,12 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute }: To
                                   className="text-xs truncate"
                                   style={{ color: sub.muted ? "#9494B8" : "#EEEEFF" }}
                                 >
-                                  {sub.name}
+                                  {(() => {
+                                    const rate = stats && stats.totalCount >= 3 ? stats.correctCount / stats.totalCount : null;
+                                    if (rate !== null && rate < 0.5) return "⚠ ";
+                                    if (rate !== null && rate >= 0.8 && stats!.totalCount >= 10) return "✓ ";
+                                    return "";
+                                  })()}{sub.name}
                                 </span>
                                 <button
                                   onClick={() => onToggleMute(sub.id, "subitem")}
@@ -211,6 +223,8 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute }: To
                               )}
                             </div>
                           </div>
+                            );
+                          })()}
                         </motion.div>
                       );
                     })}

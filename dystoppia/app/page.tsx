@@ -125,6 +125,8 @@ export default function SearchPage() {
               // Replace pending topic with full DB-persisted version
               const fullTopic = event.data as Parameters<typeof setCurrentTopic>[0];
               setCurrentTopic(fullTopic);
+              // Pré-aquece cache de perguntas enquanto a animação ainda toca
+              prefetchFirstSubItems(fullTopic);
             } else if (event.type === "error") {
               throw new Error(event.message || "Stream error");
             }
@@ -143,6 +145,23 @@ export default function SearchPage() {
       setIsLoading(false);
     }
   };
+
+  function prefetchFirstSubItems(topic: Parameters<typeof setCurrentTopic>[0]) {
+    const PREFETCH_ITEM_COUNT = 2;
+    for (const item of topic.items.slice(0, PREFETCH_ITEM_COUNT)) {
+      const firstActive = item.subItems.find((sub) => !sub.muted);
+      if (!firstActive) continue;
+      fetch("/api/generate-questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subItemId: firstActive.id,
+          count: 3,
+          difficulty: firstActive.difficulty,
+        }),
+      }).catch(() => {/* fire-and-forget: errors ignorados intencionalmente */});
+    }
+  }
 
   return (
     <>
@@ -230,6 +249,7 @@ export default function SearchPage() {
                       backgroundColor: "#818CF8",
                       color: "white",
                       flexShrink: 0,
+                      border: "none",
                     }}
                   >
                     Learn

@@ -1,5 +1,5 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import QuestionCard from "@/components/QuestionCard";
 import type { Question } from "@/types";
@@ -84,18 +84,16 @@ describe("QuestionCard — multiple_choice", () => {
   });
 
   test("submit button is disabled with no selection", async () => {
-    const onAnswer = vi.fn();
     render(
       <QuestionCard
         question={makeQuestion()}
-        onAnswer={onAnswer}
+        onAnswer={vi.fn()}
         answerShown={false}
         lastAnswerCorrect={null}
       />
     );
-    const btn = screen.getByRole("button", { name: /submit/i });
-    await userEvent.click(btn);
-    expect(onAnswer).not.toHaveBeenCalled();
+    // Current behavior: submit button only appears after selecting an option
+    expect(screen.queryByRole("button", { name: /submit/i })).toBeNull();
   });
 
   test("calls onAnswer after selecting and submitting", async () => {
@@ -263,6 +261,10 @@ describe("QuestionCard — timer", () => {
     vi.useFakeTimers();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   test("shows time remaining when timeLimit is set", () => {
     render(
       <QuestionCard
@@ -314,6 +316,117 @@ describe("QuestionCard — timer", () => {
     );
     act(() => { vi.advanceTimersByTime(15000); });
     expect(onAnswer).not.toHaveBeenCalled();
+  });
+});
+
+describe("QuestionCard — hint button", () => {
+  beforeEach(() => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ hint: "Think about the CIA triad." }),
+    }) as any;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test("shows hint button for multiple_choice when answerShown is false", () => {
+    render(
+      <QuestionCard
+        question={makeQuestion()}
+        onAnswer={vi.fn()}
+        answerShown={false}
+        lastAnswerCorrect={null}
+        xp={10}
+      />
+    );
+    expect(screen.getByTitle(/hint/i)).toBeTruthy();
+  });
+
+  test("hint button is disabled when xp < 5", () => {
+    render(
+      <QuestionCard
+        question={makeQuestion()}
+        onAnswer={vi.fn()}
+        answerShown={false}
+        lastAnswerCorrect={null}
+        xp={2}
+      />
+    );
+    const btn = screen.getByTitle(/Precisa de/i);
+    expect(btn).toBeTruthy();
+  });
+
+  test("does NOT show hint button for fill_blank", () => {
+    render(
+      <QuestionCard
+        question={makeQuestion({ type: "fill_blank", content: "Azure is a ___ platform.", options: ["cloud", "local"], answer: "cloud" })}
+        onAnswer={vi.fn()}
+        answerShown={false}
+        lastAnswerCorrect={null}
+        xp={10}
+      />
+    );
+    expect(screen.queryByTitle(/hint/i)).toBeNull();
+  });
+
+  test("does NOT show hint button when answerShown is true", () => {
+    render(
+      <QuestionCard
+        question={makeQuestion()}
+        onAnswer={vi.fn()}
+        answerShown={true}
+        lastAnswerCorrect={true}
+        userAnswer="A cloud platform"
+        xp={10}
+      />
+    );
+    expect(screen.queryByTitle(/hint/i)).toBeNull();
+  });
+
+  test("calls onHintUsed when hint is fetched successfully", async () => {
+    const onHintUsed = vi.fn();
+    render(
+      <QuestionCard
+        question={makeQuestion()}
+        onAnswer={vi.fn()}
+        answerShown={false}
+        lastAnswerCorrect={null}
+        xp={10}
+        onHintUsed={onHintUsed}
+      />
+    );
+    await userEvent.click(screen.getByTitle(/hint/i));
+    await waitFor(() => expect(onHintUsed).toHaveBeenCalledOnce());
+  });
+
+  test("displays hint text after successful fetch", async () => {
+    render(
+      <QuestionCard
+        question={makeQuestion()}
+        onAnswer={vi.fn()}
+        answerShown={false}
+        lastAnswerCorrect={null}
+        xp={10}
+      />
+    );
+    await userEvent.click(screen.getByTitle(/hint/i));
+    await waitFor(() => expect(screen.getByText(/Think about the CIA triad/)).toBeTruthy());
+  });
+
+  test("hint button shows '✓ Hint' after being used", async () => {
+    render(
+      <QuestionCard
+        question={makeQuestion()}
+        onAnswer={vi.fn()}
+        answerShown={false}
+        lastAnswerCorrect={null}
+        xp={10}
+      />
+    );
+    await userEvent.click(screen.getByTitle(/hint/i));
+    await waitFor(() => expect(screen.getByText("✓ Hint")).toBeTruthy());
   });
 });
 
