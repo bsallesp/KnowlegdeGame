@@ -41,7 +41,7 @@ export default function AchievementToast() {
             <span className="text-2xl">{current.icon}</span>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#818CF8" }}>
-                Conquista desbloqueada!
+                Achievement unlocked!
               </p>
               <p className="text-sm font-bold" style={{ color: "#EEEEFF" }}>{current.name}</p>
               <p className="text-xs" style={{ color: "#9494B8" }}>{current.description}</p>

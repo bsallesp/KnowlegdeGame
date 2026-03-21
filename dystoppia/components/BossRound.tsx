@@ -46,7 +46,7 @@ export default function BossRound({ onReady }: BossRoundProps) {
             className="text-base"
             style={{ color: "#9494B8" }}
           >
-            Prepare-se! As próximas 3 perguntas são de dificuldade máxima.
+            Get ready! The next 3 questions are maximum difficulty.
           </motion.p>
         </div>
 
@@ -61,7 +61,7 @@ export default function BossRound({ onReady }: BossRoundProps) {
             <span style={{ color: "#FACC15" }}>⚡</span> XP em dobro
           </div>
           <div className="flex items-center gap-1">
-            <span style={{ color: "#EF4444" }}>💀</span> Dificuldade máxima
+            <span style={{ color: "#EF4444" }}>💀</span> Maximum difficulty
           </div>
         </motion.div>
 
@@ -81,3 +81,4 @@ export default function BossRound({ onReady }: BossRoundProps) {
     </motion.div>
   );
 }
+

@@ -219,7 +219,7 @@ export default function QuestionCard({
               }}
               title={xp < HINT_COST ? `Precisa de ${HINT_COST} XP para usar hint` : `Hint (-${HINT_COST} XP)`}
             >
-              {hintLoading ? "..." : hintError ? "⚠ Erro" : hintUsed ? "✓ Hint" : `💡 -${HINT_COST} XP`}
+              {hintLoading ? "..." : hintError ? "⚠ Error" : hintUsed ? "✓ Hint" : `💡 -${HINT_COST} XP`}
             </button>
           )}
 
@@ -391,3 +391,4 @@ export default function QuestionCard({
     </motion.div>
   );
 }
+

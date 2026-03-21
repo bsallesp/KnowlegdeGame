@@ -43,7 +43,7 @@ vi.mock("@/components/DailyGoalBar", () => ({
 vi.mock("@/components/BossRound", () => ({
   default: ({ onReady }: { onReady: () => void }) => (
     <div data-testid="boss-round">
-      <button onClick={onReady} data-testid="boss-ready-btn">Enfrentar o Boss</button>
+      <button onClick={onReady} data-testid="boss-ready-btn">Face the Boss</button>
     </div>
   ),
 }));
@@ -51,7 +51,7 @@ vi.mock("@/components/BossRound", () => ({
 vi.mock("@/components/FlashCard", () => ({
   default: ({ onReady, subItem }: { onReady: () => void; subItem: { name: string } }) => (
     <div data-testid="flash-card" data-subitem={subItem?.name}>
-      <button onClick={onReady} data-testid="flash-ready-btn">Vamos lá</button>
+      <button onClick={onReady} data-testid="flash-ready-btn">Let's go</button>
     </div>
   ),
 }));
@@ -59,8 +59,8 @@ vi.mock("@/components/FlashCard", () => ({
 vi.mock("@/components/SessionSummary", () => ({
   default: ({ onContinue, onNewTopic, topicName }: { onContinue: () => void; onNewTopic: () => void; topicName: string }) => (
     <div data-testid="session-summary" data-topic={topicName}>
-      <button onClick={onContinue} data-testid="summary-continue">Continuar</button>
-      <button onClick={onNewTopic} data-testid="summary-new-topic">Novo tópico</button>
+      <button onClick={onContinue} data-testid="summary-continue">Continue</button>
+      <button onClick={onNewTopic} data-testid="summary-new-topic">New topic</button>
     </div>
   ),
 }));
@@ -140,6 +140,7 @@ vi.mock("@/store/useAppStore", () => ({
 
 // Mutable state for tests to control
 let storeState = {
+  _hasHydrated: true,
   currentTopic: null as any,
   questionQueue: [] as any[],
   currentQuestion: null as any,
@@ -197,6 +198,7 @@ const sampleQuestion = {
 
 function resetStoreState() {
   storeState = {
+    _hasHydrated: true,
     currentTopic: null,
     questionQueue: [],
     currentQuestion: null,
@@ -693,3 +695,4 @@ describe("SessionPage — achievement & daily goal integration", () => {
     expect(mockIncrementDailyProgress).toHaveBeenCalled();
   });
 });
+

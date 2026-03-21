@@ -15,6 +15,8 @@ import Paywall from "@/components/Paywall";
 import DailyGoalBar from "@/components/DailyGoalBar";
 import BossRound from "@/components/BossRound";
 import FlashCard from "@/components/FlashCard";
+import AudiobookPlayer from "@/components/AudiobookPlayer";
+import AudiobookDialog, { type AudiobookEntry } from "@/components/AudiobookDialog";
 import { selectNextSubItem } from "@/lib/adaptive";
 import { logger } from "@/lib/logger";
 import type { Question } from "@/types";
@@ -31,6 +33,7 @@ export default function SessionPage() {
   const { loading: authLoading } = useRequireUser();
   const router = useRouter();
   const {
+    _hasHydrated,
     currentTopic,
     questionQueue,
     currentQuestion,
@@ -79,13 +82,19 @@ export default function SessionPage() {
   const [showFlashCard, setShowFlashCard] = useState(false);
   const [pendingQuestion, setPendingQuestion] = useState<Question | null>(null);
   const [lastSubItemId, setLastSubItemId] = useState<string | null>(null);
+  const [audiobookEntries, setAudiobookEntries] = useState<AudiobookEntry[]>([]);
+  const [activeAudiobook, setActiveAudiobook] = useState<AudiobookEntry | null>(null);
+  const [isGeneratingAudiobook, setIsGeneratingAudiobook] = useState(false);
+  const [audiobookError, setAudiobookError] = useState<string | null>(null);
+  const [audiobookDialog, setAudiobookDialog] = useState<{ id: string; type: "item" | "subitem"; label: string } | null>(null);
   const generatingRef = useRef(false);
   const isFetchingRef = useRef(false);
 
-  // Redirect if no topic
+  // Redirect if no topic — only after hydration to avoid false redirects on refresh
   useEffect(() => {
+    if (!_hasHydrated) return;
     if (!currentTopic) router.push("/");
-  }, [currentTopic, router]);
+  }, [_hasHydrated, currentTopic, router]);
 
   const getAllSubItems = useCallback(() => {
     if (!currentTopic) return [];
@@ -330,6 +339,45 @@ export default function SessionPage() {
     setShowSummary(true);
   };
 
+  const handleGenerateAudiobook = async (scopeId: string, scopeType: "item" | "subitem") => {
+    if (!currentTopic || isGeneratingAudiobook) return;
+    setIsGeneratingAudiobook(true);
+    setAudiobookError(null);
+    try {
+      const res = await fetch("/api/audiobook/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topicId: currentTopic.id,
+          ...(scopeType === "item" ? { itemId: scopeId } : { subItemId: scopeId }),
+          subItemStats,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.details ?? data.error ?? `HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const entry: AudiobookEntry = {
+        id: crypto.randomUUID(),
+        scopeId,
+        scopeType,
+        scopeLabel: audiobookDialog?.label ?? scopeId,
+        url,
+        createdAt: new Date(),
+      };
+      setAudiobookEntries((prev) => [entry, ...prev]);
+      setActiveAudiobook(entry);
+    } catch (err) {
+      logger.error("session", "Audiobook generation failed", err);
+      setAudiobookError(String(err));
+      setTimeout(() => setAudiobookError(null), 5000);
+    } finally {
+      setIsGeneratingAudiobook(false);
+    }
+  };
+
   if (!currentTopic) return null;
 
   const correctCount = Object.values(subItemStats).reduce((sum, s) => sum + s.correctCount, 0);
@@ -488,6 +536,59 @@ export default function SessionPage() {
       {/* Conveyor belt */}
       <ConveyorBelt queue={questionQueue} currentQuestion={currentQuestion} isGenerating={isGenerating} />
 
+      {/* Audiobook dialog */}
+      {audiobookDialog && (
+        <AudiobookDialog
+          open={!!audiobookDialog}
+          onClose={() => setAudiobookDialog(null)}
+          scopeLabel={audiobookDialog.label}
+          audios={audiobookEntries.filter((e) => e.scopeId === audiobookDialog.id)}
+          isGenerating={isGeneratingAudiobook}
+          onGenerate={() => handleGenerateAudiobook(audiobookDialog.id, audiobookDialog.type)}
+          onPlay={(entry) => setActiveAudiobook(entry)}
+        />
+      )}
+
+      {/* Audiobook generating toast */}
+      <AnimatePresence>
+        {isGeneratingAudiobook && (
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 40 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl"
+            style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}
+          >
+            <motion.span animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="inline-block">🎧</motion.span>
+            <span className="text-sm" style={{ color: "#EEEEFF" }}>Gerando audiobook personalizado...</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Audiobook error toast */}
+      <AnimatePresence>
+        {audiobookError && (
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 40 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl max-w-sm"
+            style={{ backgroundColor: "#12121A", border: "1px solid #F97316", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}
+          >
+            <span className="text-lg">⚠️</span>
+            <span className="text-sm" style={{ color: "#F97316" }}>Falha: {audiobookError}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Audiobook player */}
+      {activeAudiobook && (
+        <AudiobookPlayer
+          audioUrl={activeAudiobook.url}
+          onClose={() => setActiveAudiobook(null)}
+        />
+      )}
+
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left sidebar */}
@@ -496,7 +597,12 @@ export default function SessionPage() {
             <h2 className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "#9494B8" }}>Learning Tree</h2>
             <p className="text-xs" style={{ color: "#9494B8" }}>⚠ = ponto fraco &nbsp; ✓ = dominado</p>
           </div>
-          <TopicDashboard items={currentTopic.items} subItemStats={subItemStats} onToggleMute={handleToggleMute} />
+          <TopicDashboard
+            items={currentTopic.items}
+            subItemStats={subItemStats}
+            onToggleMute={handleToggleMute}
+            onOpenAudiobooks={isPending ? undefined : (id, type, label) => setAudiobookDialog({ id, type, label })}
+          />
         </aside>
 
         {/* Center — Question area */}
@@ -563,7 +669,7 @@ export default function SessionPage() {
                           className="px-8 py-3 rounded-xl font-semibold text-sm flex items-center gap-2"
                           style={{ backgroundColor: isBossRound ? "#EF4444" : "#818CF8", color: "white" }}
                         >
-                          {isBossRound ? "⚔️ Próximo Boss" : "Next Question"}
+                          {isBossRound ? "⚔️ Next Boss" : "Next Question"}
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
@@ -610,3 +716,4 @@ export default function SessionPage() {
     </div>
   );
 }
+

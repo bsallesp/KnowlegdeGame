@@ -12,7 +12,7 @@ export default function DailyGoalBar() {
   const done = progress >= dailyGoal.target;
 
   return (
-    <div className="flex items-center gap-2" title={`Meta diária: ${progress}/${dailyGoal.target} perguntas`}>
+    <div className="flex items-center gap-2" title={`Daily goal: ${progress}/${dailyGoal.target} questions`}>
       <span className="text-xs font-medium" style={{ color: done ? "#60A5FA" : "#9494B8" }}>
         {done ? "🎖️" : "🎯"} {progress}/{dailyGoal.target}
       </span>
@@ -31,3 +31,4 @@ export default function DailyGoalBar() {
     </div>
   );
 }
+

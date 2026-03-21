@@ -37,16 +37,16 @@ function makeTurnResponse(overrides = {}) {
   return {
     readyToCreate: false,
     turn: {
-      question: "Qual é o seu nível atual?",
-      subtitle: "Isso ajuda a calibrar o conteúdo",
+      question: "What is your current level?",
+      subtitle: "This helps calibrate content",
       multiSelect: false,
       cards: [
-        { id: "beginner", label: "Iniciante", description: "Nunca usei cloud", icon: "🌱" },
-        { id: "intermediate", label: "Intermediário", description: "Já usei um pouco", icon: "⚡" },
-        { id: "advanced", label: "Avançado", description: "Uso no dia a dia", icon: "🚀" },
+        { id: "beginner", label: "Beginner", description: "I have never used cloud", icon: "🌱" },
+        { id: "intermediate", label: "Intermediate", description: "I have used it a bit", icon: "⚡" },
+        { id: "advanced", label: "Advanced", description: "I use it daily", icon: "🚀" },
       ],
       allowFreeText: true,
-      freeTextPlaceholder: "Ou descreva seu nível...",
+      freeTextPlaceholder: "Or describe your level...",
     },
     summary: { topic: "AZ-900" },
     ...overrides,
@@ -57,8 +57,8 @@ function makeReadyResponse() {
   return {
     readyToCreate: true,
     turn: null,
-    summary: { topic: "AZ-900", nível: "Iniciante", objetivo: "Certificação" },
-    onboardingContext: "Usuário iniciante buscando certificação AZ-900.",
+    summary: { topic: "AZ-900", level: "Beginner", goal: "Certification" },
+    onboardingContext: "Beginner user seeking AZ-900 certification.",
   };
 }
 
@@ -81,7 +81,7 @@ describe("OnboardingWizard — initial render", () => {
     // Use a never-resolving fetch so loading state persists during assertion
     global.fetch = vi.fn().mockReturnValue(new Promise(() => {}));
     render(<OnboardingWizard {...defaultProps} />);
-    expect(screen.getByText("Analisando o tema...")).toBeTruthy();
+    expect(screen.getByText("Analyzing the topic...")).toBeTruthy();
   });
 
   test("renders topic badge in header", () => {
@@ -90,10 +90,10 @@ describe("OnboardingWizard — initial render", () => {
     expect(screen.getByText("AZ-900")).toBeTruthy();
   });
 
-  test("renders Pular button", () => {
+  test("renders Skip button", () => {
     setupFetch(makeTurnResponse());
     render(<OnboardingWizard {...defaultProps} />);
-    expect(screen.getByText(/Pular/)).toBeTruthy();
+    expect(screen.getByText(/Skip/)).toBeTruthy();
   });
 
   test("calls /api/onboarding/chat on mount", async () => {
@@ -137,7 +137,7 @@ describe("OnboardingWizard — question display", () => {
     setupFetch(makeTurnResponse());
     render(<OnboardingWizard {...defaultProps} />);
     await waitFor(() => {
-      expect(screen.getByText("Qual é o seu nível atual?")).toBeTruthy();
+      expect(screen.getByText("What is your current level?")).toBeTruthy();
     });
   });
 
@@ -145,7 +145,7 @@ describe("OnboardingWizard — question display", () => {
     setupFetch(makeTurnResponse());
     render(<OnboardingWizard {...defaultProps} />);
     await waitFor(() => {
-      expect(screen.getByText("Isso ajuda a calibrar o conteúdo")).toBeTruthy();
+      expect(screen.getByText("This helps calibrate content")).toBeTruthy();
     });
   });
 
@@ -153,9 +153,9 @@ describe("OnboardingWizard — question display", () => {
     setupFetch(makeTurnResponse());
     render(<OnboardingWizard {...defaultProps} />);
     await waitFor(() => {
-      expect(screen.getByText("Iniciante")).toBeTruthy();
-      expect(screen.getByText("Intermediário")).toBeTruthy();
-      expect(screen.getByText("Avançado")).toBeTruthy();
+      expect(screen.getByText("Beginner")).toBeTruthy();
+      expect(screen.getByText("Intermediate")).toBeTruthy();
+      expect(screen.getByText("Advanced")).toBeTruthy();
     });
   });
 
@@ -171,7 +171,7 @@ describe("OnboardingWizard — question display", () => {
     setupFetch(makeTurnResponse());
     render(<OnboardingWizard {...defaultProps} />);
     await waitFor(() => {
-      expect(screen.getByText("Nunca usei cloud")).toBeTruthy();
+      expect(screen.getByText("I have never used cloud")).toBeTruthy();
     });
   });
 
@@ -179,15 +179,15 @@ describe("OnboardingWizard — question display", () => {
     setupFetch(makeTurnResponse());
     render(<OnboardingWizard {...defaultProps} />);
     await waitFor(() => {
-      expect(screen.getByPlaceholderText("Ou descreva seu nível...")).toBeTruthy();
+      expect(screen.getByPlaceholderText("Or describe your level...")).toBeTruthy();
     });
   });
 
   test("Continue button is disabled when nothing selected", async () => {
     setupFetch(makeTurnResponse());
     render(<OnboardingWizard {...defaultProps} />);
-    await waitFor(() => screen.getByText("Continuar →"));
-    const btn = screen.getByText("Continuar →").closest("button") as HTMLButtonElement;
+    await waitFor(() => screen.getByText("Continue →"));
+    const btn = screen.getByText("Continue →").closest("button") as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
 });
@@ -198,9 +198,9 @@ describe("OnboardingWizard — card selection", () => {
     setupFetch(makeTurnResponse());
     const user = userEvent.setup();
     render(<OnboardingWizard {...defaultProps} />);
-    await waitFor(() => screen.getByText("Iniciante"));
-    await user.click(screen.getByText("Iniciante"));
-    const btn = screen.getByText("Continuar →").closest("button") as HTMLButtonElement;
+    await waitFor(() => screen.getByText("Beginner"));
+    await user.click(screen.getByText("Beginner"));
+    const btn = screen.getByText("Continue →").closest("button") as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
   });
 
@@ -208,11 +208,11 @@ describe("OnboardingWizard — card selection", () => {
     setupFetch(makeTurnResponse());
     const user = userEvent.setup();
     render(<OnboardingWizard {...defaultProps} />);
-    await waitFor(() => screen.getByText("Iniciante"));
-    await user.click(screen.getByText("Iniciante"));
-    await user.click(screen.getByText("Avançado"));
-    // Only "Avançado" should be selected — Continue still enabled
-    const btn = screen.getByText("Continuar →").closest("button") as HTMLButtonElement;
+    await waitFor(() => screen.getByText("Beginner"));
+    await user.click(screen.getByText("Beginner"));
+    await user.click(screen.getByText("Advanced"));
+    // Only "Advanced" should be selected — Continue still enabled
+    const btn = screen.getByText("Continue →").closest("button") as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
   });
 
@@ -220,9 +220,9 @@ describe("OnboardingWizard — card selection", () => {
     setupFetch(makeTurnResponse());
     const user = userEvent.setup();
     render(<OnboardingWizard {...defaultProps} />);
-    await waitFor(() => screen.getByPlaceholderText("Ou descreva seu nível..."));
-    await user.type(screen.getByPlaceholderText("Ou descreva seu nível..."), "Tenho experiência com AWS");
-    const btn = screen.getByText("Continuar →").closest("button") as HTMLButtonElement;
+    await waitFor(() => screen.getByPlaceholderText("Or describe your level..."));
+    await user.type(screen.getByPlaceholderText("Or describe your level..."), "I have experience with AWS");
+    const btn = screen.getByText("Continue →").closest("button") as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
   });
 });
@@ -233,10 +233,10 @@ describe("OnboardingWizard — continuing conversation", () => {
     setupFetch(makeTurnResponse());
     const user = userEvent.setup();
     render(<OnboardingWizard {...defaultProps} />);
-    await waitFor(() => screen.getByText("Iniciante"));
-    await user.click(screen.getByText("Iniciante"));
+    await waitFor(() => screen.getByText("Beginner"));
+    await user.click(screen.getByText("Beginner"));
     await act(async () => {
-      fireEvent.click(screen.getByText("Continuar →"));
+      fireEvent.click(screen.getByText("Continue →"));
     });
     await waitFor(() => {
       expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThanOrEqual(2);
@@ -247,10 +247,10 @@ describe("OnboardingWizard — continuing conversation", () => {
     setupFetch(makeTurnResponse());
     const user = userEvent.setup();
     render(<OnboardingWizard {...defaultProps} />);
-    await waitFor(() => screen.getByText("Iniciante"));
-    await user.click(screen.getByText("Iniciante"));
+    await waitFor(() => screen.getByText("Beginner"));
+    await user.click(screen.getByText("Beginner"));
     await act(async () => {
-      fireEvent.click(screen.getByText("Continuar →"));
+      fireEvent.click(screen.getByText("Continue →"));
     });
     await waitFor(() => {
       const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
@@ -266,17 +266,17 @@ describe("OnboardingWizard — continuing conversation", () => {
 describe("OnboardingWizard — summary bar", () => {
   test("summary bar appears when summary has entries beyond topic", async () => {
     setupFetch(makeTurnResponse({
-      summary: { topic: "AZ-900", nível: "Iniciante" },
+      summary: { topic: "AZ-900", level: "Beginner" },
     }));
     render(<OnboardingWizard {...defaultProps} />);
     await waitFor(() => {
-      expect(screen.getByText("Seu perfil de aprendizado")).toBeTruthy();
+      expect(screen.getByText("Your learning profile")).toBeTruthy();
     });
   });
 
   test("topic chip always appears in summary", async () => {
     setupFetch(makeTurnResponse({
-      summary: { topic: "AZ-900", nível: "Iniciante" },
+      summary: { topic: "AZ-900", level: "Beginner" },
     }));
     render(<OnboardingWizard {...defaultProps} />);
     await waitFor(() => {
@@ -288,25 +288,25 @@ describe("OnboardingWizard — summary bar", () => {
 
   test("summary shows extra fields from API response", async () => {
     setupFetch(makeTurnResponse({
-      summary: { topic: "AZ-900", objetivo: "Certificação" },
+      summary: { topic: "AZ-900", goal: "Certification" },
     }));
     render(<OnboardingWizard {...defaultProps} />);
     await waitFor(() => {
-      expect(screen.getByText("Certificação")).toBeTruthy();
+      expect(screen.getByText("Certification")).toBeTruthy();
     });
   });
 });
 
 // ─── Skip behavior ────────────────────────────────────────────────────────────
 describe("OnboardingWizard — skip", () => {
-  test("clicking Pular on first turn shows warning modal", async () => {
+  test("clicking Skip on first turn shows warning modal", async () => {
     setupFetch(makeTurnResponse());
     const user = userEvent.setup();
     render(<OnboardingWizard {...defaultProps} />);
-    await waitFor(() => screen.getByText(/Pular/));
-    await user.click(screen.getByText(/Pular →/));
+    await waitFor(() => screen.getByText(/Skip/));
+    await user.click(screen.getByText(/Skip →/));
     await waitFor(() => {
-      expect(screen.getByText("Pular personalização?")).toBeTruthy();
+      expect(screen.getByText("Skip personalization?")).toBeTruthy();
     });
   });
 
@@ -314,34 +314,34 @@ describe("OnboardingWizard — skip", () => {
     setupFetch(makeTurnResponse());
     const user = userEvent.setup();
     render(<OnboardingWizard {...defaultProps} />);
-    await waitFor(() => screen.getByText(/Pular →/));
-    await user.click(screen.getByText(/Pular →/));
+    await waitFor(() => screen.getByText(/Skip →/));
+    await user.click(screen.getByText(/Skip →/));
     await waitFor(() => {
-      expect(screen.getByText(/genérico e menos preciso/i)).toBeTruthy();
+      expect(screen.getByText(/generic and less accurate/i)).toBeTruthy();
     });
   });
 
-  test("'Continuar' button in warning modal dismisses it", async () => {
+  test("'Continue' button in warning modal dismisses it", async () => {
     setupFetch(makeTurnResponse());
     const user = userEvent.setup();
     render(<OnboardingWizard {...defaultProps} />);
-    await waitFor(() => screen.getByText(/Pular →/));
-    await user.click(screen.getByText(/Pular →/));
-    await waitFor(() => screen.getByText("Continuar"));
-    await user.click(screen.getByText("Continuar"));
+    await waitFor(() => screen.getByText(/Skip →/));
+    await user.click(screen.getByText(/Skip →/));
+    await waitFor(() => screen.getByText("Continue"));
+    await user.click(screen.getByText("Continue"));
     await waitFor(() => {
-      expect(screen.queryByText("Pular personalização?")).toBeNull();
+      expect(screen.queryByText("Skip personalization?")).toBeNull();
     });
   });
 
-  test("'Pular mesmo assim' button calls onSkip", async () => {
+  test("'Skip anyway' button calls onSkip", async () => {
     setupFetch(makeTurnResponse());
     const user = userEvent.setup();
     render(<OnboardingWizard {...defaultProps} />);
-    await waitFor(() => screen.getByText(/Pular →/));
-    await user.click(screen.getByText(/Pular →/));
-    await waitFor(() => screen.getByText("Pular mesmo assim"));
-    await user.click(screen.getByText("Pular mesmo assim"));
+    await waitFor(() => screen.getByText(/Skip →/));
+    await user.click(screen.getByText(/Skip →/));
+    await waitFor(() => screen.getByText("Skip anyway"));
+    await user.click(screen.getByText("Skip anyway"));
     expect(defaultProps.onSkip).toHaveBeenCalled();
   });
 });
@@ -352,25 +352,25 @@ describe("OnboardingWizard — topicExists", () => {
     setupFetch(makeTurnResponse());
     render(<OnboardingWizard {...defaultProps} topicExists={true} />);
     await waitFor(() => {
-      expect(screen.getByText(/Você já estudou este tema/i)).toBeTruthy();
+      expect(screen.getByText(/You have studied this topic/i)).toBeTruthy();
     });
   });
 
   test("does not show notice when topicExists is false", async () => {
     setupFetch(makeTurnResponse());
     render(<OnboardingWizard {...defaultProps} topicExists={false} />);
-    await waitFor(() => screen.getByText("Qual é o seu nível atual?"));
-    expect(screen.queryByText(/Você já estudou este tema/i)).toBeNull();
+    await waitFor(() => screen.getByText("What is your current level?"));
+    expect(screen.queryByText(/You have studied this topic/i)).toBeNull();
   });
 });
 
 // ─── Ready to create ──────────────────────────────────────────────────────────
 describe("OnboardingWizard — readyToCreate", () => {
-  test("shows 'Perfil montado!' when readyToCreate is true", async () => {
+  test("shows 'Profile ready!' when readyToCreate is true", async () => {
     setupFetch(makeReadyResponse());
     render(<OnboardingWizard {...defaultProps} />);
     await waitFor(() => {
-      expect(screen.getByText("Perfil montado!")).toBeTruthy();
+      expect(screen.getByText("Profile ready!")).toBeTruthy();
     });
   });
 
@@ -378,7 +378,7 @@ describe("OnboardingWizard — readyToCreate", () => {
     setupFetch(makeReadyResponse());
     render(<OnboardingWizard {...defaultProps} />);
     await waitFor(() => {
-      expect(screen.getByText(/Criar conteúdo personalizado/)).toBeTruthy();
+      expect(screen.getByText(/Create personalized content/)).toBeTruthy();
     });
   });
 
@@ -386,10 +386,10 @@ describe("OnboardingWizard — readyToCreate", () => {
     setupFetch(makeReadyResponse());
     const user = userEvent.setup();
     render(<OnboardingWizard {...defaultProps} />);
-    await waitFor(() => screen.getByText(/Criar conteúdo personalizado/));
-    await user.click(screen.getByText(/Criar conteúdo personalizado/));
+    await waitFor(() => screen.getByText(/Create personalized content/));
+    await user.click(screen.getByText(/Create personalized content/));
     expect(defaultProps.onComplete).toHaveBeenCalledWith(
-      "Usuário iniciante buscando certificação AZ-900."
+      "Beginner user seeking AZ-900 certification."
     );
   });
 });
@@ -400,7 +400,7 @@ describe("OnboardingWizard — error handling", () => {
     global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
     render(<OnboardingWizard {...defaultProps} />);
     await waitFor(() => {
-      expect(screen.getByText(/Não foi possível carregar/i)).toBeTruthy();
+      expect(screen.getByText(/Could not load/i)).toBeTruthy();
     });
   });
 
@@ -408,7 +408,7 @@ describe("OnboardingWizard — error handling", () => {
     global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
     render(<OnboardingWizard {...defaultProps} />);
     await waitFor(() => {
-      expect(screen.getByText(/Continuar sem personalização/i)).toBeTruthy();
+      expect(screen.getByText(/Continue without personalization/i)).toBeTruthy();
     });
   });
 
@@ -416,8 +416,9 @@ describe("OnboardingWizard — error handling", () => {
     global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
     const user = userEvent.setup();
     render(<OnboardingWizard {...defaultProps} />);
-    await waitFor(() => screen.getByText(/Continuar sem personalização/i));
-    await user.click(screen.getByText(/Continuar sem personalização/i));
+    await waitFor(() => screen.getByText(/Continue without personalization/i));
+    await user.click(screen.getByText(/Continue without personalization/i));
     expect(defaultProps.onSkip).toHaveBeenCalled();
   });
 });
+

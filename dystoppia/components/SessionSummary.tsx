@@ -41,10 +41,10 @@ export default function SessionSummary({
     .slice(0, 3);
 
   const grade =
-    rate >= 90 ? { label: "Excelente!", color: "#60A5FA", emoji: "🏆" }
-    : rate >= 70 ? { label: "Muito bom!", color: "#818CF8", emoji: "⭐" }
-    : rate >= 50 ? { label: "Bom progresso", color: "#FACC15", emoji: "📈" }
-    : { label: "Continue praticando", color: "#F97316", emoji: "💪" };
+    rate >= 90 ? { label: "Excellent!", color: "#60A5FA", emoji: "🏆" }
+    : rate >= 70 ? { label: "Very good!", color: "#818CF8", emoji: "⭐" }
+    : rate >= 50 ? { label: "Good progress", color: "#FACC15", emoji: "📈" }
+    : { label: "Keep practicing", color: "#F97316", emoji: "💪" };
 
   return (
     <motion.div
@@ -72,9 +72,9 @@ export default function SessionSummary({
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-px mx-6 mb-6" style={{ border: "1px solid #2E2E40", borderRadius: "12px", overflow: "hidden" }}>
           {[
-            { label: "Respondidas", value: answerCount, color: "#EEEEFF" },
-            { label: "Acerto", value: `${rate}%`, color: grade.color },
-            { label: "XP Ganho", value: `+${sessionXP}`, color: "#FACC15" },
+            { label: "Answered", value: answerCount, color: "#EEEEFF" },
+            { label: "Accuracy", value: `${rate}%`, color: grade.color },
+            { label: "XP Gained", value: `+${sessionXP}`, color: "#FACC15" },
           ].map((stat) => (
             <div key={stat.label} className="flex flex-col items-center py-3" style={{ backgroundColor: "#1C1C28" }}>
               <span className="text-lg font-bold" style={{ color: stat.color }}>{stat.value}</span>
@@ -88,7 +88,7 @@ export default function SessionSummary({
           <div className="mx-6 mb-4 flex items-center gap-2 px-4 py-2 rounded-lg" style={{ backgroundColor: "rgba(249,115,22,0.1)", border: "1px solid rgba(249,115,22,0.3)" }}>
             <span>🔥</span>
             <span className="text-sm font-semibold" style={{ color: "#F97316" }}>
-              {streak} {streak === 1 ? "dia" : "dias"} de streak!
+              {streak} {streak === 1 ? "day" : "days"} streak!
             </span>
           </div>
         )}
@@ -97,7 +97,7 @@ export default function SessionSummary({
         {unlockedThisSession.length > 0 && (
           <div className="mx-6 mb-4">
             <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "#9494B8" }}>
-              Conquistas desta sessão
+              Session achievements
             </p>
             <div className="flex flex-wrap gap-2">
               {unlockedThisSession.map((a) => (
@@ -118,7 +118,7 @@ export default function SessionSummary({
         {weakSpots.length > 0 && (
           <div className="mx-6 mb-6">
             <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "#9494B8" }}>
-              Revisar mais
+              Review more
             </p>
             <div className="space-y-1">
               {weakSpots.map(([id, s]) => (
@@ -142,7 +142,7 @@ export default function SessionSummary({
             className="w-full py-3 rounded-xl font-semibold text-sm"
             style={{ backgroundColor: "#818CF8", color: "white" }}
           >
-            Continuar praticando
+            Keep practicing
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -151,10 +151,11 @@ export default function SessionSummary({
             className="w-full py-3 rounded-xl font-semibold text-sm"
             style={{ backgroundColor: "#1C1C28", color: "#9494B8", border: "1px solid #2E2E40" }}
           >
-            Novo tópico
+            New topic
           </motion.button>
         </div>
       </motion.div>
     </motion.div>
   );
 }
+

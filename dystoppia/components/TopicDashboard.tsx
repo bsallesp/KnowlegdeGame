@@ -8,6 +8,7 @@ interface TopicDashboardProps {
   items: Item[];
   subItemStats: Record<string, { correctCount: number; totalCount: number; difficulty: number }>;
   onToggleMute: (id: string, type: "item" | "subitem") => void;
+  onOpenAudiobooks?: (id: string, type: "item" | "subitem", label: string) => void;
 }
 
 const PROFICIENCY_LABELS = ["", "Beginner", "Basic", "Intermediate", "Advanced", "Expert"];
@@ -71,7 +72,7 @@ function DifficultyDots({ level }: { level: number }) {
   );
 }
 
-export default function TopicDashboard({ items, subItemStats, onToggleMute }: TopicDashboardProps) {
+export default function TopicDashboard({ items, subItemStats, onToggleMute, onOpenAudiobooks }: TopicDashboardProps) {
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(
     items.reduce((acc, item) => ({ ...acc, [item.id]: true }), {})
   );
@@ -130,6 +131,20 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute }: To
                     {item.name}
                   </span>
                 </button>
+                {onOpenAudiobooks && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onOpenAudiobooks(item.id, "item", item.name); }}
+                    className="flex-shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ color: "#818CF8" }}
+                    title="Audiobooks deste capítulo"
+                    aria-label="Abrir audiobooks do item"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 18v-6a9 9 0 0118 0v6" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
+                    </svg>
+                  </button>
+                )}
                 <button
                   onClick={() => onToggleMute(item.id, "item")}
                   className="flex-shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
@@ -194,6 +209,20 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute }: To
                                     return "";
                                   })()}{sub.name}
                                 </span>
+                                {onOpenAudiobooks && (
+                                  <button
+                                    onClick={() => onOpenAudiobooks(sub.id, "subitem", sub.name)}
+                                    className="flex-shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                    style={{ color: "#818CF8" }}
+                                    title="Audiobooks deste conceito"
+                                    aria-label="Abrir audiobooks do subitem"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 18v-6a9 9 0 0118 0v6" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
+                                    </svg>
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => onToggleMute(sub.id, "subitem")}
                                   className="flex-shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"

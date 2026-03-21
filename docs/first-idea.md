@@ -1,15 +1,15 @@
-esse app vai ter um UI UX simples e definido.
+This app should have a simple, clear, and focused UI/UX.
 
-1: a primeira pagina vai ser algo muito parecido com a primeira tela do google.com. ali, o usuario vai digitar um assunto, exemplo AZ-900.
+1. The first page should look similar to the main search screen on Google.com. The user types a topic there, for example AZ-900.
 
-a partir disso vamos para a segunda pagina. a segunda pagina vai ter um dashboard lateral no lado esquerdo, com: nome do subitem e a qualificacao do usuario.
+After that, the flow moves to page 2. Page 2 has a left-side dashboard with the sub-item name and the user's qualification/proficiency.
 
-entao ate agora temos: pagina 1 e pagina 2.
+So far, we have two pages: page 1 and page 2.
 
-continuando na pagina 2: o dashboard da direita vai listar os subitens do assunto. nesse caso, a listagem do az 900. como o usuario ainda nao respondeu nada, cada assunto vai ter um icone que representa um vazio de informacoes.
+Still on page 2, the right-side dashboard lists the sub-items of the selected topic (for example, AZ-900 sub-items). Since the user has not answered anything yet, each sub-item starts with an "empty data" style icon.
 
-no corpo da pagina 2, surge a primeira pergunta. essa pergunta pode ser de multa escolha, pode ser para responder preenchando, pode ser de unica escolha, pode ter tempo pra responder ou nao, enfim, precisamos de inumeros componentes para aferir o conhecimendo do usuario. a cada pergunta, vem a resposta certa. 
+In the center of page 2, the first question appears. This question can be multiple choice, fill-in-the-blank, single choice, timed, or untimed. We need multiple component types to properly assess the user's knowledge. After each question, the correct answer is shown.
 
-a partir de cada resposta, o dashboard esquerdo vai sendo preenchido.
+As each answer is submitted, the left dashboard is updated.
 
-obviamente precisamos de registrar cada comportamento do usuario pois o objetivo final do app eh fazer o usuario aprender, e nao ha outra maneira de fazer ele aprender a nao ser sabendo o que o usuario sabe e o que o usuario nao sabe.
+We also need to record every relevant user behavior, because the final goal of the app is to help the user learn. The only way to do that well is to understand what the user already knows and what they still do not know.

@@ -45,15 +45,15 @@ function makeAnthropicResponse(jsonContent: object) {
 const turnResponse = {
   readyToCreate: false,
   turn: {
-    question: "Qual é o seu nível?",
-    subtitle: "Ajuda a calibrar o conteúdo",
+    question: "What is your level?",
+    subtitle: "Helps calibrate content",
     multiSelect: false,
     cards: [
-      { id: "beginner", label: "Iniciante", icon: "🌱" },
-      { id: "advanced", label: "Avançado", icon: "🚀" },
+      { id: "beginner", label: "Beginner", icon: "🌱" },
+      { id: "advanced", label: "Advanced", icon: "🚀" },
     ],
     allowFreeText: true,
-    freeTextPlaceholder: "Descreva seu nível...",
+    freeTextPlaceholder: "Describe your level...",
   },
   summary: { topic: "AZ-900" },
 };
@@ -61,8 +61,8 @@ const turnResponse = {
 const readyResponse = {
   readyToCreate: true,
   turn: null,
-  summary: { topic: "AZ-900", nível: "Iniciante" },
-  onboardingContext: "Usuário iniciante buscando certificação AZ-900.",
+  summary: { topic: "AZ-900", level: "Beginner" },
+  onboardingContext: "Beginner user seeking AZ-900 certification.",
 };
 
 beforeEach(() => {
@@ -114,7 +114,7 @@ describe("POST /api/onboarding/chat — turn response", () => {
     const body = await res.json();
     expect(body.readyToCreate).toBe(false);
     expect(body.turn).toBeTruthy();
-    expect(body.turn.question).toBe("Qual é o seu nível?");
+    expect(body.turn.question).toBe("What is your level?");
   });
 
   test("returns cards in turn", async () => {
@@ -152,7 +152,7 @@ describe("POST /api/onboarding/chat — readyToCreate", () => {
     mockCreate.mockResolvedValue(makeAnthropicResponse(readyResponse));
     const res = await POST(makeRequest({ topic: "AZ-900", messages: [], pillar: "studio" }));
     const body = await res.json();
-    expect(body.onboardingContext).toBe("Usuário iniciante buscando certificação AZ-900.");
+    expect(body.onboardingContext).toBe("Beginner user seeking AZ-900 certification.");
   });
 
   test("saves onboarding entry to userProfile when ready", async () => {
@@ -172,7 +172,7 @@ describe("POST /api/onboarding/chat — readyToCreate", () => {
     const history = JSON.parse(upsertCall.create.rawHistory);
     expect(history).toHaveLength(1);
     expect(history[0].topic).toBe("AZ-900");
-    expect(history[0].context).toBe("Usuário iniciante buscando certificação AZ-900.");
+    expect(history[0].context).toBe("Beginner user seeking AZ-900 certification.");
   });
 });
 
@@ -243,11 +243,12 @@ describe("POST /api/onboarding/chat — conversation history", () => {
   test("includes message history in prompt sent to AI", async () => {
     mockCreate.mockResolvedValue(makeAnthropicResponse(turnResponse));
     const messages = [
-      { role: "assistant", content: "Qual é seu nível?" },
-      { role: "user", content: "Iniciante", selectedCards: ["beginner"] },
+      { role: "assistant", content: "What is your level?" },
+      { role: "user", content: "Beginner", selectedCards: ["beginner"] },
     ];
     await POST(makeRequest({ topic: "AZ-900", messages, pillar: "studio" }));
     const promptSent = mockCreate.mock.calls[0][0].messages[0].content;
-    expect(promptSent).toContain("Iniciante");
+    expect(promptSent).toContain("Beginner");
   });
 });
+

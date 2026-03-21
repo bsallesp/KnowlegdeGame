@@ -9,19 +9,20 @@ function generateSessionId(): string {
 }
 
 const ACHIEVEMENT_DEFINITIONS: Omit<Achievement, "unlockedAt">[] = [
-  { id: "first_answer",    name: "First Step",       description: "Responda sua primeira pergunta",          icon: "🎯" },
-  { id: "perfect_10",     name: "Perfeito!",         description: "10 respostas corretas seguidas",          icon: "🔥" },
-  { id: "streak_7",       name: "Semana Forte",      description: "7 dias de streak",                        icon: "📅" },
-  { id: "xp_100",         name: "Centenário",        description: "Acumule 100 XP",                          icon: "⚡" },
-  { id: "xp_1000",        name: "Mestre XP",         description: "Acumule 1000 XP",                         icon: "👑" },
-  { id: "boss_slayer",    name: "Boss Slayer",        description: "Vença um Boss Round",                     icon: "🗡️" },
-  { id: "speed_demon",    name: "Speed Demon",        description: "Responda corretamente em menos de 10s",   icon: "⚡" },
-  { id: "topic_master",   name: "Topic Master",       description: "Acerte 80%+ em 20 perguntas de um tópico",icon: "🏆" },
-  { id: "no_hints",       name: "Sem Muletas",        description: "Complete 20 perguntas sem usar hints",    icon: "💪" },
-  { id: "daily_goal",     name: "Meta Batida",        description: "Atinja a meta diária",                    icon: "🎖️" },
+  { id: "first_answer",    name: "First Step",       description: "Answer your first question",          icon: "🎯" },
+  { id: "perfect_10",     name: "Perfect!",          description: "10 correct answers in a row",            icon: "🔥" },
+  { id: "streak_7",       name: "Strong Week",       description: "7-day streak",                            icon: "📅" },
+  { id: "xp_100",         name: "Centurion",        description: "Accumulate 100 XP",                          icon: "⚡" },
+  { id: "xp_1000",        name: "XP Master",         description: "Accumulate 1000 XP",                      icon: "👑" },
+  { id: "boss_slayer",    name: "Boss Slayer",        description: "Defeat a Boss Round",                     icon: "🗡️" },
+  { id: "speed_demon",    name: "Speed Demon",        description: "Answer correctly in under 10s",          icon: "⚡" },
+  { id: "topic_master",   name: "Topic Master",       description: "Score 80%+ on 20 questions from one topic",icon: "🏆" },
+  { id: "no_hints",       name: "No Crutches",        description: "Complete 20 questions without hints",      icon: "💪" },
+  { id: "daily_goal",     name: "Goal Crushed",        description: "Reach the daily goal",                    icon: "🎖️" },
 ];
 
 interface AppState {
+  _hasHydrated: boolean;
   sessionId: string;
   currentTopic: Topic | null;
   questionQueue: Question[];
@@ -111,6 +112,7 @@ interface AppState {
 const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
+      _hasHydrated: false,
       sessionId: generateSessionId(),
       currentTopic: null,
       questionQueue: [],
@@ -399,6 +401,9 @@ const useAppStore = create<AppState>()(
     {
       name: "dystoppia-store",
       storage: createJSONStorage(() => localStorage),
+      onRehydrateStorage: () => (state) => {
+        if (state) state._hasHydrated = true;
+      },
       partialize: (state) => ({
         sessionId: state.sessionId,
         settings: state.settings,
@@ -424,3 +429,4 @@ const useAppStore = create<AppState>()(
 );
 
 export default useAppStore;
+

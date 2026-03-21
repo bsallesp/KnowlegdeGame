@@ -429,7 +429,7 @@ describe("QuestionCard — hint button", () => {
     await waitFor(() => expect(screen.getByText("✓ Hint")).toBeTruthy());
   });
 
-  test("shows '⚠ Erro' when API returns non-ok", async () => {
+  test("shows '⚠ Error' when API returns non-ok", async () => {
     (global.fetch as any).mockResolvedValueOnce({ ok: false });
     render(
       <QuestionCard
@@ -441,10 +441,10 @@ describe("QuestionCard — hint button", () => {
       />
     );
     await userEvent.click(screen.getByTitle(/hint/i));
-    await waitFor(() => expect(screen.getByText("⚠ Erro")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("⚠ Error")).toBeTruthy());
   });
 
-  test("shows '⚠ Erro' when fetch throws (network error)", async () => {
+  test("shows '⚠ Error' when fetch throws (network error)", async () => {
     (global.fetch as any).mockRejectedValueOnce(new Error("network fail"));
     render(
       <QuestionCard
@@ -456,7 +456,7 @@ describe("QuestionCard — hint button", () => {
       />
     );
     await userEvent.click(screen.getByTitle(/hint/i));
-    await waitFor(() => expect(screen.getByText("⚠ Erro")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("⚠ Error")).toBeTruthy());
   });
 
   test("sends topicName prop to API", async () => {
@@ -508,3 +508,4 @@ describe("QuestionCard — single_choice", () => {
     expect(screen.getByText("Single Choice")).toBeTruthy();
   });
 });
+

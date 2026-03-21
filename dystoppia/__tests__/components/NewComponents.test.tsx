@@ -46,8 +46,8 @@ global.fetch = vi.fn();
 import AchievementToast from "@/components/AchievementToast";
 
 const baseAchievements = [
-  { id: "first_answer", name: "First Step",  description: "Primeira resposta", icon: "🎯", unlockedAt: null },
-  { id: "xp_100",      name: "Centenário",   description: "100 XP",            icon: "⚡", unlockedAt: null },
+  { id: "first_answer", name: "First Step",  description: "First answer", icon: "🎯", unlockedAt: null },
+  { id: "xp_100",      name: "Centurion",   description: "100 XP",            icon: "⚡", unlockedAt: null },
 ];
 
 describe("AchievementToast", () => {
@@ -85,14 +85,14 @@ describe("AchievementToast", () => {
     expect(screen.getByText("🎯")).toBeTruthy();
   });
 
-  test("shows 'Conquista desbloqueada!' label", () => {
+  test("shows 'Achievement unlocked!' label", () => {
     mockUseAppStore.mockReturnValue({
       achievements: baseAchievements,
       pendingAchievements: ["xp_100"],
       dismissAchievement: mockDismissAchievement,
     });
     render(<AchievementToast />);
-    expect(screen.getByText("Conquista desbloqueada!")).toBeTruthy();
+    expect(screen.getByText("Achievement unlocked!")).toBeTruthy();
   });
 
   test("auto-dismisses after 4 seconds", async () => {
@@ -206,7 +206,7 @@ describe("FlashCard", () => {
 
   test("shows difficulty label for level 2", () => {
     render(<FlashCard subItem={mockSubItem} topicName="Topic" onReady={vi.fn()} />);
-    expect(screen.getByText("Básico")).toBeTruthy();
+    expect(screen.getByText("Basic")).toBeTruthy();
   });
 
   test("shows difficulty label Expert for level 5", () => {
@@ -217,7 +217,7 @@ describe("FlashCard", () => {
   test("calls onReady when button is clicked", () => {
     const onReady = vi.fn();
     render(<FlashCard subItem={mockSubItem} topicName="Topic" onReady={onReady} />);
-    fireEvent.click(screen.getByText(/Vamos lá/));
+    fireEvent.click(screen.getByText(/Let's go/));
     expect(onReady).toHaveBeenCalledOnce();
   });
 });
@@ -268,31 +268,31 @@ describe("SessionSummary", () => {
 
   test("shows streak when streak > 0", () => {
     render(<SessionSummary {...defaultProps} />);
-    expect(screen.getByText(/3 dias de streak/)).toBeTruthy();
+    expect(screen.getByText(/3 days streak/)).toBeTruthy();
   });
 
-  test("calls onContinue when 'Continuar' button is clicked", () => {
+  test("calls onContinue when 'Keep practicing' button is clicked", () => {
     const onContinue = vi.fn();
     render(<SessionSummary {...defaultProps} onContinue={onContinue} />);
-    fireEvent.click(screen.getByText(/Continuar praticando/));
+    fireEvent.click(screen.getByText(/Keep practicing/));
     expect(onContinue).toHaveBeenCalledOnce();
   });
 
-  test("calls onNewTopic when 'Novo tópico' button is clicked", () => {
+  test("calls onNewTopic when 'New topic' button is clicked", () => {
     const onNewTopic = vi.fn();
     render(<SessionSummary {...defaultProps} onNewTopic={onNewTopic} />);
-    fireEvent.click(screen.getByText(/Novo tópico/));
+    fireEvent.click(screen.getByText(/New topic/));
     expect(onNewTopic).toHaveBeenCalledOnce();
   });
 
-  test("shows grade 'Excelente!' when rate >= 90%", () => {
+  test("shows grade 'Excellent!' when rate >= 90%", () => {
     render(<SessionSummary {...defaultProps} answerCount={10} correctCount={9} />);
-    expect(screen.getByText("Excelente!")).toBeTruthy();
+    expect(screen.getByText("Excellent!")).toBeTruthy();
   });
 
-  test("shows grade 'Continue praticando' when rate < 50%", () => {
+  test("shows grade 'Keep practicing' when rate < 50%", () => {
     render(<SessionSummary {...defaultProps} answerCount={10} correctCount={4} />);
-    expect(screen.getByText("Continue praticando")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Keep practicing" })).toBeTruthy();
   });
 
   test("shows achievements unlocked recently", () => {
@@ -363,7 +363,7 @@ describe("ProgressChart", () => {
   test("shows loading text initially", () => {
     (global.fetch as any).mockImplementation(() => new Promise(() => {})); // never resolves
     render(<ProgressChart />);
-    expect(screen.getByText(/Carregando histórico/)).toBeTruthy();
+    expect(screen.getByText(/Loading history/)).toBeTruthy();
   });
 
   test("shows empty state when no history", async () => {
@@ -372,25 +372,25 @@ describe("ProgressChart", () => {
       json: () => Promise.resolve({ history: [] }),
     });
     render(<ProgressChart />);
-    await waitFor(() => expect(screen.getByText(/Sem dados ainda/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/No data yet/)).toBeTruthy());
   });
 
   test("shows error state when fetch fails (network error)", async () => {
     (global.fetch as any).mockRejectedValue(new Error("network error"));
     render(<ProgressChart />);
-    await waitFor(() => expect(screen.getByText(/Erro ao carregar histórico/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/Error loading history/)).toBeTruthy());
   });
 
   test("shows error state when API returns non-ok status", async () => {
     (global.fetch as any).mockResolvedValue({ ok: false });
     render(<ProgressChart />);
-    await waitFor(() => expect(screen.getByText(/Erro ao carregar histórico/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/Error loading history/)).toBeTruthy());
   });
 
   test("does not show loading after error", async () => {
     (global.fetch as any).mockRejectedValue(new Error("fail"));
     render(<ProgressChart />);
-    await waitFor(() => expect(screen.queryByText(/Carregando histórico/)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/Loading history/)).toBeNull());
   });
 
   test("renders chart bars when history exists", async () => {
@@ -404,7 +404,7 @@ describe("ProgressChart", () => {
       }),
     });
     render(<ProgressChart />);
-    await waitFor(() => expect(screen.getByText("Histórico (14 dias)")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("History (14 days)")).toBeTruthy());
   });
 
   test("fetches with topicId param when provided", async () => {
@@ -431,3 +431,4 @@ describe("ProgressChart", () => {
     });
   });
 });
+

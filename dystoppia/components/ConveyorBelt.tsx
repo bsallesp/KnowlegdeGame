@@ -136,7 +136,7 @@ export default function ConveyorBelt({ queue, currentQuestion, isGenerating }: C
       <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
         <AnimatePresence mode="popLayout">
           {queue.map((q, i) => (
-            <QueueCard key={q.id} question={q} index={i} />
+            <QueueCard key={q.id || `queue-${i}`} question={q} index={i} />
           ))}
         </AnimatePresence>
 

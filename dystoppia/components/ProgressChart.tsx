@@ -32,7 +32,7 @@ export default function ProgressChart({ topicId, days = 14 }: ProgressChartProps
   if (loading) {
     return (
       <div className="flex items-center justify-center h-24" style={{ color: "#9494B8" }}>
-        <span className="text-xs">Carregando histórico...</span>
+        <span className="text-xs">Loading history...</span>
       </div>
     );
   }
@@ -40,7 +40,7 @@ export default function ProgressChart({ topicId, days = 14 }: ProgressChartProps
   if (error) {
     return (
       <div className="flex items-center justify-center h-24" style={{ color: "#F97316" }}>
-        <span className="text-xs">Erro ao carregar histórico. Tente novamente.</span>
+        <span className="text-xs">Error loading history. Try again.</span>
       </div>
     );
   }
@@ -48,7 +48,7 @@ export default function ProgressChart({ topicId, days = 14 }: ProgressChartProps
   if (history.length === 0) {
     return (
       <div className="flex items-center justify-center h-24" style={{ color: "#9494B8" }}>
-        <span className="text-xs">Sem dados ainda. Responda algumas perguntas!</span>
+        <span className="text-xs">No data yet. Answer a few questions!</span>
       </div>
     );
   }
@@ -60,7 +60,7 @@ export default function ProgressChart({ topicId, days = 14 }: ProgressChartProps
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "#9494B8" }}>
-        Histórico ({days} dias)
+        History ({days} days)
       </p>
       <div className="flex items-end gap-1" style={{ height: `${chartH + 20}px` }}>
         {history.map((entry) => {
@@ -69,7 +69,7 @@ export default function ProgressChart({ topicId, days = 14 }: ProgressChartProps
           const label = entry.date.slice(5); // MM-DD
 
           return (
-            <div key={entry.date} className="flex flex-col items-center gap-1" style={{ width: `${barW}px` }} title={`${label}: ${entry.correct}/${entry.total} corretas (${entry.rate}%)`}>
+            <div key={entry.date} className="flex flex-col items-center gap-1" style={{ width: `${barW}px` }} title={`${label}: ${entry.correct}/${entry.total} correct (${entry.rate}%)`}>
               <div
                 className="w-full rounded-sm overflow-hidden flex flex-col justify-end"
                 style={{ height: `${chartH}px`, backgroundColor: "#1C1C28" }}
@@ -106,3 +106,4 @@ export default function ProgressChart({ topicId, days = 14 }: ProgressChartProps
     </div>
   );
 }
+

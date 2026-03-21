@@ -67,6 +67,7 @@ export default function SearchPage() {
   const [pendingTopic, setPendingTopic] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const [resumingSlug, setResumingSlug] = useState<string | null>(null);
   const { setCurrentTopic, addItemToCurrentTopic, resetSession } = useAppStore();
 
   useEffect(() => {
@@ -204,6 +205,22 @@ export default function SearchPage() {
       }).catch(() => {/* fire-and-forget */});
     }
   }
+
+  const resumeTopic = async (slug: string) => {
+    if (resumingSlug) return;
+    setResumingSlug(slug);
+    try {
+      const res = await fetch(`/api/topics?slug=${encodeURIComponent(slug)}`);
+      if (!res.ok) throw new Error("Failed to load topic");
+      const topic = await res.json();
+      resetSession();
+      setCurrentTopic(topic);
+      router.push("/session");
+    } catch {
+      setError("Could not load the topic. Try again.");
+      setResumingSlug(null);
+    }
+  };
 
   const topicExists = (t: string) =>
     history.some((h) => h.slug === t.toLowerCase().replace(/\s+/g, "-"));
@@ -376,11 +393,12 @@ export default function SearchPage() {
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: i * 0.05 }}
-                            onClick={() => { setQuery(topic.name); handleSearch(undefined, topic.name); }}
+                            onClick={() => resumeTopic(topic.slug)}
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.99 }}
+                            disabled={!!resumingSlug}
                             className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-left transition-all"
-                            style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}
+                            style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40", opacity: resumingSlug === topic.slug ? 0.6 : 1 }}
                           >
                             <div className="flex items-center gap-3">
                               <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: "#818CF8" }} />

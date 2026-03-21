@@ -98,41 +98,42 @@ function buildPrompt(
               `${m.role}: ${m.content}${m.selectedCards?.length ? ` [cards: ${m.selectedCards.join(", ")}]` : ""}`
           )
           .join("\n")
-      : "Sem histórico ainda — esta é a primeira mensagem.";
+      : "No history yet — this is the first message.";
 
   const profileContext = profile
-    ? `Perfil existente do usuário: ${JSON.stringify(profile)}`
-    : "Nenhum perfil existente para este usuário.";
+    ? `Existing user profile: ${JSON.stringify(profile)}`
+    : "No existing profile for this user.";
 
-  return `Você é um consultor de aprendizado inteligente no app Dystoppia. Conduza um onboarding dinâmico para personalizar o aprendizado do usuário.
+  return `You are an intelligent learning advisor in the Dystoppia app. Run a dynamic onboarding flow to personalize the user's learning.
 
-Tema solicitado: "${topic}"
-Pilar: ${pillar}
+Requested topic: "${topic}"
+Pillar: ${pillar}
 
 ${profileContext}
 
-Conversa até agora:
+Conversation so far:
 ${conversationHistory}
 
-Sua tarefa:
-- Faça UMA pergunta focada e amigável por vez
-- Gere 3-5 opções de cards ESPECÍFICAS para "${topic}" (não genéricas)
-- Após 2-4 turnos (ou antes se o contexto já estiver claro), declare readyToCreate=true
-- Responda SEMPRE no mesmo idioma do usuário (detecte nas respostas livres; padrão: português brasileiro)
-- Pule perguntas sobre coisas que você já sabe pelo perfil ou conversa
-- Se as respostas indicam nível avançado, adapte o vocabulário e profundidade
+Your task:
+- Ask ONE focused and friendly question at a time
+- Generate 3-5 SPECIFIC card options for "${topic}" (not generic)
+- After 2-4 turns (or earlier if context is already clear), set readyToCreate=true
+- Always respond in the user's same language (detect from free-text replies; default: English)
+- Skip questions about things you already know from the profile or conversation
+- If answers indicate an advanced level, adapt vocabulary and depth
 
-Prioridade das informações a coletar:
-1. Nível de conhecimento / background com "${topic}" e áreas relacionadas
-2. Objetivo principal (certificação? trabalho? curiosidade? caso de uso específico?)
-3. Tempo disponível por sessão
-4. (Opcional) Estilo de aprendizado preferido
+Information collection priority:
+1. Knowledge level/background with "${topic}" and related areas
+2. Main objective (certification? work? curiosity? specific use case?)
+3. Time available per session
+4. (Optional) Preferred learning style
 
-Retorne SOMENTE um objeto JSON válido (sem markdown, sem explicação, sem blocos de código):
+Return ONLY a valid JSON object (no markdown, no explanation, no code blocks):
 
-Se precisar de mais informações:
-{"readyToCreate":false,"turn":{"question":"Pergunta clara e amigável","subtitle":"Uma linha explicando por que você está perguntando","multiSelect":false,"cards":[{"id":"id_unico","label":"Rótulo curto","description":"Descrição opcional de uma linha","icon":"emoji"}],"allowFreeText":true,"freeTextPlaceholder":"Ou descreva com suas palavras..."},"summary":{"topic":"${topic}"}}
+If you need more information:
+{"readyToCreate":false,"turn":{"question":"Clear and friendly question","subtitle":"One line explaining why you are asking","multiSelect":false,"cards":[{"id":"unique_id","label":"Short label","description":"Optional one-line description","icon":"emoji"}],"allowFreeText":true,"freeTextPlaceholder":"Or describe in your own words..."},"summary":{"topic":"${topic}"}}
 
-Se tiver contexto suficiente (após 2+ turnos, ou se nível+objetivo já estão claros):
-{"readyToCreate":true,"turn":null,"summary":{"topic":"${topic}"},"onboardingContext":"Descrição completa em prosa do perfil do usuário para '${topic}': nível atual, objetivo específico, tempo disponível, estilo preferido e qualquer foco especial. Este texto guiará diretamente o design do currículo e a geração de perguntas."}`;
+If you have enough context (after 2+ turns, or if level+goal are already clear):
+{"readyToCreate":true,"turn":null,"summary":{"topic":"${topic}"},"onboardingContext":"A complete prose description of the user profile for '${topic}': current level, specific goal, available time, preferred style, and any special focus. This text will directly guide curriculum design and question generation."}`;
 }
+

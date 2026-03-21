@@ -135,7 +135,7 @@ export default function OnboardingWizard({
             transition={{ duration: 2, repeat: Infinity }}
           />
           <span className="text-sm" style={{ color: "#9494B8" }}>
-            Personalizando sua jornada
+            Personalizing your journey
           </span>
         </div>
         <div
@@ -153,7 +153,7 @@ export default function OnboardingWizard({
           className="text-xs px-3 py-1.5 rounded-lg transition-all"
           style={{ color: "#4B4B6B", border: "1px solid #2E2E40" }}
         >
-          Pular →
+          Skip →
         </button>
       </div>
 
@@ -173,7 +173,7 @@ export default function OnboardingWizard({
                 color: "#9494B8",
               }}
             >
-              Você já estudou este tema antes. Vamos personalizar sua nova sessão.
+              You have studied this topic before. Let's personalize your new session.
             </motion.div>
           )}
 
@@ -188,14 +188,14 @@ export default function OnboardingWizard({
                 className="flex flex-col items-center gap-4 text-center"
               >
                 <p className="text-sm" style={{ color: "#F97316" }}>
-                  Não foi possível carregar o onboarding.
+                  Could not load onboarding.
                 </p>
                 <button
                   onClick={onSkip}
                   className="text-xs px-4 py-2 rounded-lg"
                   style={{ backgroundColor: "#1C1C28", color: "#9494B8", border: "1px solid #2E2E40" }}
                 >
-                  Continuar sem personalização
+                  Continue without personalization
                 </button>
               </motion.div>
             ) : isLoading ? (
@@ -218,7 +218,7 @@ export default function OnboardingWizard({
                   ))}
                 </div>
                 <p className="text-sm" style={{ color: "#4B4B6B" }}>
-                  Analisando o tema...
+                  Analyzing the topic...
                 </p>
               </motion.div>
             ) : readyToCreate ? (
@@ -243,10 +243,10 @@ export default function OnboardingWizard({
                 </motion.div>
                 <div>
                   <h2 className="text-xl font-bold mb-2" style={{ color: "#EEEEFF" }}>
-                    Perfil montado!
+                    Profile ready!
                   </h2>
                   <p className="text-sm" style={{ color: "#9494B8" }}>
-                    Criamos um plano de aprendizado personalizado para seus objetivos.
+                    We created a personalized learning plan for your goals.
                   </p>
                 </div>
                 <motion.button
@@ -256,7 +256,7 @@ export default function OnboardingWizard({
                   className="px-8 py-3 rounded-xl font-semibold text-sm"
                   style={{ backgroundColor: "#818CF8", color: "white", border: "none" }}
                 >
-                  Criar conteúdo personalizado →
+                  Create personalized content →
                 </motion.button>
               </motion.div>
             ) : currentTurn ? (
@@ -343,7 +343,7 @@ export default function OnboardingWizard({
                         className="text-xs text-center mb-2"
                         style={{ color: "#4B4B6B" }}
                       >
-                        ou descreva com suas palavras
+                        or describe in your own words
                       </p>
                     )}
                     <textarea
@@ -351,7 +351,7 @@ export default function OnboardingWizard({
                       value={freeText}
                       onChange={(e) => setFreeText(e.target.value)}
                       placeholder={
-                        currentTurn.freeTextPlaceholder ?? "Digite aqui..."
+                        currentTurn.freeTextPlaceholder ?? "Type here..."
                       }
                       rows={2}
                       className="w-full px-4 py-3 rounded-xl text-sm resize-none outline-none transition-all"
@@ -391,7 +391,7 @@ export default function OnboardingWizard({
                       cursor: canSubmit ? "pointer" : "default",
                     }}
                   >
-                    Continuar →
+                    Continue →
                   </motion.button>
                 </div>
               </motion.div>
@@ -410,7 +410,7 @@ export default function OnboardingWizard({
             style={{ borderTop: "1px solid #1E1E2E" }}
           >
             <p className="text-xs mb-2" style={{ color: "#4B4B6B" }}>
-              Seu perfil de aprendizado
+              Your learning profile
             </p>
             <div className="flex flex-wrap gap-2">
               <div
@@ -447,7 +447,7 @@ export default function OnboardingWizard({
                 animate={{ opacity: 1 }}
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
-                onClick={() => onComplete(onboardingContext || `Tópico: ${topic}. ${summaryEntries.map(([k, v]) => `${k}: ${v}`).join(". ")}`)}
+                onClick={() => onComplete(onboardingContext || `Topic: ${topic}. ${summaryEntries.map(([k, v]) => `${k}: ${v}`).join(". ")}`)}
                 className="mt-3 w-full py-2.5 rounded-xl font-semibold text-sm text-center transition-all"
                 style={{
                   backgroundColor: "rgba(129, 140, 248, 0.08)",
@@ -455,7 +455,7 @@ export default function OnboardingWizard({
                   border: "1px solid rgba(129, 140, 248, 0.2)",
                 }}
               >
-                Isso é suficiente, criar conteúdo →
+                This is enough, create content →
               </motion.button>
             )}
           </motion.div>
@@ -485,11 +485,11 @@ export default function OnboardingWizard({
                   className="text-base font-bold mb-2"
                   style={{ color: "#EEEEFF" }}
                 >
-                  Pular personalização?
+                  Skip personalization?
                 </h3>
                 <p className="text-sm leading-relaxed" style={{ color: "#9494B8" }}>
-                  Sem o onboarding, o conteúdo será genérico e menos preciso
-                  para seus objetivos e nível.
+                  Without onboarding, the content will be generic and less accurate
+                  for your goals and level.
                 </p>
               </div>
               <div className="flex gap-3">
@@ -502,7 +502,7 @@ export default function OnboardingWizard({
                     border: "1px solid #2E2E40",
                   }}
                 >
-                  Continuar
+                  Continue
                 </button>
                 <button
                   onClick={() => {
@@ -516,7 +516,7 @@ export default function OnboardingWizard({
                     border: "1px solid rgba(249, 115, 22, 0.3)",
                   }}
                 >
-                  Pular mesmo assim
+                  Skip anyway
                 </button>
               </div>
             </motion.div>
@@ -526,3 +526,4 @@ export default function OnboardingWizard({
     </motion.div>
   );
 }
+
