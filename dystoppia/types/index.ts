@@ -93,3 +93,53 @@ export interface SessionHistoryEntry {
   xpEarned: number;
   topicId: string;
 }
+
+// Onboarding types
+
+export interface OnboardingCard {
+  id: string;
+  label: string;
+  description?: string;
+  icon?: string;
+}
+
+export interface OnboardingTurn {
+  question: string;
+  subtitle?: string;
+  multiSelect: boolean;
+  cards: OnboardingCard[];
+  allowFreeText: boolean;
+  freeTextPlaceholder?: string;
+}
+
+export interface OnboardingMessage {
+  role: "assistant" | "user";
+  content: string;
+  selectedCards?: string[];
+}
+
+export interface OnboardingSummary {
+  topic: string;
+  [key: string]: string | undefined;
+}
+
+export interface OnboardingChatResponse {
+  turn: OnboardingTurn | null;
+  summary: OnboardingSummary;
+  readyToCreate: boolean;
+  onboardingContext?: string;
+}
+
+export interface OnboardingEntry {
+  topic: string;
+  context: string;
+  createdAt: string;
+}
+
+export interface UserProfile {
+  goals: string[];
+  knowledgeLevels: Record<string, string>;
+  timePerSession?: string;
+  preferredLang: string;
+  rawHistory?: OnboardingEntry[];
+}

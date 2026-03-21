@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const auth = await requireUser(req);
   if (auth instanceof NextResponse) return auth;
 
-  const { topic } = await req.json();
+  const { topic, onboardingContext } = await req.json() as { topic: string; onboardingContext?: string };
 
   if (!topic || typeof topic !== "string") {
     return new Response(JSON.stringify({ error: "Topic is required" }), { status: 400 });
@@ -83,10 +83,14 @@ export async function POST(req: NextRequest) {
     throw e;
   }
 
+  const userContextSection = onboardingContext
+    ? `\nUser Learning Context (use this to deeply personalize the teaching profile and item selection):\n${onboardingContext}\n`
+    : "";
+
   const prompt = `You are a curriculum designer and pedagogy expert. Given a topic, generate a structured learning outline with a teaching profile.
 
 Topic: "${topic}"
-
+${userContextSection}
 Analyze the domain deeply. Consider:
 - Is this a certification/exam topic? (scenario-based, problem-solving)
 - Is it a practical/craft skill? (procedural, hands-on)

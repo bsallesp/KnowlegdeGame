@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import NeuralTransition from "@/components/NeuralTransition";
+import OnboardingWizard from "@/components/OnboardingWizard";
 import useAppStore from "@/store/useAppStore";
 import { useRequireUser } from "@/lib/useRequireUser";
 import type { Item } from "@/types";
@@ -62,6 +63,8 @@ export default function SearchPage() {
   const [error, setError] = useState("");
   const [showTransition, setShowTransition] = useState(false);
   const [history, setHistory] = useState<TopicHistory[]>([]);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [pendingTopic, setPendingTopic] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { setCurrentTopic, addItemToCurrentTopic, resetSession } = useAppStore();
@@ -76,12 +79,17 @@ export default function SearchPage() {
 
   if (authLoading) return null;
 
-  const handleSearch = async (e?: React.FormEvent, topicOverride?: string) => {
+  const handleSearch = (e?: React.FormEvent, topicOverride?: string) => {
     if (e) e.preventDefault();
     const topic = topicOverride ?? query.trim();
     if (!topic || isLoading) return;
-
     setError("");
+    setPendingTopic(topic);
+    setShowOnboarding(true);
+  };
+
+  const proceedWithContent = async (topic: string, onboardingContext?: string) => {
+    setShowOnboarding(false);
     setIsLoading(true);
     setShowTransition(true);
     resetSession();
@@ -100,7 +108,7 @@ export default function SearchPage() {
       const res = await fetch("/api/generate-structure", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic }),
+        body: JSON.stringify({ topic, onboardingContext }),
       });
 
       if (!res.ok || !res.body) {
@@ -197,9 +205,24 @@ export default function SearchPage() {
     }
   }
 
+  const topicExists = (t: string) =>
+    history.some((h) => h.slug === t.toLowerCase().replace(/\s+/g, "-"));
+
   return (
     <>
-      <NeuralTransition visible={showTransition} topic={query.trim()} />
+      <NeuralTransition visible={showTransition} topic={pendingTopic || query.trim()} />
+
+      <AnimatePresence>
+        {showOnboarding && (
+          <OnboardingWizard
+            topic={pendingTopic}
+            pillar={mode as "studio" | "lens" | "reach"}
+            topicExists={topicExists(pendingTopic)}
+            onComplete={(ctx) => proceedWithContent(pendingTopic, ctx)}
+            onSkip={() => proceedWithContent(pendingTopic)}
+          />
+        )}
+      </AnimatePresence>
 
       <main
         className="min-h-screen flex flex-col items-center justify-center px-4"

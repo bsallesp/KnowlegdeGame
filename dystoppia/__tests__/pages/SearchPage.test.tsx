@@ -32,6 +32,14 @@ vi.mock("@/components/NeuralTransition", () => ({
     visible ? <div data-testid="neural-transition" data-topic={topic} /> : null,
 }));
 
+// ─── OnboardingWizard mock — auto-skips so existing tests stay intact ─────────
+vi.mock("@/components/OnboardingWizard", () => ({
+  default: ({ onSkip, topic }: { onSkip: () => void; onComplete: (ctx: string) => void; topic: string; pillar: string; topicExists: boolean }) => {
+    React.useEffect(() => { onSkip(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    return <div data-testid="onboarding-wizard" data-topic={topic} />;
+  },
+}));
+
 // ─── Router mock ──────────────────────────────────────────────────────────────
 const mockPush = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -342,10 +350,10 @@ describe("SearchPage — search submission", () => {
     await act(async () => { fireEvent.submit(document.querySelector("form")!); });
     await waitFor(() => {
       const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
-        ([url]: [string]) => url.includes("generate-structure")
+        (c: unknown[]) => (c[0] as string).includes("generate-structure")
       );
       expect(call).toBeTruthy();
-      const body = JSON.parse(call![1].body);
+      const body = JSON.parse((call![1] as RequestInit).body as string);
       expect(body.topic).toBe("AZ-900");
     });
   });
@@ -457,7 +465,7 @@ describe("SearchPage — history click", () => {
     await act(async () => { fireEvent.click(screen.getByText("AZ-900")); });
     await waitFor(() => {
       const structureCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
-        ([url]: [string]) => url.includes("generate-structure")
+        (c: unknown[]) => (c[0] as string).includes("generate-structure")
       );
       expect(structureCall).toBeTruthy();
     }, { timeout: 3000 });
