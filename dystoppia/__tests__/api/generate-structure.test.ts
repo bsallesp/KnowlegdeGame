@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 const mockTopicFindUnique = vi.hoisted(() => vi.fn());
@@ -26,6 +26,24 @@ vi.mock("@anthropic-ai/sdk", () => ({
   default: class {
     messages = { stream: mockStream };
   },
+}));
+
+// ─── Auth guard mock ──────────────────────────────────────────────────────────
+const mockRequireUser = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/authGuard", () => ({ requireUser: mockRequireUser }));
+
+// ─── Credits mock ─────────────────────────────────────────────────────────────
+const mockDeductCredits = vi.hoisted(() => vi.fn());
+const MockCreditError = vi.hoisted(() => {
+  class Err extends Error {
+    remaining: number;
+    constructor(remaining: number) { super("Insufficient credits"); this.remaining = remaining; }
+  }
+  return Err;
+});
+vi.mock("@/lib/credits", () => ({
+  deductCredits: mockDeductCredits,
+  CreditError: MockCreditError,
 }));
 
 import { POST } from "@/app/api/generate-structure/route";
@@ -60,6 +78,10 @@ beforeEach(() => {
   mockItemCreate.mockReset();
   mockSubItemCreate.mockReset();
   mockStream.mockReset();
+  mockRequireUser.mockReset();
+  mockDeductCredits.mockReset();
+  mockRequireUser.mockResolvedValue({ userId: "user-1" });
+  mockDeductCredits.mockResolvedValue(45);
 });
 
 const profileLine = JSON.stringify({
@@ -223,5 +245,65 @@ describe("POST /api/generate-structure — SSE headers", () => {
     mockTopicFindUnique.mockResolvedValue({ id: "t1", slug: "az-900", teachingProfile: null, items: [] });
     const res = await POST(makeRequest({ topic: "AZ-900" }));
     expect(res.headers.get("Connection")).toBe("keep-alive");
+  });
+});
+
+// ─── Auth guard ───────────────────────────────────────────────────────────────
+
+describe("POST /api/generate-structure — auth guard", () => {
+  test("returns 401 when not authenticated", async () => {
+    mockRequireUser.mockResolvedValue(new NextResponse(null, { status: 401 }));
+    const res = await POST(makeRequest({ topic: "AZ-900" }));
+    expect(res.status).toBe(401);
+  });
+
+  test("does not call LLM when not authenticated", async () => {
+    mockRequireUser.mockResolvedValue(new NextResponse(null, { status: 401 }));
+    await POST(makeRequest({ topic: "AZ-900" }));
+    expect(mockStream).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Credit system ────────────────────────────────────────────────────────────
+
+describe("POST /api/generate-structure — credit system", () => {
+  test("does not deduct credits on cache hit", async () => {
+    mockTopicFindUnique.mockResolvedValue({ id: "t1", slug: "az-900", teachingProfile: null, items: [] });
+    await POST(makeRequest({ topic: "AZ-900" }));
+    expect(mockDeductCredits).not.toHaveBeenCalled();
+  });
+
+  test("deducts 5 credits on cache miss before streaming", async () => {
+    mockTopicFindUnique.mockResolvedValue(null);
+    mockStream.mockReturnValue(makeNdjsonStream([]));
+    mockTopicCreate.mockResolvedValue({ id: "t1", slug: "az-900" });
+
+    await POST(makeRequest({ topic: "AZ-900" }));
+    expect(mockDeductCredits).toHaveBeenCalledWith("user-1", 5);
+  });
+
+  test("returns 402 on cache miss when user has insufficient credits", async () => {
+    mockTopicFindUnique.mockResolvedValue(null);
+    mockDeductCredits.mockRejectedValue(new MockCreditError(2));
+
+    const res = await POST(makeRequest({ topic: "AZ-900" }));
+    expect(res.status).toBe(402);
+  });
+
+  test("includes remaining credits in 402 response", async () => {
+    mockTopicFindUnique.mockResolvedValue(null);
+    mockDeductCredits.mockRejectedValue(new MockCreditError(2));
+
+    const res = await POST(makeRequest({ topic: "AZ-900" }));
+    const body = await res.json();
+    expect(body.remaining).toBe(2);
+  });
+
+  test("does not call LLM when credits insufficient on cache miss", async () => {
+    mockTopicFindUnique.mockResolvedValue(null);
+    mockDeductCredits.mockRejectedValue(new MockCreditError(0));
+
+    await POST(makeRequest({ topic: "AZ-900" }));
+    expect(mockStream).not.toHaveBeenCalled();
   });
 });

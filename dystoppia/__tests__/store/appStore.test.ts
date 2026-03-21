@@ -384,6 +384,29 @@ describe("checkAchievements", () => {
     const a = useAppStore.getState().achievements.find((a) => a.id === "no_hints");
     expect(a?.unlockedAt).not.toBeNull();
   });
+
+  test("unlocks boss_slayer when bossCompleted is true", () => {
+    useAppStore.getState().checkAchievements({ bossCompleted: true });
+    const a = useAppStore.getState().achievements.find((a) => a.id === "boss_slayer");
+    expect(a?.unlockedAt).not.toBeNull();
+  });
+
+  test("adds boss_slayer to pendingAchievements when bossCompleted", () => {
+    useAppStore.getState().checkAchievements({ bossCompleted: true });
+    expect(useAppStore.getState().pendingAchievements).toContain("boss_slayer");
+  });
+
+  test("does NOT unlock boss_slayer when bossCompleted is false", () => {
+    useAppStore.getState().checkAchievements({ bossCompleted: false });
+    const a = useAppStore.getState().achievements.find((a) => a.id === "boss_slayer");
+    expect(a?.unlockedAt).toBeNull();
+  });
+
+  test("does NOT unlock boss_slayer from a correct answer alone (no bossCompleted)", () => {
+    useAppStore.getState().checkAchievements({ correct: true });
+    const a = useAppStore.getState().achievements.find((a) => a.id === "boss_slayer");
+    expect(a?.unlockedAt).toBeNull();
+  });
 });
 
 // ─── dismissAchievement ───────────────────────────────────────────────────────

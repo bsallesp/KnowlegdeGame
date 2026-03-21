@@ -1,8 +1,10 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/utils";
 import { logger } from "@/lib/logger";
+import { requireUser } from "@/lib/authGuard";
+import { deductCredits, CreditError } from "@/lib/credits";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -15,6 +17,9 @@ function sseEvent(data: object): Uint8Array {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireUser(req);
+  if (auth instanceof NextResponse) return auth;
+
   const { topic } = await req.json();
 
   if (!topic || typeof topic !== "string") {
@@ -64,6 +69,19 @@ export async function POST(req: NextRequest) {
   }
 
   logger.info("generate-structure", `No cache — streaming LLM for "${topic}"`);
+
+  // Cache miss: costs 5 credits (Opus call)
+  try {
+    await deductCredits(auth.userId, 5);
+  } catch (e) {
+    if (e instanceof CreditError) {
+      return new Response(
+        JSON.stringify({ error: "Insufficient credits", remaining: e.remaining }),
+        { status: 402, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    throw e;
+  }
 
   const prompt = `You are a curriculum designer and pedagogy expert. Given a topic, generate a structured learning outline with a teaching profile.
 

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
+import { requireUser } from "@/lib/authGuard";
+import { deductCredits, CreditError } from "@/lib/credits";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -187,6 +189,9 @@ Rules:
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
+
     const { subItemId, difficulty, count = 3, stats } = await req.json();
 
     if (!subItemId) {
@@ -204,6 +209,19 @@ export async function POST(req: NextRequest) {
 
     const resolvedDifficulty = difficulty || subItem.difficulty;
     const correctRate = stats?.totalCount > 0 ? (stats.correctCount / stats.totalCount) * 100 : 50;
+
+    // Credit check — deduct before serving (credit = question served, not generated)
+    try {
+      await deductCredits(auth.userId, count);
+    } catch (e) {
+      if (e instanceof CreditError) {
+        return NextResponse.json(
+          { error: "Insufficient credits", remaining: e.remaining },
+          { status: 402 }
+        );
+      }
+      throw e;
+    }
 
     // Fetch cached questions
     const existingQuestions = await prisma.question.findMany({

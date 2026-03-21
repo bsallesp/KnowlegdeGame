@@ -242,6 +242,7 @@ describe("SessionSummary", () => {
       achievements: baseAchievements,
       subItemStats: {},
       streak: 3,
+      currentTopic: null,
     });
   });
 
@@ -302,9 +303,50 @@ describe("SessionSummary", () => {
       ],
       subItemStats: {},
       streak: 0,
+      currentTopic: null,
     });
     render(<SessionSummary {...defaultProps} />);
     expect(screen.getByText("First Step")).toBeTruthy();
+  });
+
+  test("shows sub-item real name in weak spots", () => {
+    mockUseAppStore.mockReturnValue({
+      achievements: baseAchievements,
+      subItemStats: {
+        "sub-abc": { correctCount: 0, totalCount: 5, difficulty: 1 },
+      },
+      streak: 0,
+      currentTopic: {
+        id: "t1",
+        name: "Topic",
+        slug: "topic",
+        createdAt: new Date().toISOString(),
+        teachingProfile: null,
+        items: [{
+          id: "item-1",
+          topicId: "t1",
+          name: "Item 1",
+          order: 0,
+          muted: false,
+          subItems: [{ id: "sub-abc", itemId: "item-1", name: "CIA Triad", order: 0, muted: false, difficulty: 1 }],
+        }],
+      },
+    });
+    render(<SessionSummary {...defaultProps} />);
+    expect(screen.getByText(/CIA Triad/)).toBeTruthy();
+  });
+
+  test("falls back to sub-item ID when topic has no matching subItem", () => {
+    mockUseAppStore.mockReturnValue({
+      achievements: baseAchievements,
+      subItemStats: {
+        "unknown-id": { correctCount: 0, totalCount: 5, difficulty: 1 },
+      },
+      streak: 0,
+      currentTopic: null,
+    });
+    render(<SessionSummary {...defaultProps} />);
+    expect(screen.getByText(/unknown-id/)).toBeTruthy();
   });
 });
 
@@ -331,6 +373,24 @@ describe("ProgressChart", () => {
     });
     render(<ProgressChart />);
     await waitFor(() => expect(screen.getByText(/Sem dados ainda/)).toBeTruthy());
+  });
+
+  test("shows error state when fetch fails (network error)", async () => {
+    (global.fetch as any).mockRejectedValue(new Error("network error"));
+    render(<ProgressChart />);
+    await waitFor(() => expect(screen.getByText(/Erro ao carregar histórico/)).toBeTruthy());
+  });
+
+  test("shows error state when API returns non-ok status", async () => {
+    (global.fetch as any).mockResolvedValue({ ok: false });
+    render(<ProgressChart />);
+    await waitFor(() => expect(screen.getByText(/Erro ao carregar histórico/)).toBeTruthy());
+  });
+
+  test("does not show loading after error", async () => {
+    (global.fetch as any).mockRejectedValue(new Error("fail"));
+    render(<ProgressChart />);
+    await waitFor(() => expect(screen.queryByText(/Carregando histórico/)).toBeNull());
   });
 
   test("renders chart bars when history exists", async () => {

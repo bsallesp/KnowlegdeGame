@@ -89,11 +89,15 @@ interface AppState {
   // User identity
   userId: string | null;
   userEmail: string | null;
+  credits: number;
+  plan: string;
   setUser: (id: string, email: string) => void;
   clearUser: () => void;
+  setCredits: (n: number) => void;
+  setPlan: (p: string) => void;
 
   // Achievement actions
-  checkAchievements: (context: { correct?: boolean; timeSpent?: number; usedHint?: boolean }) => void;
+  checkAchievements: (context: { correct?: boolean; timeSpent?: number; usedHint?: boolean; bossCompleted?: boolean }) => void;
   dismissAchievement: (id: string) => void;
 
   // Daily goal actions
@@ -134,6 +138,8 @@ const useAppStore = create<AppState>()(
       // User identity
       userId: null,
       userEmail: null,
+      credits: 50,
+      plan: "free",
 
       // Achievements — initialize all as locked
       achievements: ACHIEVEMENT_DEFINITIONS.map((a) => ({ ...a, unlockedAt: null })),
@@ -291,8 +297,10 @@ const useAppStore = create<AppState>()(
       resetLives: () => set((state) => ({ lives: state.maxLives })),
       setUser: (id, email) => set({ userId: id, userEmail: email }),
       clearUser: () => set({ userId: null, userEmail: null }),
+      setCredits: (n) => set({ credits: n }),
+      setPlan: (p) => set({ plan: p }),
 
-      checkAchievements: ({ correct, timeSpent, usedHint }) =>
+      checkAchievements: ({ correct, timeSpent, usedHint, bossCompleted }) =>
         set((state) => {
           const newUnlocked: string[] = [];
           const totalAnswered = Object.values(state.subItemStats).reduce((s, v) => s + v.totalCount, 0);
@@ -325,6 +333,7 @@ const useAppStore = create<AppState>()(
           check("speed_demon", !!(correct && timeSpent !== undefined && timeSpent < 10000));
           check("no_hints", newConsecutiveNoHint >= 20);
           check("daily_goal", state.dailyGoal.progress + 1 >= state.dailyGoal.target);
+          check("boss_slayer", !!bossCompleted);
 
           // topic_master: 80%+ in 20 questions of any subItem
           const topicMaster = Object.values(state.subItemStats).some(
@@ -402,6 +411,8 @@ const useAppStore = create<AppState>()(
         maxLives: state.maxLives,
         userId: state.userId,
         userEmail: state.userEmail,
+        credits: state.credits,
+        plan: state.plan,
         achievements: state.achievements,
         dailyGoal: state.dailyGoal,
         sessionHistory: state.sessionHistory,

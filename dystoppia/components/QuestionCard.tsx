@@ -12,6 +12,7 @@ interface QuestionCardProps {
   userAnswer?: string;
   onHintUsed?: () => void;
   xp?: number;
+  topicName?: string;
 }
 
 function AnswerFeedback({ correct }: { correct: boolean }) {
@@ -53,12 +54,14 @@ export default function QuestionCard({
   userAnswer,
   onHintUsed,
   xp = 0,
+  topicName = "",
 }: QuestionCardProps) {
   const [selectedAnswer, setSelectedAnswer] = useState<string>("");
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const [hintLoading, setHintLoading] = useState(false);
   const [hintUsed, setHintUsed] = useState(false);
+  const [hintError, setHintError] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -68,6 +71,7 @@ export default function QuestionCard({
     setSelectedAnswer("");
     setHint(null);
     setHintUsed(false);
+    setHintError(false);
     startTimeRef.current = Date.now();
 
     if (question.timeLimit && question.timeLimit > 0) {
@@ -116,6 +120,7 @@ export default function QuestionCard({
   const handleHint = async () => {
     if (hintUsed || hintLoading || xp < HINT_COST) return;
     setHintLoading(true);
+    setHintError(false);
     try {
       const res = await fetch("/api/hint", {
         method: "POST",
@@ -125,7 +130,7 @@ export default function QuestionCard({
           options: question.options,
           answer: question.answer,
           subItemName: question.subItem?.name ?? "",
-          topicName: question.subItem?.name ?? "",
+          topicName,
         }),
       });
       if (res.ok) {
@@ -133,9 +138,11 @@ export default function QuestionCard({
         setHint(data.hint);
         setHintUsed(true);
         onHintUsed?.();
+      } else {
+        setHintError(true);
       }
     } catch {
-      // silent
+      setHintError(true);
     } finally {
       setHintLoading(false);
     }
@@ -212,7 +219,7 @@ export default function QuestionCard({
               }}
               title={xp < HINT_COST ? `Precisa de ${HINT_COST} XP para usar hint` : `Hint (-${HINT_COST} XP)`}
             >
-              {hintLoading ? "..." : hintUsed ? "✓ Hint" : `💡 -${HINT_COST} XP`}
+              {hintLoading ? "..." : hintError ? "⚠ Erro" : hintUsed ? "✓ Hint" : `💡 -${HINT_COST} XP`}
             </button>
           )}
 

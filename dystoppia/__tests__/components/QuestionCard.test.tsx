@@ -428,6 +428,71 @@ describe("QuestionCard — hint button", () => {
     await userEvent.click(screen.getByTitle(/hint/i));
     await waitFor(() => expect(screen.getByText("✓ Hint")).toBeTruthy());
   });
+
+  test("shows '⚠ Erro' when API returns non-ok", async () => {
+    (global.fetch as any).mockResolvedValueOnce({ ok: false });
+    render(
+      <QuestionCard
+        question={makeQuestion()}
+        onAnswer={vi.fn()}
+        answerShown={false}
+        lastAnswerCorrect={null}
+        xp={10}
+      />
+    );
+    await userEvent.click(screen.getByTitle(/hint/i));
+    await waitFor(() => expect(screen.getByText("⚠ Erro")).toBeTruthy());
+  });
+
+  test("shows '⚠ Erro' when fetch throws (network error)", async () => {
+    (global.fetch as any).mockRejectedValueOnce(new Error("network fail"));
+    render(
+      <QuestionCard
+        question={makeQuestion()}
+        onAnswer={vi.fn()}
+        answerShown={false}
+        lastAnswerCorrect={null}
+        xp={10}
+      />
+    );
+    await userEvent.click(screen.getByTitle(/hint/i));
+    await waitFor(() => expect(screen.getByText("⚠ Erro")).toBeTruthy());
+  });
+
+  test("sends topicName prop to API", async () => {
+    render(
+      <QuestionCard
+        question={makeQuestion()}
+        onAnswer={vi.fn()}
+        answerShown={false}
+        lastAnswerCorrect={null}
+        xp={10}
+        topicName="Cloud Computing"
+      />
+    );
+    await userEvent.click(screen.getByTitle(/hint/i));
+    await waitFor(() => {
+      const body = JSON.parse((global.fetch as any).mock.calls[0][1].body);
+      expect(body.topicName).toBe("Cloud Computing");
+    });
+  });
+
+  test("sends empty topicName when prop is not provided", async () => {
+    render(
+      <QuestionCard
+        question={makeQuestion()}
+        onAnswer={vi.fn()}
+        answerShown={false}
+        lastAnswerCorrect={null}
+        xp={10}
+      />
+    );
+    await userEvent.click(screen.getByTitle(/hint/i));
+    await waitFor(() => {
+      const body = JSON.parse((global.fetch as any).mock.calls[0][1].body);
+      expect(body.topicName).toBe("");
+    });
+  });
 });
 
 describe("QuestionCard — single_choice", () => {

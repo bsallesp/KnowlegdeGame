@@ -20,7 +20,12 @@ export default function SessionSummary({
   onContinue,
   onNewTopic,
 }: SessionSummaryProps) {
-  const { achievements, subItemStats, streak } = useAppStore();
+  const { achievements, subItemStats, streak, currentTopic } = useAppStore();
+
+  const subItemNameMap = (currentTopic?.items ?? []).flatMap((i) => i.subItems).reduce<Record<string, string>>((acc, s) => {
+    acc[s.id] = s.name;
+    return acc;
+  }, {});
 
   const rate = answerCount > 0 ? Math.round((correctCount / answerCount) * 100) : 0;
   const unlockedThisSession = achievements.filter(
@@ -118,7 +123,7 @@ export default function SessionSummary({
             <div className="space-y-1">
               {weakSpots.map(([id, s]) => (
                 <div key={id} className="flex items-center justify-between px-3 py-1.5 rounded-lg" style={{ backgroundColor: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.2)" }}>
-                  <span className="text-xs" style={{ color: "#F97316" }}>⚠ SubItem</span>
+                  <span className="text-xs" style={{ color: "#F97316" }}>⚠ {subItemNameMap[id] ?? id}</span>
                   <span className="text-xs font-semibold" style={{ color: "#F97316" }}>
                     {Math.round((s.correctCount / s.totalCount) * 100)}%
                   </span>

@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 
@@ -22,6 +22,21 @@ vi.mock("@anthropic-ai/sdk", () => ({
   default: class {
     messages = { create: mockCreate_llm };
   },
+}));
+
+// ─── Auth guard mock ──────────────────────────────────────────────────────────
+const mockRequireUser = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/authGuard", () => ({ requireUser: mockRequireUser }));
+
+// ─── Credits mock ─────────────────────────────────────────────────────────────
+const mockDeductCredits = vi.hoisted(() => vi.fn());
+class MockCreditError extends Error {
+  remaining: number;
+  constructor(remaining: number) { super("Insufficient credits"); this.remaining = remaining; }
+}
+vi.mock("@/lib/credits", () => ({
+  deductCredits: mockDeductCredits,
+  CreditError: MockCreditError,
 }));
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -90,6 +105,8 @@ beforeEach(() => {
   mockCreate.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
     Promise.resolve({ ...data, id: "new-q", createdAt: new Date() })
   );
+  mockRequireUser.mockResolvedValue({ userId: "user-1" });
+  mockDeductCredits.mockResolvedValue(47);
 });
 
 // ─── Input validation ─────────────────────────────────────────────────────────
@@ -271,6 +288,65 @@ describe("generation path", () => {
       content: [{ type: "text", text: "not json at all" }],
     });
 
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
+    expect(res.status).toBe(500);
+  });
+});
+
+// ─── Auth guard ───────────────────────────────────────────────────────────────
+
+describe("auth guard", () => {
+  test("returns 401 when not authenticated", async () => {
+    mockRequireUser.mockResolvedValue(
+      new (await import("next/server")).NextResponse(null, { status: 401 })
+    );
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
+    expect(res.status).toBe(401);
+  });
+
+  test("does not call LLM when not authenticated", async () => {
+    mockRequireUser.mockResolvedValue(
+      new (await import("next/server")).NextResponse(null, { status: 401 })
+    );
+    await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
+    expect(mockCreate_llm).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Credit system ────────────────────────────────────────────────────────────
+
+describe("credit system", () => {
+  beforeEach(() => {
+    mockFindMany.mockResolvedValue([]); // no cache — forces LLM path
+    mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
+  });
+
+  test("returns 402 when user has insufficient credits", async () => {
+    mockDeductCredits.mockRejectedValue(new MockCreditError(0));
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
+    expect(res.status).toBe(402);
+  });
+
+  test("includes remaining credits in 402 response body", async () => {
+    mockDeductCredits.mockRejectedValue(new MockCreditError(3));
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
+    const body = await res.json();
+    expect(body.remaining).toBe(3);
+  });
+
+  test("deducts credits equal to count on success", async () => {
+    await POST(makeRequest({ subItemId: "sub-1", count: 4 }));
+    expect(mockDeductCredits).toHaveBeenCalledWith("user-1", 4);
+  });
+
+  test("does not call LLM when credit deduction fails", async () => {
+    mockDeductCredits.mockRejectedValue(new MockCreditError(0));
+    await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
+    expect(mockCreate_llm).not.toHaveBeenCalled();
+  });
+
+  test("returns 500 when credit deduction throws unexpected error", async () => {
+    mockDeductCredits.mockRejectedValue(new Error("DB connection lost"));
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
     expect(res.status).toBe(500);
   });

@@ -11,6 +11,7 @@ import QuestionCard from "@/components/QuestionCard";
 import SkeletonBlock from "@/components/ui/SkeletonBlock";
 import AchievementToast from "@/components/AchievementToast";
 import SessionSummary from "@/components/SessionSummary";
+import Paywall from "@/components/Paywall";
 import DailyGoalBar from "@/components/DailyGoalBar";
 import BossRound from "@/components/BossRound";
 import FlashCard from "@/components/FlashCard";
@@ -44,6 +45,7 @@ export default function SessionPage() {
     streak,
     lives,
     maxLives,
+    credits,
     setCurrentQuestion,
     addToQueue,
     advanceQueue,
@@ -70,6 +72,7 @@ export default function SessionPage() {
   const [xpPopups, setXpPopups] = useState<XPPopup[]>([]);
   const [showGameOver, setShowGameOver] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
   const [showBossIntro, setShowBossIntro] = useState(false);
   const [isBossRound, setIsBossRound] = useState(false);
   const [bossQuestionsLeft, setBossQuestionsLeft] = useState(0);
@@ -113,6 +116,7 @@ export default function SessionPage() {
           }),
         });
 
+        if (res.status === 402) { setShowPaywall(true); return; }
         if (!res.ok) throw new Error("Failed to generate questions");
         const data = await res.json();
         const questionsWithSubItem: Question[] = data.questions.map((q: Question) => ({ ...q, subItem }));
@@ -238,10 +242,7 @@ export default function SessionPage() {
       setBossQuestionsLeft(left);
       if (left <= 0) {
         setIsBossRound(false);
-        if (isCorrect) {
-          // Unlock boss_slayer achievement
-          useAppStore.getState().checkAchievements({ correct: true });
-        }
+        useAppStore.getState().checkAchievements({ bossCompleted: true });
       }
     }
 
@@ -341,6 +342,11 @@ export default function SessionPage() {
       {/* Achievement toasts */}
       <AchievementToast />
 
+      {/* Paywall */}
+      <AnimatePresence>
+        {showPaywall && <Paywall onClose={() => setShowPaywall(false)} />}
+      </AnimatePresence>
+
       {/* Game over overlay */}
       <AnimatePresence>
         {showGameOver && (
@@ -418,6 +424,12 @@ export default function SessionPage() {
         </div>
 
         <div className="flex items-center gap-4">
+          {/* Credits */}
+          <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: credits <= 5 ? "#F97316" : "#818CF8" }}>
+            <span>⚡</span>
+            <span>{credits} left</span>
+          </div>
+
           {/* Daily goal */}
           <DailyGoalBar />
 
@@ -531,6 +543,7 @@ export default function SessionPage() {
                     lastAnswerCorrect={lastAnswerCorrect}
                     userAnswer={userAnswer}
                     xp={xp}
+                    topicName={currentTopic.name}
                     onHintUsed={() => {
                       addXP(-5);
                       checkAchievements({ usedHint: true });

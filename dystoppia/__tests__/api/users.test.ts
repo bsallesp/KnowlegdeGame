@@ -1,6 +1,10 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
+// ─── cookieToken mock ─────────────────────────────────────────────────────────
+const mockSign = vi.hoisted(() => vi.fn((id: string) => `${id}.fakemac`));
+vi.mock("@/lib/cookieToken", () => ({ sign: mockSign }));
+
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 const mockFindUnique = vi.hoisted(() => vi.fn());
 const mockCreate = vi.hoisted(() => vi.fn());
@@ -18,10 +22,11 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
+const mockCookieSet = vi.hoisted(() => vi.fn());
 vi.mock("next/headers", () => ({
   cookies: () =>
     Promise.resolve({
-      set: vi.fn(),
+      set: mockCookieSet,
       get: vi.fn(() => undefined),
     }),
 }));
@@ -44,6 +49,8 @@ beforeEach(() => {
   mockFindUnique.mockReset();
   mockCreate.mockReset();
   mockUpdateMany.mockReset();
+  mockCookieSet.mockReset();
+  mockSign.mockImplementation((id: string) => `${id}.fakemac`);
   mockUpdateMany.mockResolvedValue({ count: 0 });
 });
 
@@ -166,5 +173,41 @@ describe("POST /api/users — error handling", () => {
     const res = await POST(makeRequest({ email: "test@example.com" }));
     const data = await res.json();
     expect(data.details).toContain("unique constraint failed");
+  });
+});
+
+// ─── Signed cookie ────────────────────────────────────────────────────────────
+
+describe("POST /api/users — signed cookie", () => {
+  test("sets cookie with signed token (not raw userId)", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue({ id: "user-1", email: "test@example.com" });
+
+    await POST(makeRequest({ email: "test@example.com" }));
+    expect(mockCookieSet).toHaveBeenCalledWith(
+      "dystoppia_uid",
+      "user-1.fakemac",
+      expect.objectContaining({ httpOnly: true })
+    );
+  });
+
+  test("calls sign() with the user id", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue({ id: "user-xyz", email: "a@b.com" });
+
+    await POST(makeRequest({ email: "a@b.com" }));
+    expect(mockSign).toHaveBeenCalledWith("user-xyz");
+  });
+
+  test("sets cookie with sameSite: lax", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue({ id: "user-1", email: "test@example.com" });
+
+    await POST(makeRequest({ email: "test@example.com" }));
+    expect(mockCookieSet).toHaveBeenCalledWith(
+      "dystoppia_uid",
+      expect.any(String),
+      expect.objectContaining({ sameSite: "lax" })
+    );
   });
 });

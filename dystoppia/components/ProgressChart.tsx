@@ -17,13 +17,15 @@ interface ProgressChartProps {
 export default function ProgressChart({ topicId, days = 14 }: ProgressChartProps) {
   const [history, setHistory] = useState<ProgressEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
+    setError(false);
     const url = `/api/progress?days=${days}${topicId ? `&topicId=${topicId}` : ""}`;
     fetch(url)
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); })
       .then((d) => setHistory(d.history || []))
-      .catch(() => {})
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [topicId, days]);
 
@@ -31,6 +33,14 @@ export default function ProgressChart({ topicId, days = 14 }: ProgressChartProps
     return (
       <div className="flex items-center justify-center h-24" style={{ color: "#9494B8" }}>
         <span className="text-xs">Carregando histórico...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-24" style={{ color: "#F97316" }}>
+        <span className="text-xs">Erro ao carregar histórico. Tente novamente.</span>
       </div>
     );
   }

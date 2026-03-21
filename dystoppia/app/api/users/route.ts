@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
+import { sign } from "@/lib/cookieToken";
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
     }
 
     const cookieStore = await cookies();
-    cookieStore.set("dystoppia_uid", user.id, {
+    cookieStore.set("dystoppia_uid", sign(user.id), {
       httpOnly: true,
       sameSite: "lax",
       path: "/",
