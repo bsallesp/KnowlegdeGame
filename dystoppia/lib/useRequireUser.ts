@@ -21,11 +21,11 @@ export function useRequireUser() {
           setPlan(data.plan ?? "free");
           setLoading(false);
         } else {
-          router.replace("/register");
+          router.replace("/login");
         }
       })
       .catch(() => {
-        router.replace("/register");
+        router.replace("/login");
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

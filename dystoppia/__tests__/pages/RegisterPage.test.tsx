@@ -1,240 +1,282 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import React from "react";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
-const mockPush = vi.fn();
+const mockPush    = vi.fn();
 const mockReplace = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace }),
 }));
 
+vi.mock("next/link", () => ({
+  default: ({ children, href }: React.PropsWithChildren<{ href: string }>) => (
+    <a href={href}>{children}</a>
+  ),
+}));
+
 vi.mock("framer-motion", () => ({
   motion: {
-    div: ({ children, animate, initial, exit, transition, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <div {...props}>{children}</div>,
-    p: ({ children, animate, initial, exit, transition, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <p {...props}>{children}</p>,
-    h1: ({ children, animate, initial, exit, transition, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <h1 {...props}>{children}</h1>,
-    button: ({ children, onClick, animate, initial, exit, transition, whileHover, whileTap, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <button onClick={onClick as any} {...props}>{children}</button>,
-    span: ({ children, animate, initial, exit, transition, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <span {...props}>{children}</span>,
+    div:    ({ children, ...p }: React.PropsWithChildren<Record<string, unknown>>) => <div {...p}>{children}</div>,
+    form:   ({ children, onSubmit, ...p }: React.PropsWithChildren<Record<string, unknown>>) => <form onSubmit={onSubmit as React.FormEventHandler} {...p}>{children}</form>,
+    button: ({ children, onClick, disabled, ...p }: React.PropsWithChildren<Record<string, unknown>>) => <button onClick={onClick as React.MouseEventHandler} disabled={disabled as boolean} {...p}>{children}</button>,
+    p:      ({ children, ...p }: React.PropsWithChildren<Record<string, unknown>>) => <p {...p}>{children}</p>,
+    h1:     ({ children, ...p }: React.PropsWithChildren<Record<string, unknown>>) => <h1 {...p}>{children}</h1>,
+    span:   ({ children, ...p }: React.PropsWithChildren<Record<string, unknown>>) => <span {...p}>{children}</span>,
   },
   AnimatePresence: ({ children }: React.PropsWithChildren) => <>{children}</>,
-}));
-
-vi.mock("@/components/NeuralTransition", () => ({
-  default: ({ visible }: { visible: boolean }) => visible ? <div data-testid="transition">Transition</div> : null,
-}));
-
-vi.mock("@/lib/useRequireUser", () => ({
-  useRequireUser: () => ({ loading: false }),
 }));
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
+// ─── Import after mocks ───────────────────────────────────────────────────────
 
-import useAppStore from "@/store/useAppStore";
 import RegisterPage from "@/app/register/page";
 
-beforeEach(() => {
-  mockPush.mockClear();
-  mockReplace.mockClear();
-  mockFetch.mockClear();
-  useAppStore.setState({
-    xp: 0,
-    streak: 0,
-    sessionId: "sess_test",
-    userId: null,
-    userEmail: null,
-  });
-  // Default: /api/auth/me returns 401 (not logged in)
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function setupNotLoggedIn() {
   mockFetch.mockImplementation((url: string) => {
-    if (url === "/api/auth/me") {
-      return Promise.resolve({ ok: false, status: 401 });
-    }
-    return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    if (url === "/api/auth/me") return Promise.resolve({ ok: false, status: 401 });
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
   });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  setupNotLoggedIn();
 });
 
-describe("RegisterPage — rendering", () => {
+// ─── Step 1 rendering ─────────────────────────────────────────────────────────
+
+describe("RegisterPage — step 1 rendering", () => {
   test("renders Dystoppia title", () => {
     render(<RegisterPage />);
     expect(screen.getByText("Dystoppia")).toBeTruthy();
   });
 
-  test("renders subtitle", () => {
+  test("renders 'Create your account' subtitle", () => {
     render(<RegisterPage />);
-    expect(screen.getByText("Your progress. Your universe.")).toBeTruthy();
+    expect(screen.getByText("Create your account")).toBeTruthy();
   });
 
-  test("renders XP badge", () => {
+  test("renders email input", () => {
     render(<RegisterPage />);
-    expect(screen.getAllByText(/XP/)[0]).toBeTruthy();
+    expect(screen.getByPlaceholderText("you@example.com")).toBeTruthy();
   });
 
-  test("renders Streaks badge", () => {
+  test("renders password input", () => {
     render(<RegisterPage />);
-    expect(screen.getByText(/Streaks/)).toBeTruthy();
+    expect(screen.getByPlaceholderText("Min. 8 characters")).toBeTruthy();
   });
 
-  test("renders Adaptive AI badge", () => {
+  test("renders confirm password input", () => {
     render(<RegisterPage />);
-    expect(screen.getByText(/Adaptive AI/)).toBeTruthy();
+    expect(screen.getByPlaceholderText("Repeat your password")).toBeTruthy();
   });
 
-  test("renders two email inputs", () => {
+  test("renders Create account button", () => {
     render(<RegisterPage />);
-    const inputs = screen.getAllByRole("textbox");
-    expect(inputs.length).toBe(2);
+    expect(screen.getByRole("button", { name: /create account/i })).toBeTruthy();
   });
 
-  test("renders Enter Dystoppia button", () => {
+  test("renders Sign in link", () => {
     render(<RegisterPage />);
-    expect(screen.getByRole("button", { name: /Enter Dystoppia/i })).toBeTruthy();
-  });
-
-  test("renders no-password notice", () => {
-    render(<RegisterPage />);
-    expect(screen.getByText("No password needed. Just your email.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /sign in/i })).toBeTruthy();
   });
 });
 
-describe("RegisterPage — validation", () => {
-  test("shows error when email is empty", async () => {
+// ─── Step 1 validation ────────────────────────────────────────────────────────
+
+describe("RegisterPage — step 1 validation", () => {
+  test("shows error when password is too short", async () => {
     render(<RegisterPage />);
-    await userEvent.click(screen.getByRole("button", { name: /Enter Dystoppia/i }));
-    await waitFor(() => expect(screen.getByText("Please enter your email.")).toBeTruthy());
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText("you@example.com"), "a@test.com");
+    await user.type(screen.getByPlaceholderText("Min. 8 characters"), "short");
+    await user.type(screen.getByPlaceholderText("Repeat your password"), "short");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+    await waitFor(() => expect(screen.getByText(/8 characters/i)).toBeTruthy());
   });
 
-  test("shows error for invalid email format", async () => {
+  test("shows error when passwords don't match", async () => {
     render(<RegisterPage />);
-    const inputs = screen.getAllByRole("textbox");
-    await userEvent.type(inputs[0], "notanemail");
-    // fireEvent.submit bypasses HTML5 email validation in jsdom so the JS handler runs
-    fireEvent.submit(document.querySelector("form")!);
-    await waitFor(() => expect(screen.getByText("That doesn't look like a valid email.")).toBeTruthy());
-  });
-
-  test("shows error when emails don't match", async () => {
-    render(<RegisterPage />);
-    const inputs = screen.getAllByRole("textbox");
-    await userEvent.type(inputs[0], "a@example.com");
-    await userEvent.type(inputs[1], "b@example.com");
-    await userEvent.click(screen.getByRole("button", { name: /Enter Dystoppia/i }));
-    await waitFor(() => expect(screen.getByText("Emails don't match. Try again.")).toBeTruthy());
-  });
-
-  test("error persists while user types (not auto-cleared until next submit)", async () => {
-    render(<RegisterPage />);
-    await userEvent.click(screen.getByRole("button", { name: /Enter Dystoppia/i }));
-    await waitFor(() => screen.getByText("Please enter your email."));
-    const inputs = screen.getAllByRole("textbox");
-    await userEvent.type(inputs[0], "test@example.com");
-    expect(screen.queryByText("Please enter your email.")).toBeTruthy();
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText("you@example.com"), "a@test.com");
+    await user.type(screen.getByPlaceholderText("Min. 8 characters"), "password123");
+    await user.type(screen.getByPlaceholderText("Repeat your password"), "different1");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+    await waitFor(() => expect(screen.getByText(/don't match/i)).toBeTruthy());
   });
 });
 
-describe("RegisterPage — API interaction", () => {
-  test("calls /api/users on valid submit", async () => {
-    mockFetch.mockImplementation((url: string) => {
-      if (url === "/api/auth/me") return Promise.resolve({ ok: false });
-      if (url === "/api/users") return Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ id: "user-1", email: "a@example.com", isNew: true }),
-      });
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-    });
+// ─── Step 1 API interaction ───────────────────────────────────────────────────
 
+describe("RegisterPage — step 1 API interaction", () => {
+  test("calls /api/auth/register on valid submit", async () => {
     render(<RegisterPage />);
-    const inputs = screen.getAllByRole("textbox");
-    await userEvent.type(inputs[0], "a@example.com");
-    await userEvent.type(inputs[1], "a@example.com");
-    await userEvent.click(screen.getByRole("button", { name: /Enter Dystoppia/i }));
-
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith("/api/users", expect.objectContaining({ method: "POST" }));
-    });
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText("you@example.com"), "a@test.com");
+    await user.type(screen.getByPlaceholderText("Min. 8 characters"), "password123");
+    await user.type(screen.getByPlaceholderText("Repeat your password"), "password123");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/auth/register",
+        expect.objectContaining({ method: "POST" })
+      )
+    );
   });
 
-  test("shows error when API returns error", async () => {
+  test("advances to verify step on successful registration", async () => {
+    render(<RegisterPage />);
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText("you@example.com"), "a@test.com");
+    await user.type(screen.getByPlaceholderText("Min. 8 characters"), "password123");
+    await user.type(screen.getByPlaceholderText("Repeat your password"), "password123");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+    await waitFor(() => expect(screen.getByText(/check your inbox/i)).toBeTruthy());
+  });
+
+  test("shows error message when API returns error", async () => {
     mockFetch.mockImplementation((url: string) => {
       if (url === "/api/auth/me") return Promise.resolve({ ok: false });
-      if (url === "/api/users") return Promise.resolve({
+      if (url === "/api/auth/register") return Promise.resolve({
         ok: false,
-        json: () => Promise.resolve({ error: "Failed to create user" }),
+        json: () => Promise.resolve({ error: "Something went wrong." }),
       });
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
-
     render(<RegisterPage />);
-    const inputs = screen.getAllByRole("textbox");
-    await userEvent.type(inputs[0], "a@example.com");
-    await userEvent.type(inputs[1], "a@example.com");
-    await userEvent.click(screen.getByRole("button", { name: /Enter Dystoppia/i }));
-
-    await waitFor(() => expect(screen.getByText("Failed to create user")).toBeTruthy());
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText("you@example.com"), "a@test.com");
+    await user.type(screen.getByPlaceholderText("Min. 8 characters"), "password123");
+    await user.type(screen.getByPlaceholderText("Repeat your password"), "password123");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+    await waitFor(() => expect(screen.getByText("Something went wrong.")).toBeTruthy());
   });
 
-  test("shows network error message on fetch failure", async () => {
+  test("shows generic error on network failure", async () => {
     mockFetch.mockImplementation((url: string) => {
       if (url === "/api/auth/me") return Promise.resolve({ ok: false });
-      if (url === "/api/users") return Promise.reject(new Error("Network error"));
+      if (url === "/api/auth/register") return Promise.reject(new Error("Network error"));
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
-
     render(<RegisterPage />);
-    const inputs = screen.getAllByRole("textbox");
-    await userEvent.type(inputs[0], "a@example.com");
-    await userEvent.type(inputs[1], "a@example.com");
-    await userEvent.click(screen.getByRole("button", { name: /Enter Dystoppia/i }));
-
-    await waitFor(() => expect(screen.getByText("Something went wrong. Please try again.")).toBeTruthy());
-  });
-
-  test("shows 'logging you in' info for existing user", async () => {
-    mockFetch.mockImplementation((url: string) => {
-      if (url === "/api/auth/me") return Promise.resolve({ ok: false });
-      if (url === "/api/users") return Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ id: "user-1", email: "a@example.com", isNew: false }),
-      });
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-    });
-
-    render(<RegisterPage />);
-    const inputs = screen.getAllByRole("textbox");
-    await userEvent.type(inputs[0], "a@example.com");
-    await userEvent.type(inputs[1], "a@example.com");
-    await userEvent.click(screen.getByRole("button", { name: /Enter Dystoppia/i }));
-
-    await waitFor(() => expect(screen.getByText("Email already registered — logging you in...")).toBeTruthy());
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText("you@example.com"), "a@test.com");
+    await user.type(screen.getByPlaceholderText("Min. 8 characters"), "password123");
+    await user.type(screen.getByPlaceholderText("Repeat your password"), "password123");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+    await waitFor(() => expect(screen.getByText(/something went wrong/i)).toBeTruthy());
   });
 });
 
-describe("RegisterPage — local data banner", () => {
-  test("shows local data banner when user has XP", () => {
-    useAppStore.setState({ xp: 286, streak: 1 });
+// ─── Step 2 — OTP verification ────────────────────────────────────────────────
+
+describe("RegisterPage — step 2 OTP verification", () => {
+  async function goToStep2() {
+    const user = userEvent.setup();
     render(<RegisterPage />);
-    expect(screen.getByText(/286 XP/)).toBeTruthy();
+    await user.type(screen.getByPlaceholderText("you@example.com"), "a@test.com");
+    await user.type(screen.getByPlaceholderText("Min. 8 characters"), "password123");
+    await user.type(screen.getByPlaceholderText("Repeat your password"), "password123");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+    await waitFor(() => screen.getByText(/check your inbox/i));
+    return user;
+  }
+
+  test("shows OTP input after successful step 1", async () => {
+    await goToStep2();
+    expect(screen.getByPlaceholderText("000000")).toBeTruthy();
   });
 
-  test("shows local data banner when user has streak", () => {
-    useAppStore.setState({ xp: 0, streak: 3 });
-    render(<RegisterPage />);
-    expect(screen.getByText(/3-day streak/)).toBeTruthy();
+  test("shows email in the verification message", async () => {
+    await goToStep2();
+    await waitFor(() => expect(screen.getByText("a@test.com")).toBeTruthy());
   });
 
-  test("does not show banner when xp=0 and streak=0", () => {
-    useAppStore.setState({ xp: 0, streak: 0 });
-    render(<RegisterPage />);
-    expect(screen.queryByText(/Found a previous session/)).toBeNull();
+  test("Verify button is disabled when code has fewer than 6 digits", async () => {
+    const user = await goToStep2();
+    await user.type(screen.getByPlaceholderText("000000"), "123");
+    const btn = screen.getByRole("button", { name: /verify email/i });
+    expect(btn).toBeTruthy();
+    expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 
-  test("redirects to / when already logged in (auth/me returns ok)", async () => {
+  test("calls /api/auth/verify-email with email and code", async () => {
     mockFetch.mockImplementation((url: string) => {
-      if (url === "/api/auth/me") return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: "u1", email: "a@b.com" }) });
+      if (url === "/api/auth/me") return Promise.resolve({ ok: false });
+      if (url === "/api/auth/register") return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
+      if (url === "/api/auth/verify-email") return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ id: "u1", email: "a@test.com" }),
+      });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+    const user = await goToStep2();
+    await user.type(screen.getByPlaceholderText("000000"), "123456");
+    await user.click(screen.getByRole("button", { name: /verify email/i }));
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/auth/verify-email",
+        expect.objectContaining({ method: "POST" })
+      )
+    );
+  });
+
+  test("redirects to / after successful verification", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url === "/api/auth/me") return Promise.resolve({ ok: false });
+      if (url === "/api/auth/register") return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
+      if (url === "/api/auth/verify-email") return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ id: "u1", email: "a@test.com" }),
+      });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+    const user = await goToStep2();
+    await user.type(screen.getByPlaceholderText("000000"), "123456");
+    await user.click(screen.getByRole("button", { name: /verify email/i }));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/"));
+  });
+
+  test("shows error when OTP is wrong", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url === "/api/auth/me") return Promise.resolve({ ok: false });
+      if (url === "/api/auth/register") return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
+      if (url === "/api/auth/verify-email") return Promise.resolve({
+        ok: false,
+        json: () => Promise.resolve({ error: "Incorrect code. Try again." }),
+      });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+    const user = await goToStep2();
+    await user.type(screen.getByPlaceholderText("000000"), "999999");
+    await user.click(screen.getByRole("button", { name: /verify email/i }));
+    await waitFor(() => expect(screen.getByText("Incorrect code. Try again.")).toBeTruthy());
+  });
+
+  test("Back button returns to step 1", async () => {
+    const user = await goToStep2();
+    await user.click(screen.getByRole("button", { name: /← back/i }));
+    await waitFor(() => expect(screen.getByPlaceholderText("you@example.com")).toBeTruthy());
+  });
+});
+
+// ─── Already logged in ────────────────────────────────────────────────────────
+
+describe("RegisterPage — already logged in", () => {
+  test("redirects to / when already authenticated", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url === "/api/auth/me") return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ id: "u1", email: "a@b.com" }),
+      });
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
     render(<RegisterPage />);

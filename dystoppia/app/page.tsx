@@ -8,6 +8,8 @@ import useAppStore from "@/store/useAppStore";
 import { useRequireUser } from "@/lib/useRequireUser";
 import type { Item } from "@/types";
 
+type Mode = "studio" | "lens" | "reach";
+
 interface TopicHistory {
   id: string;
   name: string;
@@ -17,9 +19,45 @@ interface TopicHistory {
   correctRate: number | null;
 }
 
+const MODES: { id: Mode; label: string; description: string; icon: React.ReactNode }[] = [
+  {
+    id: "studio",
+    label: "Studio",
+    description: "Create learning content",
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+      </svg>
+    ),
+  },
+  {
+    id: "lens",
+    label: "Lens",
+    description: "Extract from the web",
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    ),
+  },
+  {
+    id: "reach",
+    label: "Reach",
+    description: "Manage your ads",
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+      </svg>
+    ),
+  },
+];
+
 export default function SearchPage() {
   const { loading: authLoading } = useRequireUser();
+  const [mode, setMode] = useState<Mode>("studio");
   const [query, setQuery] = useState("");
+  const [lensUrl, setLensUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showTransition, setShowTransition] = useState(false);
@@ -48,7 +86,6 @@ export default function SearchPage() {
     setShowTransition(true);
     resetSession();
 
-    // Set a pending topic immediately so session page doesn't redirect to /
     const pendingId = `pending_${Date.now()}`;
     setCurrentTopic({
       id: pendingId,
@@ -117,15 +154,12 @@ export default function SearchPage() {
 
               if (!navigated) {
                 navigated = true;
-                // Let transition animation play before navigating
                 await new Promise((r) => setTimeout(r, 1500));
                 router.push("/session");
               }
             } else if (event.type === "done") {
-              // Replace pending topic with full DB-persisted version
               const fullTopic = event.data as Parameters<typeof setCurrentTopic>[0];
               setCurrentTopic(fullTopic);
-              // Pré-aquece cache de perguntas enquanto a animação ainda toca
               prefetchFirstSubItems(fullTopic);
             } else if (event.type === "error") {
               throw new Error(event.message || "Stream error");
@@ -159,7 +193,7 @@ export default function SearchPage() {
           count: 3,
           difficulty: firstActive.difficulty,
         }),
-      }).catch(() => {/* fire-and-forget: errors ignorados intencionalmente */});
+      }).catch(() => {/* fire-and-forget */});
     }
   }
 
@@ -199,175 +233,275 @@ export default function SearchPage() {
             </p>
           </motion.div>
 
-          {/* Search form */}
-          <motion.form
-            onSubmit={handleSearch}
+          {/* Mode selector */}
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="w-full"
+            transition={{ duration: 0.6, delay: 0.15 }}
+            className="w-full grid grid-cols-3 gap-3"
           >
-            <div
-              className="relative flex items-center rounded-2xl overflow-hidden"
-              style={{
-                backgroundColor: "#12121A",
-                border: "1px solid #2E2E40",
-                boxShadow: "0 4px 40px rgba(0,0,0,0.4)",
-              }}
-            >
-              {/* Search icon */}
-              <div className="pl-4 pr-3 flex items-center" style={{ color: "#9494B8" }}>
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
+            {MODES.map((m) => {
+              const isActive = mode === m.id;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => setMode(m.id)}
+                  className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl transition-all duration-200"
+                  style={{
+                    backgroundColor: isActive ? "rgba(129, 140, 248, 0.12)" : "#12121A",
+                    border: isActive ? "1px solid rgba(129, 140, 248, 0.4)" : "1px solid #2E2E40",
+                    color: isActive ? "#818CF8" : "#9494B8",
+                  }}
+                >
+                  <div style={{ color: isActive ? "#818CF8" : "#4B4B6B" }}>{m.icon}</div>
+                  <span className="text-sm font-semibold">{m.label}</span>
+                  <span className="text-xs leading-tight text-center" style={{ color: isActive ? "#9494B8" : "#4B4B6B" }}>
+                    {m.description}
+                  </span>
+                </button>
+              );
+            })}
+          </motion.div>
 
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="What do you want to learn today?"
-                className="flex-1 py-4 pr-4 text-base bg-transparent outline-none"
-                style={{ color: "#EEEEFF" }}
-                disabled={isLoading}
-                autoFocus
-              />
-
-              <AnimatePresence>
-                {query.trim() && (
-                  <motion.button
-                    type="submit"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    disabled={isLoading}
-                    className="mr-2 px-5 py-2 rounded-xl font-semibold text-sm transition-all"
+          {/* Content area */}
+          <AnimatePresence mode="wait">
+            {mode === "studio" && (
+              <motion.div
+                key="studio"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25 }}
+                className="w-full flex flex-col gap-6"
+              >
+                {/* Search form */}
+                <form onSubmit={handleSearch}>
+                  <div
+                    className="relative flex items-center rounded-2xl overflow-hidden"
                     style={{
-                      backgroundColor: "#818CF8",
-                      color: "white",
-                      flexShrink: 0,
-                      border: "none",
+                      backgroundColor: "#12121A",
+                      border: "1px solid #2E2E40",
+                      boxShadow: "0 4px 40px rgba(0,0,0,0.4)",
                     }}
                   >
-                    Learn
-                  </motion.button>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.form>
+                    <div className="pl-4 pr-3 flex items-center" style={{ color: "#9494B8" }}>
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                    </div>
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="What do you want to learn today?"
+                      className="flex-1 py-4 pr-4 text-base bg-transparent outline-none"
+                      style={{ color: "#EEEEFF" }}
+                      disabled={isLoading}
+                      autoFocus
+                    />
+                    <AnimatePresence>
+                      {query.trim() && (
+                        <motion.button
+                          type="submit"
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          disabled={isLoading}
+                          className="mr-2 px-5 py-2 rounded-xl font-semibold text-sm transition-all"
+                          style={{ backgroundColor: "#818CF8", color: "white", flexShrink: 0, border: "none" }}
+                        >
+                          Learn
+                        </motion.button>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </form>
 
-          {/* Error */}
-          <AnimatePresence>
-            {error && (
-              <motion.p
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="text-sm px-4 py-2 rounded-lg"
-                style={{
-                  backgroundColor: "rgba(249, 115, 22, 0.1)",
-                  border: "1px solid rgba(249, 115, 22, 0.3)",
-                  color: "#F97316",
-                }}
-              >
-                {error}
-              </motion.p>
-            )}
-          </AnimatePresence>
-
-          {/* History or example topics */}
-          <AnimatePresence mode="wait">
-            {history.length > 0 ? (
-              <motion.div
-                key="history"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="w-full"
-              >
-                <p className="text-xs mb-3 text-center" style={{ color: "#9494B8" }}>
-                  Continue learning
-                </p>
-                <div className="flex flex-col gap-2">
-                  {history.map((topic, i) => (
-                    <motion.button
-                      key={topic.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.4 + i * 0.05 }}
-                      onClick={() => {
-                        setQuery(topic.name);
-                        handleSearch(undefined, topic.name);
-                      }}
-                      whileHover={{ scale: 1.01 }}
-                      whileTap={{ scale: 0.99 }}
-                      className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-left transition-all"
+                {/* Error */}
+                <AnimatePresence>
+                  {error && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="text-sm px-4 py-2 rounded-lg"
                       style={{
-                        backgroundColor: "#12121A",
-                        border: "1px solid #2E2E40",
+                        backgroundColor: "rgba(249, 115, 22, 0.1)",
+                        border: "1px solid rgba(249, 115, 22, 0.3)",
+                        color: "#F97316",
                       }}
                     >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: "#818CF8" }}
-                        />
-                        <span className="text-sm font-medium" style={{ color: "#EEEEFF" }}>
-                          {topic.name}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        {topic.totalAnswers > 0 && (
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="h-1.5 rounded-full overflow-hidden"
-                              style={{ width: "60px", backgroundColor: "#2E2E40" }}
-                            >
-                              <div
-                                className="h-full rounded-full transition-all"
-                                style={{
-                                  width: `${topic.correctRate ?? 0}%`,
-                                  backgroundColor: "#60A5FA",
-                                }}
-                              />
+                      {error}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+
+                {/* History or suggestions */}
+                <AnimatePresence mode="wait">
+                  {history.length > 0 ? (
+                    <motion.div key="history" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+                      <p className="text-xs mb-3 text-center" style={{ color: "#9494B8" }}>
+                        Continue learning
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        {history.map((topic, i) => (
+                          <motion.button
+                            key={topic.id}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: i * 0.05 }}
+                            onClick={() => { setQuery(topic.name); handleSearch(undefined, topic.name); }}
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                            className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-left transition-all"
+                            style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: "#818CF8" }} />
+                              <span className="text-sm font-medium" style={{ color: "#EEEEFF" }}>{topic.name}</span>
                             </div>
-                            <span className="text-xs" style={{ color: "#9494B8" }}>
-                              {topic.correctRate}%
-                            </span>
-                          </div>
-                        )}
-                        <span className="text-xs" style={{ color: "#2E2E40" }}>
-                          {topic.totalAnswers > 0 ? `${topic.totalAnswers} answers` : "Not started"}
-                        </span>
-                        <svg className="w-4 h-4" style={{ color: "#2E2E40" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              {topic.totalAnswers > 0 && (
+                                <div className="flex items-center gap-2">
+                                  <div className="h-1.5 rounded-full overflow-hidden" style={{ width: "60px", backgroundColor: "#2E2E40" }}>
+                                    <div className="h-full rounded-full transition-all" style={{ width: `${topic.correctRate ?? 0}%`, backgroundColor: "#60A5FA" }} />
+                                  </div>
+                                  <span className="text-xs" style={{ color: "#9494B8" }}>{topic.correctRate}%</span>
+                                </div>
+                              )}
+                              <span className="text-xs" style={{ color: "#2E2E40" }}>
+                                {topic.totalAnswers > 0 ? `${topic.totalAnswers} answers` : "Not started"}
+                              </span>
+                              <svg className="w-4 h-4" style={{ color: "#2E2E40" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </div>
+                          </motion.button>
+                        ))}
                       </div>
-                    </motion.button>
-                  ))}
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="suggestions"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.2 }}
+                      className="flex flex-wrap gap-2 justify-center"
+                    >
+                      {["Quantum Computing", "Roman History", "Machine Learning", "Jazz Theory", "DNA Replication"].map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          onClick={() => { setQuery(suggestion); inputRef.current?.focus(); }}
+                          className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
+                          style={{ backgroundColor: "#1C1C28", border: "1px solid #2E2E40", color: "#9494B8" }}
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )}
+
+            {mode === "lens" && (
+              <motion.div
+                key="lens"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25 }}
+                className="w-full flex flex-col gap-4"
+              >
+                <div
+                  className="relative flex items-center rounded-2xl overflow-hidden"
+                  style={{
+                    backgroundColor: "#12121A",
+                    border: "1px solid #2E2E40",
+                    boxShadow: "0 4px 40px rgba(0,0,0,0.4)",
+                  }}
+                >
+                  <div className="pl-4 pr-3 flex items-center" style={{ color: "#9494B8" }}>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                  </div>
+                  <input
+                    type="url"
+                    value={lensUrl}
+                    onChange={(e) => setLensUrl(e.target.value)}
+                    placeholder="Paste a URL to extract knowledge from..."
+                    className="flex-1 py-4 pr-4 text-base bg-transparent outline-none"
+                    style={{ color: "#EEEEFF" }}
+                    autoFocus
+                  />
+                  <AnimatePresence>
+                    {lensUrl.trim() && (
+                      <motion.button
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="mr-2 px-5 py-2 rounded-xl font-semibold text-sm"
+                        style={{ backgroundColor: "#818CF8", color: "white", flexShrink: 0, border: "none" }}
+                      >
+                        Extract
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <div
+                  className="flex flex-col items-center gap-3 py-8 rounded-2xl"
+                  style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: "rgba(129, 140, 248, 0.1)", border: "1px solid rgba(129, 140, 248, 0.2)" }}
+                  >
+                    <svg className="w-5 h-5" style={{ color: "#818CF8" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-medium" style={{ color: "#EEEEFF" }}>Lens is coming soon</p>
+                  <p className="text-xs text-center max-w-xs" style={{ color: "#4B4B6B" }}>
+                    Paste any URL and we&apos;ll extract, summarize, and turn it into structured learning content.
+                  </p>
                 </div>
               </motion.div>
-            ) : (
+            )}
+
+            {mode === "reach" && (
               <motion.div
-                key="suggestions"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="flex flex-wrap gap-2 justify-center"
+                key="reach"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25 }}
+                className="w-full"
               >
-                {["Quantum Computing", "Roman History", "Machine Learning", "Jazz Theory", "DNA Replication"].map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    onClick={() => { setQuery(suggestion); inputRef.current?.focus(); }}
-                    className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
-                    style={{ backgroundColor: "#1C1C28", border: "1px solid #2E2E40", color: "#9494B8" }}
+                <div
+                  className="flex flex-col items-center gap-3 py-8 rounded-2xl"
+                  style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: "rgba(129, 140, 248, 0.1)", border: "1px solid rgba(129, 140, 248, 0.2)" }}
                   >
-                    {suggestion}
-                  </button>
-                ))}
+                    <svg className="w-5 h-5" style={{ color: "#818CF8" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-medium" style={{ color: "#EEEEFF" }}>Reach is coming soon</p>
+                  <p className="text-xs text-center max-w-xs" style={{ color: "#4B4B6B" }}>
+                    Automate and manage your Google Ads, Meta Ads, and more — all from one intelligent dashboard.
+                  </p>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

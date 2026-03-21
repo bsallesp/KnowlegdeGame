@@ -58,11 +58,26 @@ model Question {
 model User {
   id              String       @id @default(cuid())
   email           String       @unique
+  passwordHash    String?
+  emailVerified   Boolean      @default(false)
   createdAt       DateTime     @default(now())
   credits         Int          @default(50)
   creditsResetsAt DateTime     @default(now())
   plan            String       @default("free")
   answers         UserAnswer[]
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  email     String
+  codeHash  String
+  type      String   // VERIFY_EMAIL | RESET_PASSWORD
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([email, type])
 }
 
 model UserAnswer {

@@ -598,7 +598,7 @@ describe("SearchPage — additional UI coverage", () => {
     render(<SearchPage />);
     const user = userEvent.setup();
     await user.type(screen.getByRole("textbox"), "   ");
-    expect(screen.queryByRole("button", { name: /learn/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^learn$/i })).toBeNull();
   });
 
   test("history card click keeps topic name in input", async () => {
