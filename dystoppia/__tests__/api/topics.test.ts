@@ -51,7 +51,7 @@ function makeTopicWithAnswers(correct: number, wrong: number) {
 describe("GET /api/topics — happy path", () => {
   test("returns 200 with topics array", async () => {
     mockFindMany.mockResolvedValue([]);
-    const res = await GET();
+    const res = await GET(makeRequest());
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(Array.isArray(data.topics)).toBe(true);
@@ -59,14 +59,14 @@ describe("GET /api/topics — happy path", () => {
 
   test("returns empty array when no topics exist", async () => {
     mockFindMany.mockResolvedValue([]);
-    const res = await GET();
+    const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.topics).toEqual([]);
   });
 
   test("returns topic with correct fields", async () => {
     mockFindMany.mockResolvedValue([makeTopic()]);
-    const res = await GET();
+    const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.topics[0]).toMatchObject({
       id: "topic-1",
@@ -77,35 +77,35 @@ describe("GET /api/topics — happy path", () => {
 
   test("includes totalAnswers count", async () => {
     mockFindMany.mockResolvedValue([makeTopicWithAnswers(3, 2)]);
-    const res = await GET();
+    const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.topics[0].totalAnswers).toBe(5);
   });
 
   test("calculates correctRate as rounded percentage", async () => {
     mockFindMany.mockResolvedValue([makeTopicWithAnswers(3, 2)]);
-    const res = await GET();
+    const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.topics[0].correctRate).toBe(60);
   });
 
   test("correctRate is null when no answers", async () => {
     mockFindMany.mockResolvedValue([makeTopic()]);
-    const res = await GET();
+    const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.topics[0].correctRate).toBeNull();
   });
 
   test("returns 100 correctRate when all correct", async () => {
     mockFindMany.mockResolvedValue([makeTopicWithAnswers(4, 0)]);
-    const res = await GET();
+    const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.topics[0].correctRate).toBe(100);
   });
 
   test("returns 0 correctRate when all wrong", async () => {
     mockFindMany.mockResolvedValue([makeTopicWithAnswers(0, 5)]);
-    const res = await GET();
+    const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.topics[0].correctRate).toBe(0);
   });
@@ -115,7 +115,7 @@ describe("GET /api/topics — happy path", () => {
       makeTopic({ id: "t1", name: "AZ-900", slug: "az-900" }),
       makeTopic({ id: "t2", name: "AWS", slug: "aws" }),
     ]);
-    const res = await GET();
+    const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.topics.length).toBe(2);
   });
@@ -129,14 +129,14 @@ describe("GET /api/topics — happy path", () => {
         ],
       }),
     ]);
-    const res = await GET();
+    const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.topics[0].totalAnswers).toBe(3);
   });
 
   test("queries topics ordered by createdAt desc", async () => {
     mockFindMany.mockResolvedValue([]);
-    await GET();
+    await GET(makeRequest());
     expect(mockFindMany).toHaveBeenCalledWith(
       expect.objectContaining({ orderBy: { createdAt: "desc" } })
     );
@@ -146,13 +146,13 @@ describe("GET /api/topics — happy path", () => {
 describe("GET /api/topics — error handling", () => {
   test("returns 500 when prisma throws", async () => {
     mockFindMany.mockRejectedValue(new Error("DB error"));
-    const res = await GET();
+    const res = await GET(makeRequest());
     expect(res.status).toBe(500);
   });
 
   test("includes error in 500 body", async () => {
     mockFindMany.mockRejectedValue(new Error("DB unavailable"));
-    const res = await GET();
+    const res = await GET(makeRequest());
     const data = await res.json();
     expect(data.error).toContain("DB unavailable");
   });

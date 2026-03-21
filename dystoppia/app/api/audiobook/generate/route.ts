@@ -63,39 +63,39 @@ function buildPrompt(
 ): string {
   const weakSection =
     weakSpots.length > 0
-      ? `Struggling with: ${weakSpots.map((w) => `"${w.name}" (${Math.round(w.rate * 100)}% correct)`).join(", ")}.`
-      : "No significant weak spots yet in this scope.";
+      ? `WEAK (needs reinforcement): ${weakSpots.map((w) => `"${w.name}" (${Math.round(w.rate * 100)}% correct)`).join(", ")}`
+      : "No weak spots yet.";
 
   const masteredSection =
     mastered.length > 0
-      ? `Mastered: ${mastered.map((m) => `"${m.name}"`).join(", ")}.`
-      : "Nothing fully mastered yet here.";
+      ? `MASTERED: ${mastered.map((m) => `"${m.name}"`).join(", ")}`
+      : "";
 
   const upcomingSection =
     upcoming.length > 0
-      ? `Not yet attempted: ${upcoming.map((u) => `"${u.name}"`).join(", ")}.`
+      ? `NOT SEEN YET: ${upcoming.map((u) => `"${u.name}"`).join(", ")}`
       : "";
 
-  return `You are a warm, encouraging learning narrator for Dystoppia, an adaptive learning app.
+  return `You are a brutally efficient tutor creating an audio lesson for someone with ADHD.
 
-Topic: "${topicName}"
-Focused scope: ${scopeLabel} — ${scopeDescription}
+CONTEXT:
+- Topic: "${topicName}"
+- Scope: ${scopeLabel} — ${scopeDescription}
+- ${weakSection}
+- ${masteredSection}
+- ${upcomingSection}
 
-LEARNER PERFORMANCE IN THIS SCOPE:
-${weakSection}
-${masteredSection}
-${upcomingSection}
+RULES (non-negotiable):
+1. ZERO warm-up. Start with the content immediately. No "Hey there!", no "Welcome back", no "Today we're going to...".
+2. MAX 200 words total. Every word must earn its place.
+3. Cover ONLY the weak spots. Ignore mastered content.
+4. One concept = one sentence. Short. Punchy. No compound sentences.
+5. Use concrete examples, never abstract definitions.
+6. No filler words: "basically", "essentially", "in other words", "remember that", "it's important to".
+7. End with ONE actionable next step. Nothing else.
 
-Write a personalized 2–3 minute audio narration (approximately 350–450 words) that:
-1. Opens by naming the specific scope (chapter or concept) the learner asked about
-2. Reinforces the weak spots with clear, concise explanations (main focus)
-3. Briefly celebrates any mastered concepts
-4. Previews what's next in this scope
-5. Closes with an encouraging call to action
-
-Tone: mentor-like, warm, direct — like a brilliant tutor speaking naturally.
-Style: conversational spoken word. No bullet points, no markdown, no stage directions.
-Write ONLY the narration text that will be read aloud.`;
+FORMAT: Plain spoken sentences. No lists read aloud. No "first... second... third".
+Write ONLY the narration. Nothing else.`;
 }
 
 export async function POST(req: NextRequest) {
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
 
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 1024,
+      max_tokens: 400,
       messages: [{ role: "user", content: prompt }],
     });
 

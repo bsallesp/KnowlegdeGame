@@ -143,6 +143,68 @@ describe("TopicDashboard — interactions", () => {
   });
 });
 
+describe("TopicDashboard — onOpenAudiobooks", () => {
+  test("renders headphone button for item when onOpenAudiobooks is provided", () => {
+    render(
+      <TopicDashboard
+        items={[makeItem()]}
+        subItemStats={emptyStats}
+        onToggleMute={vi.fn()}
+        onOpenAudiobooks={vi.fn()}
+      />
+    );
+    expect(screen.getByLabelText("Abrir audiobooks do item")).toBeTruthy();
+  });
+
+  test("renders headphone buttons for subitems when onOpenAudiobooks is provided", () => {
+    render(
+      <TopicDashboard
+        items={[makeItem()]}
+        subItemStats={emptyStats}
+        onToggleMute={vi.fn()}
+        onOpenAudiobooks={vi.fn()}
+      />
+    );
+    const btns = screen.getAllByLabelText("Abrir audiobooks do subitem");
+    expect(btns.length).toBe(2);
+  });
+
+  test("does NOT render headphone buttons when onOpenAudiobooks is undefined", () => {
+    render(<TopicDashboard items={[makeItem()]} subItemStats={emptyStats} onToggleMute={vi.fn()} />);
+    expect(screen.queryByLabelText("Abrir audiobooks do item")).toBeNull();
+    expect(screen.queryByLabelText("Abrir audiobooks do subitem")).toBeNull();
+  });
+
+  test("calls onOpenAudiobooks with item id, 'item', and item name", async () => {
+    const onOpenAudiobooks = vi.fn();
+    render(
+      <TopicDashboard
+        items={[makeItem()]}
+        subItemStats={emptyStats}
+        onToggleMute={vi.fn()}
+        onOpenAudiobooks={onOpenAudiobooks}
+      />
+    );
+    await userEvent.click(screen.getByLabelText("Abrir audiobooks do item"));
+    expect(onOpenAudiobooks).toHaveBeenCalledWith("item-1", "item", "Cloud Concepts");
+  });
+
+  test("calls onOpenAudiobooks with subitem id, 'subitem', and subitem name", async () => {
+    const onOpenAudiobooks = vi.fn();
+    render(
+      <TopicDashboard
+        items={[makeItem()]}
+        subItemStats={emptyStats}
+        onToggleMute={vi.fn()}
+        onOpenAudiobooks={onOpenAudiobooks}
+      />
+    );
+    const btns = screen.getAllByLabelText("Abrir audiobooks do subitem");
+    await userEvent.click(btns[0]);
+    expect(onOpenAudiobooks).toHaveBeenCalledWith("sub-1", "subitem", "IaaS vs PaaS");
+  });
+});
+
 describe("TopicDashboard — stats display", () => {
   test("progress bar title shows correct/total", () => {
     render(<TopicDashboard items={[makeItem()]} subItemStats={stats} onToggleMute={vi.fn()} />);
