@@ -101,7 +101,7 @@ export default function OnboardingWizard({
   };
 
   const summaryEntries = Object.entries(summary).filter(
-    ([k, v]) => k !== "topic" && v
+    ([k, v]) => k !== "topic" && v && typeof v === "string"
   );
   const canSubmit = selectedCards.length > 0 || freeText.trim().length > 0;
 
