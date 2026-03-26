@@ -143,6 +143,16 @@ const doneTopicPayload = {
   ],
 };
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 function setupFetchWithDone() {
   const sseBody = makeSseStream([
     { type: "item", data: { name: "Cloud Concepts", subItems: [{ name: "Cloud Concepts" }] } },
@@ -398,10 +408,10 @@ describe("SearchPage — search submission", () => {
   });
 
   test("shows NeuralTransition during search", async () => {
-    // Use a never-resolving structure fetch so the component stays in loading state
+    const pendingStructure = createDeferred<{ ok: true; body: null }>();
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes("/api/topics")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ topics: [] }) });
-      if (url.includes("/api/generate-structure")) return new Promise(() => {}); // never resolves
+      if (url.includes("/api/generate-structure")) return pendingStructure.promise;
       return Promise.reject(new Error("Unexpected"));
     }) as any;
     render(<SearchPage />);
@@ -409,8 +419,10 @@ describe("SearchPage — search submission", () => {
     const input = screen.getByRole("textbox");
     await user.type(input, "AZ-900");
     await act(async () => { fireEvent.submit(document.querySelector("form")!); });
-    // NeuralTransition is visible while the fetch is pending
-    expect(screen.getByTestId("neural-transition")).toBeTruthy();
+    expect(screen.getByTestId("neural-transition")).toBeInTheDocument();
+    await act(async () => {
+      pendingStructure.resolve({ ok: true, body: null });
+    });
   });
 });
 
@@ -458,16 +470,33 @@ describe("SearchPage — error handling", () => {
 
 // ─── History topic click ──────────────────────────────────────────────────────
 describe("SearchPage — history click", () => {
-  test("clicking history topic calls API with that topic", async () => {
-    setupFetch(true, false);
+  test("clicking history topic calls resume endpoint with slug", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/topics") {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(topicsResponse) });
+      }
+      if (url.includes("/api/topics?slug=")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            id: "t1",
+            name: "AZ-900",
+            slug: "az-900",
+            createdAt: "2024-01-01T00:00:00.000Z",
+            items: [],
+          }),
+        });
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    }) as any;
     render(<SearchPage />);
-    await waitFor(() => screen.getByText("AZ-900"));
-    await act(async () => { fireEvent.click(screen.getByText("AZ-900")); });
+    const historyButton = await screen.findByRole("button", { name: /AZ-900/i });
+    await act(async () => { fireEvent.click(historyButton); });
     await waitFor(() => {
-      const structureCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
-        (c: unknown[]) => (c[0] as string).includes("generate-structure")
+      const resumeCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
+        (c: unknown[]) => (c[0] as string).includes("/api/topics?slug=az-900")
       );
-      expect(structureCall).toBeTruthy();
+      expect(resumeCall).toBeTruthy();
     }, { timeout: 3000 });
   });
 });
@@ -610,14 +639,31 @@ describe("SearchPage — additional UI coverage", () => {
   });
 
   test("history card click keeps topic name in input", async () => {
-    setupFetch(true, false);
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/topics") {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(topicsResponse) });
+      }
+      if (url.includes("/api/topics?slug=")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            id: "t1",
+            name: "AZ-900",
+            slug: "az-900",
+            createdAt: "2024-01-01T00:00:00.000Z",
+            items: [],
+          }),
+        });
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    }) as any;
     render(<SearchPage />);
-    await waitFor(() => screen.getByText("AZ-900"));
+    const historyButton = await screen.findByRole("button", { name: /AZ-900/i });
     await act(async () => {
-      fireEvent.click(screen.getByText("AZ-900"));
+      fireEvent.click(historyButton);
     });
     const input = screen.getByRole("textbox") as HTMLInputElement;
-    expect(input.value).toBe("AZ-900");
+    expect(input.value).toBe("");
   });
 
   test("history cards render as clickable buttons", async () => {
@@ -634,10 +680,10 @@ describe("SearchPage — additional UI coverage", () => {
   });
 
   test("typing valid query updates NeuralTransition topic prop on submit path", async () => {
-    // Keep request pending so transition remains visible for assertion
+    const pendingStructure = createDeferred<{ ok: true; body: null }>();
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes("/api/topics")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ topics: [] }) });
-      if (url.includes("/api/generate-structure")) return new Promise(() => {});
+      if (url.includes("/api/generate-structure")) return pendingStructure.promise;
       return Promise.reject(new Error("Unexpected"));
     }) as any;
     render(<SearchPage />);
@@ -648,6 +694,9 @@ describe("SearchPage — additional UI coverage", () => {
     });
     const transition = screen.getByTestId("neural-transition");
     expect(transition.getAttribute("data-topic")).toBe("Kubernetes");
+    await act(async () => {
+      pendingStructure.resolve({ ok: true, body: null });
+    });
   });
 });
 

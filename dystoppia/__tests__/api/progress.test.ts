@@ -96,9 +96,44 @@ describe("GET /api/progress", () => {
     expect(diffDays).toBeCloseTo(7, 0);
   });
 
+  test("uses NaN date window when days is invalid string", async () => {
+    mockFindMany.mockResolvedValue([]);
+    await GET(makeRequest({ days: "abc" }));
+    const whereArg = mockFindMany.mock.calls[0][0].where;
+    expect(Number.isNaN(whereArg.createdAt.gte.getTime())).toBe(true);
+  });
+
+  test("supports negative days by producing future since date", async () => {
+    mockFindMany.mockResolvedValue([]);
+    await GET(makeRequest({ days: "-3" }));
+    const whereArg = mockFindMany.mock.calls[0][0].where;
+    expect(whereArg.createdAt.gte.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  test("does not include topic relation filter when topicId absent", async () => {
+    mockFindMany.mockResolvedValue([]);
+    await GET(makeRequest());
+    const whereArg = mockFindMany.mock.calls[0][0].where;
+    expect(whereArg.subItem).toBeUndefined();
+  });
+
+  test("returns dates as YYYY-MM-DD strings", async () => {
+    mockFindMany.mockResolvedValue([makeAnswer(true, 0)]);
+    const res = await GET(makeRequest());
+    const { history } = await res.json();
+    expect(history[0].date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
   test("returns 500 on prisma error", async () => {
     mockFindMany.mockRejectedValue(new Error("DB error"));
     const res = await GET(makeRequest());
     expect(res.status).toBe(500);
+  });
+
+  test("500 response contains stable error message", async () => {
+    mockFindMany.mockRejectedValue(new Error("DB error"));
+    const res = await GET(makeRequest());
+    const body = await res.json();
+    expect(body.error).toBe("Failed to fetch progress");
   });
 });

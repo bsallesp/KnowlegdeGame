@@ -86,6 +86,7 @@ CONTEXT:
 - ${upcomingSection}
 
 RULES (non-negotiable):
+0. Write the narration entirely in English.
 1. ZERO warm-up. Start with the content immediately. No "Hey there!", no "Welcome back", no "Today we're going to...".
 2. MAX 200 words total. Every word must earn its place.
 3. Cover ONLY the weak spots. Ignore mastered content.
@@ -124,11 +125,15 @@ export async function POST(req: NextRequest) {
     let scopeLabel: string;
     let scopeDescription: string;
 
+    type TopicItem = (typeof topic.items)[number];
+    type SubItem = TopicItem["subItems"][number];
+
     if (subItemId) {
       // Single concept
-      const found = topic.items
-        .flatMap((it) => it.subItems.map((s) => ({ ...s, itemName: it.name })))
-        .find((s) => s.id === subItemId);
+      const flatItems: SubItemWithParent[] = topic.items.flatMap((it: TopicItem) =>
+        it.subItems.map((s: SubItem) => ({ id: s.id, name: s.name, itemName: it.name }))
+      );
+      const found = flatItems.find((s: SubItemWithParent) => s.id === subItemId);
 
       if (!found) return NextResponse.json({ error: "SubItem not found" }, { status: 404 });
 
@@ -137,16 +142,16 @@ export async function POST(req: NextRequest) {
       scopeDescription = `"${found.name}" (from chapter "${found.itemName}")`;
     } else if (itemId) {
       // Full chapter (all subitems of that item)
-      const item = topic.items.find((it) => it.id === itemId);
+      const item = topic.items.find((it: TopicItem) => it.id === itemId);
       if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });
 
-      scopedSubItems = item.subItems.map((s) => ({ ...s, itemName: item.name }));
+      scopedSubItems = item.subItems.map((s: SubItem) => ({ id: s.id, name: s.name, itemName: item.name }));
       scopeLabel = `Chapter`;
       scopeDescription = `"${item.name}"`;
     } else {
       // Full topic fallback
-      scopedSubItems = topic.items.flatMap((it) =>
-        it.subItems.map((s) => ({ ...s, itemName: it.name }))
+      scopedSubItems = topic.items.flatMap((it: TopicItem) =>
+        it.subItems.map((s: SubItem) => ({ id: s.id, name: s.name, itemName: it.name }))
       );
       scopeLabel = `Topic`;
       scopeDescription = `"${topic.name}"`;
@@ -179,7 +184,7 @@ export async function POST(req: NextRequest) {
 
     logger.info("audiobook", `Audio synthesized (${audioBuffer.length} bytes)`);
 
-    return new NextResponse(audioBuffer, {
+    return new NextResponse(audioBuffer.buffer as ArrayBuffer, {
       status: 200,
       headers: {
         "Content-Type": "audio/mpeg",

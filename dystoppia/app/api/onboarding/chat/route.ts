@@ -118,7 +118,7 @@ Your task:
 - Ask ONE focused and friendly question at a time
 - Generate 3-5 SPECIFIC card options for "${topic}" (not generic)
 - After 2-4 turns (or earlier if context is already clear), set readyToCreate=true
-- Always respond in the user's same language (detect from free-text replies; default: English)
+- Always respond in English, regardless of the language used by the user
 - Skip questions about things you already know from the profile or conversation
 - If answers indicate an advanced level, adapt vocabulary and depth
 

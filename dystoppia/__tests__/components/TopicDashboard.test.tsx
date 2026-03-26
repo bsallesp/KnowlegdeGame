@@ -36,13 +36,13 @@ const stats = {
 describe("TopicDashboard — rendering", () => {
   test("renders item name", () => {
     render(<TopicDashboard items={[makeItem()]} subItemStats={emptyStats} onToggleMute={vi.fn()} />);
-    expect(screen.getByText("Cloud Concepts")).toBeTruthy();
+    expect(screen.getByText("Cloud Concepts")).toBeInTheDocument();
   });
 
   test("renders subitem names", () => {
     render(<TopicDashboard items={[makeItem()]} subItemStats={emptyStats} onToggleMute={vi.fn()} />);
-    expect(screen.getByText("IaaS vs PaaS")).toBeTruthy();
-    expect(screen.getByText("SaaS overview")).toBeTruthy();
+    expect(screen.getByText("IaaS vs PaaS")).toBeInTheDocument();
+    expect(screen.getByText("SaaS overview")).toBeInTheDocument();
   });
 
   test("renders multiple items", () => {
@@ -51,19 +51,19 @@ describe("TopicDashboard — rendering", () => {
       makeItem({ id: "item-2", name: "Security", subItems: [{ id: "sub-3", itemId: "item-2", name: "IAM", order: 0, muted: false, difficulty: 1 }] }),
     ];
     render(<TopicDashboard items={items} subItemStats={emptyStats} onToggleMute={vi.fn()} />);
-    expect(screen.getByText("Cloud Concepts")).toBeTruthy();
-    expect(screen.getByText("Security")).toBeTruthy();
-    expect(screen.getByText("IAM")).toBeTruthy();
+    expect(screen.getByText("Cloud Concepts")).toBeInTheDocument();
+    expect(screen.getByText("Security")).toBeInTheDocument();
+    expect(screen.getByText("IAM")).toBeInTheDocument();
   });
 
   test("renders empty items list without crash", () => {
     const { container } = render(<TopicDashboard items={[]} subItemStats={emptyStats} onToggleMute={vi.fn()} />);
-    expect(container.firstChild).toBeTruthy();
+    expect(container.firstChild).toBeInTheDocument();
   });
 
   test("renders mute button for item", () => {
     render(<TopicDashboard items={[makeItem()]} subItemStats={emptyStats} onToggleMute={vi.fn()} />);
-    expect(screen.getByLabelText("Mute item")).toBeTruthy();
+    expect(screen.getByLabelText("Mute item")).toBeInTheDocument();
   });
 
   test("renders mute buttons for subitems", () => {
@@ -74,21 +74,18 @@ describe("TopicDashboard — rendering", () => {
 
   test("shows Unmute label when item is muted", () => {
     render(<TopicDashboard items={[makeItem({ muted: true })]} subItemStats={emptyStats} onToggleMute={vi.fn()} />);
-    expect(screen.getByLabelText("Unmute item")).toBeTruthy();
+    expect(screen.getByLabelText("Unmute item")).toBeInTheDocument();
   });
 
   test("renders progress bar when stats have data", () => {
     render(<TopicDashboard items={[makeItem()]} subItemStats={stats} onToggleMute={vi.fn()} />);
-    // progress bars are divs with title containing correct/total
-    const bars = document.querySelectorAll('[title*="/"]');
+    const bars = screen.getAllByTestId("topic-progress-bar");
     expect(bars.length).toBeGreaterThan(0);
   });
 
   test("displays totalCount = 0 for subitems with no stats", () => {
-    // ProgressBar only renders when totalCount > 0, so with empty stats no bars appear
     render(<TopicDashboard items={[makeItem()]} subItemStats={emptyStats} onToggleMute={vi.fn()} />);
-    const bars = document.querySelectorAll('[title*=" correct"]');
-    expect(bars.length).toBe(0);
+    expect(screen.queryByTestId("topic-progress-bar")).toBeNull();
   });
 });
 
@@ -123,7 +120,7 @@ describe("TopicDashboard — interactions", () => {
     const collapseBtn = screen.getByRole("button", { name: /cloud concepts/i });
     await userEvent.click(collapseBtn);
     await userEvent.click(collapseBtn);
-    expect(screen.getByText("IaaS vs PaaS")).toBeTruthy();
+    expect(screen.getByText("IaaS vs PaaS")).toBeInTheDocument();
   });
 
   test("muted item has reduced opacity", () => {
@@ -139,7 +136,7 @@ describe("TopicDashboard — interactions", () => {
       subItems: [{ id: "sub-1", itemId: "item-1", name: "IaaS vs PaaS", order: 0, muted: true, difficulty: 1 }],
     });
     render(<TopicDashboard items={[item]} subItemStats={emptyStats} onToggleMute={vi.fn()} />);
-    expect(screen.getByLabelText("Unmute subitem")).toBeTruthy();
+    expect(screen.getByLabelText("Unmute subitem")).toBeInTheDocument();
   });
 });
 
@@ -153,7 +150,7 @@ describe("TopicDashboard — onOpenAudiobooks", () => {
         onOpenAudiobooks={vi.fn()}
       />
     );
-    expect(screen.getByLabelText("Abrir audiobooks do item")).toBeTruthy();
+    expect(screen.getByLabelText("Abrir audiobooks do item")).toBeInTheDocument();
   });
 
   test("renders headphone buttons for subitems when onOpenAudiobooks is provided", () => {
@@ -208,13 +205,13 @@ describe("TopicDashboard — onOpenAudiobooks", () => {
 describe("TopicDashboard — stats display", () => {
   test("progress bar title shows correct/total", () => {
     render(<TopicDashboard items={[makeItem()]} subItemStats={stats} onToggleMute={vi.fn()} />);
-    expect(document.querySelector('[title="3/5 correct"]')).toBeTruthy();
+    const [firstBar] = screen.getAllByTestId("topic-progress-bar");
+    expect(firstBar).toHaveAttribute("title", "3/5 correct");
   });
 
   test("renders difficulty dots for each subitem", () => {
     render(<TopicDashboard items={[makeItem()]} subItemStats={stats} onToggleMute={vi.fn()} />);
-    // 5 difficulty dots per subitem, 2 subitems = 10 dots
-    const dots = document.querySelectorAll(".w-1\\.5.h-1\\.5.rounded-full");
+    const dots = screen.getAllByTestId("topic-difficulty-dot");
     expect(dots.length).toBeGreaterThanOrEqual(10);
   });
 
@@ -226,6 +223,6 @@ describe("TopicDashboard — stats display", () => {
         onToggleMute={vi.fn()}
       />
     );
-    expect(screen.getByText("IaaS vs PaaS")).toBeTruthy();
+    expect(screen.getByText("IaaS vs PaaS")).toBeInTheDocument();
   });
 });

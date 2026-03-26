@@ -17,35 +17,50 @@ export class CreditError extends Error {
   }
 }
 
+const MAX_DEDUCT_RETRIES = 5;
+
 // Deducts `amount` credits from the user. Performs a lazy monthly reset first
 // if creditsResetsAt has passed. Returns remaining credits after deduction.
 // Throws CreditError if the user has insufficient credits.
 export async function deductCredits(userId: string, amount: number): Promise<number> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { credits: true, creditsResetsAt: true, plan: true },
-  });
+  for (let attempt = 0; attempt < MAX_DEDUCT_RETRIES; attempt++) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { credits: true, creditsResetsAt: true, plan: true },
+    });
 
-  if (!user) throw new Error("User not found");
+    if (!user) throw new Error("User not found");
 
-  let credits = user.credits;
-  const updateData: { credits?: number; creditsResetsAt?: Date } = {};
+    const now = new Date();
+    const shouldReset = now >= user.creditsResetsAt;
+    const availableCredits = shouldReset ? planLimit(user.plan) : user.credits;
 
-  // Lazy monthly reset
-  if (new Date() >= user.creditsResetsAt) {
-    credits = planLimit(user.plan);
-    const next = new Date(user.creditsResetsAt);
-    next.setMonth(next.getMonth() + 1);
-    updateData.creditsResetsAt = next;
+    if (availableCredits < amount) {
+      throw new CreditError(availableCredits);
+    }
+
+    const remaining = availableCredits - amount;
+    const data: { credits: number; creditsResetsAt?: Date } = { credits: remaining };
+
+    if (shouldReset) {
+      const next = new Date(user.creditsResetsAt);
+      next.setMonth(next.getMonth() + 1);
+      data.creditsResetsAt = next;
+    }
+
+    const result = await prisma.user.updateMany({
+      where: {
+        id: userId,
+        credits: user.credits,
+        creditsResetsAt: user.creditsResetsAt,
+      },
+      data,
+    });
+
+    if (result.count === 1) {
+      return remaining;
+    }
   }
 
-  if (credits < amount) throw new CreditError(credits);
-
-  const remaining = credits - amount;
-  await prisma.user.update({
-    where: { id: userId },
-    data: { ...updateData, credits: remaining },
-  });
-
-  return remaining;
+  throw new Error("Failed to deduct credits due to concurrent updates");
 }

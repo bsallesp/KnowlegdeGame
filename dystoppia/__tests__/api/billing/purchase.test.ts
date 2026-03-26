@@ -136,6 +136,19 @@ describe("POST /api/billing/purchase — success", () => {
     expect(body.user.credits).toBe(500);
   });
 
+  test("returns creditsResetsAt in response payload", async () => {
+    const resetAt = new Date("2026-04-22T10:00:00.000Z");
+    mockUserUpdate.mockResolvedValue({
+      id: "user-1",
+      plan: "learner",
+      credits: 500,
+      creditsResetsAt: resetAt,
+    });
+    const res = await POST(makeRequest({ plan: "learner" }));
+    const body = await res.json();
+    expect(body.user.creditsResetsAt).toBeDefined();
+  });
+
   test("allows downgrade to free plan", async () => {
     mockUserUpdate.mockResolvedValue({
       id: "user-1",
@@ -148,6 +161,21 @@ describe("POST /api/billing/purchase — success", () => {
     const body = await res.json();
     expect(body.user.plan).toBe("free");
   });
+
+  test("processes repeated purchase requests independently", async () => {
+    const callsBefore = mockUserUpdate.mock.calls.length;
+    const first = await POST(makeRequest({ plan: "learner" }));
+    const second = await POST(makeRequest({ plan: "learner" }));
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(mockUserUpdate.mock.calls.length - callsBefore).toBe(2);
+  });
+});
+
+describe("POST /api/billing/purchase — idempotency roadmap", () => {
+  test.todo("deduplicates retries when an idempotency key is provided");
+  test.todo("prevents double plan updates on fast client retries");
 });
 
 // ─── Error handling ───────────────────────────────────────────────────────────

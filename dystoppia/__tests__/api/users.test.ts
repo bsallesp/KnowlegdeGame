@@ -133,6 +133,14 @@ describe("POST /api/users — new user creation", () => {
     await POST(makeRequest({ email: "test@example.com" }));
     expect(mockUpdateMany).not.toHaveBeenCalled();
   });
+
+  test("does not call backfill when sessionId is empty string", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue({ id: "user-1", email: "test@example.com" });
+
+    await POST(makeRequest({ email: "test@example.com", sessionId: "" }));
+    expect(mockUpdateMany).not.toHaveBeenCalled();
+  });
 });
 
 describe("POST /api/users — existing user", () => {

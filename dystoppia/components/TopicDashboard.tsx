@@ -20,6 +20,7 @@ function ProgressBar({ correctCount, totalCount }: { correctCount: number; total
   return (
     <div
       className="w-full h-1.5 rounded-full overflow-hidden mt-1"
+      data-testid="topic-progress-bar"
       style={{ backgroundColor: "#2E2E40" }}
       title={`${correctCount}/${totalCount} correct`}
     >
@@ -63,6 +64,7 @@ function DifficultyDots({ level }: { level: number }) {
         <div
           key={d}
           className="w-1.5 h-1.5 rounded-full"
+          data-testid="topic-difficulty-dot"
           style={{
             backgroundColor: d <= level ? "#818CF8" : "#2E2E40",
           }}

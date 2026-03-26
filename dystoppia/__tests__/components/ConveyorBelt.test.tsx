@@ -29,27 +29,23 @@ function makeQuestion(overrides: Partial<Question> = {}): Question {
 describe("ConveyorBelt — rendering", () => {
   test("renders 'Now' label", () => {
     render(<ConveyorBelt queue={[]} currentQuestion={null} isGenerating={false} />);
-    expect(screen.getByText("Now")).toBeTruthy();
+    expect(screen.getByText("Now")).toBeInTheDocument();
   });
 
   test("renders 'Up next' label", () => {
     render(<ConveyorBelt queue={[]} currentQuestion={null} isGenerating={false} />);
-    expect(screen.getByText("Up next")).toBeTruthy();
+    expect(screen.getByText("Up next")).toBeInTheDocument();
   });
 
   test("renders skeleton when no currentQuestion", () => {
-    const { container } = render(<ConveyorBelt queue={[]} currentQuestion={null} isGenerating={false} />);
-    // SkeletonCard is a div with specific dimensions
-    const skeletons = container.querySelectorAll('[style*="56px"]');
-    expect(skeletons.length).toBeGreaterThan(0);
+    render(<ConveyorBelt queue={[]} currentQuestion={null} isGenerating={false} />);
+    expect(screen.getByTestId("conveyor-skeleton")).toBeInTheDocument();
   });
 
   test("renders current question indicator when present", () => {
     const q = makeQuestion();
-    const { container } = render(<ConveyorBelt queue={[]} currentQuestion={q} isGenerating={false} />);
-    // The active card has boxShadow glow
-    const glowCard = container.querySelector('[style*="box-shadow"]');
-    expect(glowCard).toBeTruthy();
+    render(<ConveyorBelt queue={[]} currentQuestion={q} isGenerating={false} />);
+    expect(screen.getByTestId("conveyor-current-indicator")).toBeInTheDocument();
   });
 
   test("renders queue cards for each queued question", () => {
@@ -58,24 +54,23 @@ describe("ConveyorBelt — rendering", () => {
       makeQuestion({ id: "q-3", type: "true_false" }),
       makeQuestion({ id: "q-4", type: "fill_blank" }),
     ];
-    const { container } = render(<ConveyorBelt queue={queue} currentQuestion={null} isGenerating={false} />);
+    render(<ConveyorBelt queue={queue} currentQuestion={null} isGenerating={false} />);
     // MC=MC, TF, FB labels
-    expect(screen.getByText("MC")).toBeTruthy();
-    expect(screen.getByText("TF")).toBeTruthy();
-    expect(screen.getByText("FB")).toBeTruthy();
+    expect(screen.getByText("MC")).toBeInTheDocument();
+    expect(screen.getByText("TF")).toBeInTheDocument();
+    expect(screen.getByText("FB")).toBeInTheDocument();
   });
 
   test("renders 'SC' label for single_choice questions", () => {
     const queue = [makeQuestion({ id: "q-5", type: "single_choice" })];
     render(<ConveyorBelt queue={queue} currentQuestion={null} isGenerating={false} />);
-    expect(screen.getByText("SC")).toBeTruthy();
+    expect(screen.getByText("SC")).toBeInTheDocument();
   });
 
   test("renders 'Generating...' when isGenerating = true", () => {
-    // Component renders 3 animated dots, NOT the text "Generating..."
-    const { container } = render(<ConveyorBelt queue={[]} currentQuestion={null} isGenerating={true} />);
-    const dots = container.querySelectorAll('.w-1\\.5.h-1\\.5.rounded-full');
-    expect(dots.length).toBe(3);
+    render(<ConveyorBelt queue={[]} currentQuestion={null} isGenerating={true} />);
+    expect(screen.getByTestId("conveyor-generating")).toBeInTheDocument();
+    expect(screen.getAllByTestId("conveyor-generating-dot")).toHaveLength(3);
   });
 
   test("does not render generating text when isGenerating = false", () => {
@@ -85,31 +80,30 @@ describe("ConveyorBelt — rendering", () => {
 
   test("renders empty queue without crash", () => {
     const { container } = render(<ConveyorBelt queue={[]} currentQuestion={null} isGenerating={false} />);
-    expect(container).toBeTruthy();
+    expect(container.firstChild).toBeInTheDocument();
   });
 
   test("shows subItem name as title tooltip on queue card", () => {
     const q = makeQuestion({
       subItem: { id: "sub-1", itemId: "item-1", name: "IaaS vs PaaS", order: 0, muted: false, difficulty: 1 },
     });
-    const { container } = render(<ConveyorBelt queue={[q]} currentQuestion={null} isGenerating={false} />);
-    const card = container.querySelector('[title="IaaS vs PaaS"]');
-    expect(card).toBeTruthy();
+    render(<ConveyorBelt queue={[q]} currentQuestion={null} isGenerating={false} />);
+    const [card] = screen.getAllByTestId("conveyor-queue-card");
+    expect(card).toHaveAttribute("title", "IaaS vs PaaS");
   });
 
   test("falls back to 'Question' title when subItem is missing", () => {
     const q = makeQuestion({ subItem: undefined });
-    const { container } = render(<ConveyorBelt queue={[q]} currentQuestion={null} isGenerating={false} />);
-    const card = container.querySelector('[title="Question"]');
-    expect(card).toBeTruthy();
+    render(<ConveyorBelt queue={[q]} currentQuestion={null} isGenerating={false} />);
+    const [card] = screen.getAllByTestId("conveyor-queue-card");
+    expect(card).toHaveAttribute("title", "Question");
   });
 
   test("renders difficulty bar proportional to difficulty level", () => {
     const q = makeQuestion({ difficulty: 4 });
-    const { container } = render(<ConveyorBelt queue={[q]} currentQuestion={null} isGenerating={false} />);
-    // difficulty 4 = 80% width
-    const bar = container.querySelector('[style*="80%"]');
-    expect(bar).toBeTruthy();
+    render(<ConveyorBelt queue={[q]} currentQuestion={null} isGenerating={false} />);
+    const [bar] = screen.getAllByTestId("conveyor-difficulty-fill");
+    expect(bar).toHaveStyle({ width: "80%" });
   });
 
   test("multiple questions in queue all get unique cards", () => {
@@ -118,25 +112,23 @@ describe("ConveyorBelt — rendering", () => {
     );
     render(<ConveyorBelt queue={queue} currentQuestion={null} isGenerating={false} />);
     const labels = screen.getAllByText("MC");
-    expect(labels.length).toBe(5);
+    expect(labels).toHaveLength(5);
   });
 
   test("renders component with both currentQuestion and queue", () => {
     const current = makeQuestion({ id: "current" });
     const queue = [makeQuestion({ id: "next-1" }), makeQuestion({ id: "next-2" })];
     render(<ConveyorBelt queue={queue} currentQuestion={current} isGenerating={false} />);
-    expect(screen.getByText("Now")).toBeTruthy();
-    expect(screen.getByText("Up next")).toBeTruthy();
-    expect(screen.getAllByText("MC").length).toBe(2);
+    expect(screen.getByText("Now")).toBeInTheDocument();
+    expect(screen.getByText("Up next")).toBeInTheDocument();
+    expect(screen.getAllByText("MC")).toHaveLength(2);
   });
 
   test("shows both generating and queue questions simultaneously", () => {
     const queue = [makeQuestion({ id: "q-extra" })];
-    const { container } = render(<ConveyorBelt queue={queue} currentQuestion={null} isGenerating={true} />);
-    expect(screen.getByText("MC")).toBeTruthy();
-    // Generating indicator shows 3 animated dots alongside the queue
-    const dots = container.querySelectorAll('.w-1\\.5.h-1\\.5.rounded-full');
-    expect(dots.length).toBe(3);
+    render(<ConveyorBelt queue={queue} currentQuestion={null} isGenerating={true} />);
+    expect(screen.getByText("MC")).toBeInTheDocument();
+    expect(screen.getAllByTestId("conveyor-generating-dot")).toHaveLength(3);
   });
 });
 

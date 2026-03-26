@@ -183,7 +183,7 @@ describe("POST /api/onboarding/chat — existing profile", () => {
       goals: JSON.stringify(["certification"]),
       knowledgeLevels: JSON.stringify({}),
       timePerSession: "15min",
-      preferredLang: "pt",
+      preferredLang: "en",
       rawHistory: null,
     });
     mockCreate.mockResolvedValue(makeAnthropicResponse(turnResponse));

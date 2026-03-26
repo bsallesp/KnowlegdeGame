@@ -9,6 +9,11 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+function shuffleOptions(options: string[] | null, type: string): string[] | null {
+  if (!options || type === "true_false") return options;
+  return [...options].sort(() => Math.random() - 0.5);
+}
+
 // Minimum cached questions before background refill kicks in
 const REFILL_THRESHOLD = 8;
 // How many questions to generate per background refill
@@ -94,7 +99,7 @@ Apply this pedagogical approach when writing all questions. The questions should
   const defaultTimeLimit = timeLimitByDifficulty[resolvedDifficulty] ?? 150;
   const timerInstruction = `- "timeLimit": use ${defaultTimeLimit} for multiple_choice, true_false, and single_choice. Use null for fill_blank.`;
 
-  const prompt = `You are an expert educator creating quiz questions.
+  const prompt = `You are an expert educator creating quiz questions. All questions, options, answers, and explanations must be written in English.
 
 Topic: "${subItem.item.topic.name}"
 Chapter: "${subItem.item.name}"
@@ -111,7 +116,7 @@ Return ONLY valid JSON in this exact format:
     {
       "type": "multiple_choice",
       "content": "Question text here?",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "options": ["Option B", "Option C", "Option A", "Option D"],
       "answer": "Option A",
       "explanation": "Explanation of why Option A is correct...",
       "timeLimit": null
@@ -127,7 +132,7 @@ Return ONLY valid JSON in this exact format:
     {
       "type": "fill_blank",
       "content": "The process of ___ converts sunlight into energy.",
-      "options": ["photosynthesis", "respiration", "fermentation"],
+      "options": ["respiration", "photosynthesis", "fermentation"],
       "answer": "photosynthesis",
       "explanation": "Photosynthesis is the process by which plants convert sunlight into chemical energy.",
       "timeLimit": null
@@ -149,7 +154,8 @@ Rules:
 - Explanations should be educational and clear
 - Difficulty ${resolvedDifficulty} means: ${difficultyDesc}
 - No markdown in JSON strings, no newlines in strings
-- Answer must exactly match one of the options (for choice questions)`;
+- Answer must exactly match one of the options (for choice questions)
+- Randomize the position of the correct answer within the options array — do NOT always put it first`;
 
   const message = await client.messages.create({
     model: "claude-sonnet-4-6",
@@ -251,10 +257,10 @@ export async function POST(req: NextRequest) {
       }
 
       return NextResponse.json({
-        questions: shuffled.map((q) => ({
-          ...q,
-          options: q.options ? JSON.parse(q.options) : null,
-        })),
+        questions: shuffled.map((q) => {
+          const options = q.options ? JSON.parse(q.options) : null;
+          return { ...q, options: shuffleOptions(options, q.type) };
+        }),
       });
     }
 
@@ -267,10 +273,10 @@ export async function POST(req: NextRequest) {
       );
 
       return NextResponse.json({
-        questions: validQuestions.map((q) => ({
-          ...q,
-          options: q.options ? JSON.parse(q.options) : null,
-        })),
+        questions: validQuestions.map((q) => {
+          const options = q.options ? JSON.parse(q.options) : null;
+          return { ...q, options: shuffleOptions(options, q.type) };
+        }),
       });
     }
 
@@ -287,7 +293,7 @@ export async function POST(req: NextRequest) {
       questions: generated.map((q) => ({
         type: q.type,
         content: q.content,
-        options: q.options ?? null,
+        options: shuffleOptions(q.options ?? null, q.type),
         answer: q.answer,
         explanation: q.explanation,
         timeLimit: q.timeLimit ?? null,

@@ -49,6 +49,12 @@ describe("GET /api/auth/me — no cookie", () => {
     const data = await res.json();
     expect(data.error).toMatch(/not authenticated/i);
   });
+
+  test("does not attempt token verification without cookie", async () => {
+    mockCookieValue = undefined;
+    await GET();
+    expect(mockVerify).not.toHaveBeenCalled();
+  });
 });
 
 // ─── Tampered / invalid token ─────────────────────────────────────────────────
@@ -66,6 +72,14 @@ describe("GET /api/auth/me — invalid token", () => {
     mockVerify.mockReturnValue(null);
     await GET();
     expect(mockUserFindUnique).not.toHaveBeenCalled();
+  });
+
+  test("returns stable not authenticated message for invalid token", async () => {
+    mockCookieValue = "garbage";
+    mockVerify.mockReturnValue(null);
+    const res = await GET();
+    const data = await res.json();
+    expect(data.error).toBe("Not authenticated");
   });
 });
 

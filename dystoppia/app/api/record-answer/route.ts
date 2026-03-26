@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { calculateNewDifficulty, calculateSM2 } from "@/lib/adaptive";
 import { logger } from "@/lib/logger";
 
+const MAX_SUBITEM_UPDATE_RETRIES = 5;
+
 export async function POST(req: NextRequest) {
   try {
     const { questionId, subItemId, sessionId, correct, timeSpent } = await req.json();
@@ -35,7 +37,7 @@ export async function POST(req: NextRequest) {
     const recentTotal = recentAnswers.length;
 
     // Get current difficulty and SM-2 fields
-    const subItem = await prisma.subItem.findUnique({
+    let subItem = await prisma.subItem.findUnique({
       where: { id: subItemId },
       select: { difficulty: true, easeFactor: true, reviewInterval: true },
     });
@@ -44,34 +46,66 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "SubItem not found" }, { status: 404 });
     }
 
-    const newDifficulty = calculateNewDifficulty(
-      subItem.difficulty,
-      recentCorrect,
-      recentTotal
-    );
+    const initialDifficulty = subItem.difficulty;
+    let appliedDifficulty = subItem.difficulty;
+    let appliedSm2: ReturnType<typeof calculateSM2> | null = null;
 
-    // Calculate SM-2 values (expected time: 15 seconds = 15000ms)
-    const sm2 = calculateSM2(
-      subItem.easeFactor,
-      subItem.reviewInterval,
-      Boolean(correct),
-      timeSpent || 0,
-      15000
-    );
+    for (let attempt = 0; attempt < MAX_SUBITEM_UPDATE_RETRIES; attempt++) {
+      const newDifficulty = calculateNewDifficulty(
+        subItem.difficulty,
+        recentCorrect,
+        recentTotal
+      );
 
-    // Update subItem with new difficulty and SM-2 values
-    await prisma.subItem.update({
-      where: { id: subItemId },
-      data: {
-        difficulty: newDifficulty,
-        easeFactor: sm2.easeFactor,
-        reviewInterval: sm2.reviewInterval,
-        nextReviewAt: sm2.nextReviewAt,
-      },
-    });
+      // Calculate SM-2 values (expected time: 15 seconds = 15000ms)
+      const sm2 = calculateSM2(
+        subItem.easeFactor,
+        subItem.reviewInterval,
+        Boolean(correct),
+        timeSpent || 0,
+        15000
+      );
 
-    if (newDifficulty !== subItem.difficulty) {
-      logger.info("record-answer", `Difficulty changed`, { subItemId, from: subItem.difficulty, to: newDifficulty });
+      // CAS update prevents lost updates when two requests race on the same subItem.
+      const result = await prisma.subItem.updateMany({
+        where: {
+          id: subItemId,
+          difficulty: subItem.difficulty,
+          easeFactor: subItem.easeFactor,
+          reviewInterval: subItem.reviewInterval,
+        },
+        data: {
+          difficulty: newDifficulty,
+          easeFactor: sm2.easeFactor,
+          reviewInterval: sm2.reviewInterval,
+          nextReviewAt: sm2.nextReviewAt,
+        },
+      });
+
+      if (result.count === 1) {
+        appliedDifficulty = newDifficulty;
+        appliedSm2 = sm2;
+        break;
+      }
+
+      const latest = await prisma.subItem.findUnique({
+        where: { id: subItemId },
+        select: { difficulty: true, easeFactor: true, reviewInterval: true },
+      });
+
+      if (!latest) {
+        return NextResponse.json({ error: "SubItem not found" }, { status: 404 });
+      }
+
+      subItem = latest;
+    }
+
+    if (!appliedSm2) {
+      throw new Error("Concurrent subItem update conflict");
+    }
+
+    if (appliedDifficulty !== initialDifficulty) {
+      logger.info("record-answer", `Difficulty changed`, { subItemId, from: initialDifficulty, to: appliedDifficulty });
     }
 
     // Get all stats for this subItem
@@ -84,12 +118,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      newDifficulty,
-      nextReviewAt: sm2.nextReviewAt.toISOString(),
+      newDifficulty: appliedDifficulty,
+      nextReviewAt: appliedSm2.nextReviewAt.toISOString(),
       stats: {
         correctCount,
         totalCount,
-        difficulty: newDifficulty,
+        difficulty: appliedDifficulty,
       },
     });
   } catch (error) {

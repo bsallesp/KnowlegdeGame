@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "mkdir -p /home/data 2>/dev/null; node_modules/.bin/prisma migrate deploy 2>/dev/null || node_modules/.bin/prisma db push --skip-generate 2>/dev/null || true; next start",
+    "postinstall": "prisma generate",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",

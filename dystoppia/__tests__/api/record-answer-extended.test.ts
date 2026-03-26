@@ -10,7 +10,7 @@ const mockCreate = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    subItem: { findUnique: mockFindUnique, update: mockUpdate },
+    subItem: { findUnique: mockFindUnique, updateMany: mockUpdate },
     userAnswer: { create: mockCreate, findMany: mockFindMany },
   },
 }));
@@ -53,7 +53,7 @@ beforeEach(() => {
 
   mockFindUnique.mockResolvedValue(mockSubItem);
   mockCreate.mockResolvedValue({ id: "answer-1" });
-  mockUpdate.mockResolvedValue({});
+  mockUpdate.mockResolvedValue({ count: 1 });
   mockFindMany.mockResolvedValue([{ correct: true, createdAt: new Date() }]);
 });
 
@@ -112,7 +112,9 @@ describe("POST /api/record-answer — SM-2 value constraints", () => {
   test("update where clause targets the correct subItemId", async () => {
     await POST(makeRequest(validBody));
     const updateCall = mockUpdate.mock.calls[0][0];
-    expect(updateCall.where).toEqual({ id: "sub-1" });
+    expect(updateCall.where).toEqual(
+      expect.objectContaining({ id: "sub-1" })
+    );
   });
 });
 

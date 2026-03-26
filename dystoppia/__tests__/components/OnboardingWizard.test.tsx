@@ -69,6 +69,16 @@ function setupFetch(response: object, ok = true) {
   });
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   defaultProps.onComplete = vi.fn();
@@ -78,10 +88,13 @@ beforeEach(() => {
 // ─── Initial render ───────────────────────────────────────────────────────────
 describe("OnboardingWizard — initial render", () => {
   test("shows loading text on mount before API responds", async () => {
-    // Use a never-resolving fetch so loading state persists during assertion
-    global.fetch = vi.fn().mockReturnValue(new Promise(() => {}));
+    const pendingResponse = createDeferred<{ ok: true; json: () => Promise<object> }>();
+    global.fetch = vi.fn().mockReturnValue(pendingResponse.promise);
     render(<OnboardingWizard {...defaultProps} />);
-    expect(screen.getByText("Analyzing the topic...")).toBeTruthy();
+    expect(screen.getByText("Analyzing the topic...")).toBeInTheDocument();
+    await act(async () => {
+      pendingResponse.resolve({ ok: true, json: () => Promise.resolve(makeTurnResponse()) });
+    });
   });
 
   test("renders topic badge in header", () => {

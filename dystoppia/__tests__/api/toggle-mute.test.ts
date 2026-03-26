@@ -63,6 +63,11 @@ describe("POST /api/toggle-mute — validation", () => {
     const data = await res.json();
     expect(data.error).toMatch(/invalid type/i);
   });
+
+  test("returns 400 when id is empty string", async () => {
+    const res = await POST(makeRequest({ id: "", type: "item" }));
+    expect(res.status).toBe(400);
+  });
 });
 
 describe("POST /api/toggle-mute — item type", () => {
@@ -172,5 +177,11 @@ describe("POST /api/toggle-mute — error handling", () => {
     const res = await POST(makeRequest({ id: "sub-1", type: "subitem" }));
     const data = await res.json();
     expect(data.error).toBe("Failed to toggle mute");
+  });
+
+  test("returns 500 when subitem lookup throws", async () => {
+    mockSubItemFindUnique.mockRejectedValue(new Error("DB read failed"));
+    const res = await POST(makeRequest({ id: "sub-1", type: "subitem" }));
+    expect(res.status).toBe(500);
   });
 });

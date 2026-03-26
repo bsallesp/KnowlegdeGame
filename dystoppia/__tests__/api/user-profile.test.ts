@@ -43,6 +43,14 @@ describe("GET /api/user/profile — auth", () => {
     const res = await GET(makeRequest("GET"));
     expect(res.status).toBe(401);
   });
+
+  test("does not query prisma when auth fails", async () => {
+    mockRequireUser.mockResolvedValue(
+      NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+    );
+    await GET(makeRequest("GET"));
+    expect(mockProfileFindUnique).not.toHaveBeenCalled();
+  });
 });
 
 // ─── GET — no profile ─────────────────────────────────────────────────────────
@@ -65,6 +73,13 @@ describe("GET /api/user/profile — no profile", () => {
     await GET(makeRequest("GET"));
     expect(mockProfileFindUnique).toHaveBeenCalledWith({ where: { userId: "user-1" } });
   });
+
+  test("ignores query param userId and still uses authenticated user", async () => {
+    mockProfileFindUnique.mockResolvedValue(null);
+    const req = new NextRequest("http://localhost/api/user/profile?userId=attacker-user");
+    await GET(req);
+    expect(mockProfileFindUnique).toHaveBeenCalledWith({ where: { userId: "user-1" } });
+  });
 });
 
 // ─── GET — with profile ───────────────────────────────────────────────────────
@@ -73,7 +88,7 @@ describe("GET /api/user/profile — existing profile", () => {
     goals: JSON.stringify(["certification", "career"]),
     knowledgeLevels: JSON.stringify({ cloud: "beginner" }),
     timePerSession: "15min",
-    preferredLang: "pt",
+    preferredLang: "en",
     rawHistory: JSON.stringify([{ topic: "AZ-900", context: "ctx", createdAt: "2025-01-01" }]),
   };
 
@@ -117,7 +132,7 @@ describe("GET /api/user/profile — existing profile", () => {
       goals: null,
       knowledgeLevels: null,
       timePerSession: null,
-      preferredLang: "pt",
+      preferredLang: "en",
       rawHistory: null,
     });
     const res = await GET(makeRequest("GET"));
@@ -137,6 +152,14 @@ describe("PATCH /api/user/profile — auth", () => {
     const res = await PATCH(makeRequest("PATCH", { preferredLang: "en" }));
     expect(res.status).toBe(401);
   });
+
+  test("does not call upsert when auth fails", async () => {
+    mockRequireUser.mockResolvedValue(
+      NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+    );
+    await PATCH(makeRequest("PATCH", { preferredLang: "en" }));
+    expect(mockProfileUpsert).not.toHaveBeenCalled();
+  });
 });
 
 // ─── PATCH — upsert ───────────────────────────────────────────────────────────
@@ -154,6 +177,14 @@ describe("PATCH /api/user/profile — upsert", () => {
     expect(mockProfileUpsert).toHaveBeenCalledWith(
       expect.objectContaining({ where: { userId: "user-1" } })
     );
+  });
+
+  test("ignores userId sent in payload and keeps authenticated user scope", async () => {
+    mockProfileUpsert.mockResolvedValue({});
+    await PATCH(makeRequest("PATCH", { userId: "attacker-user", preferredLang: "en" }));
+    const call = mockProfileUpsert.mock.calls[0][0];
+    expect(call.where.userId).toBe("user-1");
+    expect(call.create.userId).toBe("user-1");
   });
 
   test("serializes goals array to JSON string", async () => {

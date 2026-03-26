@@ -21,7 +21,7 @@ Options: ${options ? JSON.stringify(options) : "open answer"}
 
 Give a short, helpful hint (1-2 sentences) that guides the student toward the answer without revealing it directly.
 Do NOT mention the correct answer (${answer}). Be encouraging and specific to the concept.
-Reply with ONLY the hint text, no preamble.`;
+Reply in English only. Reply with ONLY the hint text, no preamble.`;
 
     const message = await client.messages.create({
       model: "claude-haiku-4-5-20251001",

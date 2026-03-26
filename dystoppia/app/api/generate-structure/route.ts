@@ -89,6 +89,9 @@ export async function POST(req: NextRequest) {
 
   const prompt = `You are a curriculum designer and pedagogy expert. Given a topic, generate a structured learning outline with a teaching profile.
 
+All output (item names, subItem names, and all teaching profile text fields) must be written in English.
+
+
 Topic: "${topic}"
 ${userContextSection}
 Analyze the domain deeply. Consider:

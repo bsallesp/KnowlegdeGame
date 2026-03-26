@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 model Topic {
@@ -75,7 +76,7 @@ model UserProfile {
   goals           String?  // JSON: string[]
   knowledgeLevels String?  // JSON: Record<domain, level>
   timePerSession  String?  // "5min" | "15min" | "30min" | "60min+"
-  preferredLang   String   @default("pt")
+  preferredLang   String   @default("en")
   rawHistory      String?  // JSON: OnboardingEntry[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

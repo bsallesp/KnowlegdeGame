@@ -34,6 +34,7 @@ function QueueCard({ question, index }: { question: Question; index: number }) {
       exit={{ opacity: 0, scale: 0.8, x: -40 }}
       transition={{ delay: index * 0.05 }}
       className="flex-shrink-0 rounded-lg p-2 flex flex-col items-center gap-1"
+      data-testid="conveyor-queue-card"
       style={{
         width: "56px",
         backgroundColor: "#1C1C28",
@@ -43,6 +44,7 @@ function QueueCard({ question, index }: { question: Question; index: number }) {
     >
       <div
         className="text-xs font-bold px-1.5 py-0.5 rounded"
+        data-testid="conveyor-type-label"
         style={{ backgroundColor: color + "22", color }}
       >
         {label}
@@ -53,6 +55,7 @@ function QueueCard({ question, index }: { question: Question; index: number }) {
       >
         <div
           className="h-full rounded-full"
+          data-testid="conveyor-difficulty-fill"
           style={{
             width: `${Math.min(100, question.difficulty * 20)}%`,
             backgroundColor: color,
@@ -67,6 +70,7 @@ function SkeletonCard() {
   return (
     <motion.div
       className="flex-shrink-0 rounded-lg"
+      data-testid="conveyor-skeleton"
       style={{
         width: "56px",
         height: "52px",
@@ -100,6 +104,7 @@ export default function ConveyorBelt({ queue, currentQuestion, isGenerating }: C
       {currentQuestion ? (
         <motion.div
           className="flex-shrink-0 rounded-lg p-2 flex items-center justify-center"
+          data-testid="conveyor-current-indicator"
           style={{
             width: "56px",
             height: "52px",
@@ -144,6 +149,7 @@ export default function ConveyorBelt({ queue, currentQuestion, isGenerating }: C
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
+            data-testid="conveyor-generating"
             className="flex-shrink-0 flex items-center gap-1 px-3 rounded-lg"
             style={{
               backgroundColor: "#1C1C28",
@@ -157,6 +163,7 @@ export default function ConveyorBelt({ queue, currentQuestion, isGenerating }: C
                 <motion.div
                   key={i}
                   className="w-1.5 h-1.5 rounded-full"
+                  data-testid="conveyor-generating-dot"
                   style={{ backgroundColor: "#818CF8" }}
                   animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
                   transition={{
