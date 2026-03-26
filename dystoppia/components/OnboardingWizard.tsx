@@ -6,7 +6,7 @@ import type { OnboardingMessage, OnboardingTurn, OnboardingSummary, OnboardingCh
 
 interface OnboardingWizardProps {
   topic: string;
-  pillar: "studio" | "lens" | "reach";
+  pillar: "studio";
   topicExists: boolean;
   onComplete: (onboardingContext: string) => void;
   onSkip: () => void;
