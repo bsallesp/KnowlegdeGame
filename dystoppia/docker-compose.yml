@@ -1,0 +1,27 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dystoppia
+      POSTGRES_USER: dystoppia
+      POSTGRES_PASSWORD: localpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://dystoppia:localpassword@db:5432/dystoppia
+    env_file:
+      - .env.local
+    ports:
+      - "3000:8080"
+
+volumes:
+  postgres_data:

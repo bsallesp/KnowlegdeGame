@@ -1,0 +1,79 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  ACR_NAME: dystoppiaacr
+  APP_NAME: dystoppia-app
+  RG: rg-dystoppia-prod
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dystoppia
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: dystoppia/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  deploy:
+    name: Build & Deploy
+    needs: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dystoppia
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: ACR login
+        run: az acr login --name $ACR_NAME
+
+      - name: Set image tag
+        id: tag
+        run: echo "value=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        run: |
+          docker build \
+            -t $ACR_NAME.azurecr.io/dystoppia:${{ steps.tag.outputs.value }} \
+            -t $ACR_NAME.azurecr.io/dystoppia:latest \
+            .
+          docker push $ACR_NAME.azurecr.io/dystoppia:${{ steps.tag.outputs.value }}
+          docker push $ACR_NAME.azurecr.io/dystoppia:latest
+
+      - name: Deploy to Container Apps
+        run: |
+          az containerapp update \
+            --name $APP_NAME \
+            --resource-group $RG \
+            --image $ACR_NAME.azurecr.io/dystoppia:${{ steps.tag.outputs.value }}
+
+      - name: Show app URL
+        run: |
+          az containerapp show \
+            --name $APP_NAME \
+            --resource-group $RG \
+            --query "properties.configuration.ingress.fqdn" \
+            -o tsv
