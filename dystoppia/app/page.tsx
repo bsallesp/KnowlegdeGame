@@ -7,7 +7,8 @@ import NeuralTransition from "@/components/NeuralTransition";
 import OnboardingWizard from "@/components/OnboardingWizard";
 import useAppStore from "@/store/useAppStore";
 import { useRequireUser } from "@/lib/useRequireUser";
-import type { Item } from "@/types";
+import type { Item, Topic } from "@/types";
+import TopicApprovalScreen from "@/components/TopicApprovalScreen";
 
 type Mode = "studio" | "lens" | "reach";
 
@@ -68,7 +69,8 @@ export default function SearchPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const [resumingSlug, setResumingSlug] = useState<string | null>(null);
-  const { setCurrentTopic, addItemToCurrentTopic, resetSession } = useAppStore();
+  const [approvalTopic, setApprovalTopic] = useState<Topic | null>(null);
+  const { setCurrentTopic, addItemToCurrentTopic, resetSession, toggleItemMute } = useAppStore();
 
   useEffect(() => {
     if (authLoading) return;
@@ -89,7 +91,7 @@ export default function SearchPage() {
     setShowOnboarding(true);
   };
 
-  const proceedWithContent = async (topic: string, onboardingContext?: string) => {
+  const proceedWithContent = async (topic: string, onboardingContext?: string, isNewTopic = false) => {
     setShowOnboarding(false);
     setIsLoading(true);
     setShowTransition(true);
@@ -120,7 +122,6 @@ export default function SearchPage() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let sseBuffer = "";
-      let navigated = false;
       let itemIndex = 0;
 
       while (true) {
@@ -160,16 +161,17 @@ export default function SearchPage() {
               };
               addItemToCurrentTopic(item);
               itemIndex++;
-
-              if (!navigated) {
-                navigated = true;
-                await new Promise((r) => setTimeout(r, 1500));
-                router.push("/session");
-              }
             } else if (event.type === "done") {
               const fullTopic = event.data as Parameters<typeof setCurrentTopic>[0];
               setCurrentTopic(fullTopic);
               prefetchFirstSubItems(fullTopic);
+              setIsLoading(false);
+              setShowTransition(false);
+              if (isNewTopic) {
+                setApprovalTopic(fullTopic as Topic);
+              } else {
+                router.push("/session");
+              }
             } else if (event.type === "error") {
               throw new Error(event.message || "Stream error");
             }
@@ -225,6 +227,19 @@ export default function SearchPage() {
   const topicExists = (t: string) =>
     history.some((h) => h.slug === t.toLowerCase().replace(/\s+/g, "-"));
 
+  const handleApprovalConfirm = (disabledItemIds: Set<string>) => {
+    for (const id of disabledItemIds) {
+      toggleItemMute(id);
+      fetch("/api/toggle-mute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, type: "item" }),
+      }).catch(() => {});
+    }
+    setApprovalTopic(null);
+    router.push("/session");
+  };
+
   return (
     <>
       <NeuralTransition visible={showTransition} topic={pendingTopic || query.trim()} />
@@ -235,8 +250,14 @@ export default function SearchPage() {
             topic={pendingTopic}
             pillar={mode as "studio" | "lens" | "reach"}
             topicExists={topicExists(pendingTopic)}
-            onComplete={(ctx) => proceedWithContent(pendingTopic, ctx)}
+            onComplete={(ctx) => proceedWithContent(pendingTopic, ctx, !topicExists(pendingTopic))}
             onSkip={() => proceedWithContent(pendingTopic)}
+          />
+        )}
+        {approvalTopic && (
+          <TopicApprovalScreen
+            topic={approvalTopic}
+            onConfirm={handleApprovalConfirm}
           />
         )}
       </AnimatePresence>
@@ -555,6 +576,16 @@ export default function SearchPage() {
             className="flex gap-4 text-xs"
             style={{ color: "#9494B8" }}
           >
+            <a
+              href="/profile"
+              className="hover:text-primary transition-colors flex items-center gap-1"
+              style={{ color: "#9494B8" }}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              Profile
+            </a>
             <a
               href="/settings"
               className="hover:text-primary transition-colors flex items-center gap-1"

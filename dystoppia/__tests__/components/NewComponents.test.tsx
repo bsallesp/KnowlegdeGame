@@ -220,6 +220,55 @@ describe("FlashCard", () => {
     fireEvent.click(screen.getByText(/Let's go/));
     expect(onReady).toHaveBeenCalledOnce();
   });
+
+  test("shows default subtitle for difficulty > 1", () => {
+    render(<FlashCard subItem={mockSubItem} topicName="Topic" onReady={vi.fn()} />);
+    expect(screen.getByText("Ready to answer questions about this concept?")).toBeTruthy();
+  });
+
+  test("does NOT show onboarding banner for difficulty > 1", () => {
+    render(<FlashCard subItem={mockSubItem} topicName="Topic" onReady={vi.fn()} />);
+    expect(screen.queryByText(/Practical onboarding/)).toBeNull();
+  });
+});
+
+// ─── FlashCard — beginner / practical onboarding ─────────────────────────────
+
+describe("FlashCard — difficulty 1 (practical onboarding)", () => {
+  const beginnerSubItem = { ...mockSubItem, difficulty: 1 };
+
+  test("shows 'Beginner' difficulty label", () => {
+    render(<FlashCard subItem={beginnerSubItem} topicName="Topic" onReady={vi.fn()} />);
+    expect(screen.getByText("Beginner")).toBeTruthy();
+  });
+
+  test("shows practical onboarding banner", () => {
+    render(<FlashCard subItem={beginnerSubItem} topicName="Topic" onReady={vi.fn()} />);
+    expect(screen.getByText(/Practical onboarding/)).toBeTruthy();
+  });
+
+  test("banner mentions leveling up", () => {
+    render(<FlashCard subItem={beginnerSubItem} topicName="Topic" onReady={vi.fn()} />);
+    expect(screen.getByText(/level up/i)).toBeTruthy();
+  });
+
+  test("shows calibration subtitle explaining progression requirement", () => {
+    render(<FlashCard subItem={beginnerSubItem} topicName="Topic" onReady={vi.fn()} />);
+    expect(screen.getByText(/3 questions/i)).toBeTruthy();
+    expect(screen.getByText(/80%/i)).toBeTruthy();
+  });
+
+  test("does NOT show default subtitle when difficulty is 1", () => {
+    render(<FlashCard subItem={beginnerSubItem} topicName="Topic" onReady={vi.fn()} />);
+    expect(screen.queryByText("Ready to answer questions about this concept?")).toBeNull();
+  });
+
+  test("still calls onReady when button is clicked at difficulty 1", () => {
+    const onReady = vi.fn();
+    render(<FlashCard subItem={beginnerSubItem} topicName="Topic" onReady={onReady} />);
+    fireEvent.click(screen.getByText(/Let's go/));
+    expect(onReady).toHaveBeenCalledOnce();
+  });
 });
 
 // =============================================================================

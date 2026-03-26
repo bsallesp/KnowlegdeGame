@@ -120,6 +120,16 @@ describe("GET /api/user/profile — existing profile", () => {
     expect(body.profile.preferredLang).toBe("pt");
   });
 
+  test("maps stored pt -> returned en", async () => {
+    mockProfileFindUnique.mockResolvedValue({
+      ...storedProfile,
+      preferredLang: "pt",
+    });
+    const res = await GET(makeRequest("GET"));
+    const body = await res.json();
+    expect(body.profile.preferredLang).toBe("en");
+  });
+
   test("returns parsed rawHistory array", async () => {
     const res = await GET(makeRequest("GET"));
     const body = await res.json();

@@ -38,8 +38,23 @@ export default function FlashCard({ subItem, topicName, onReady }: FlashCardProp
           {difficultyLabel}
         </span>
 
+        {subItem.difficulty === 1 && (
+          <div
+            className="text-xs mb-4 px-3 py-2 rounded-lg"
+            style={{
+              backgroundColor: "rgba(129, 140, 248, 0.06)",
+              border: "1px solid rgba(129, 140, 248, 0.15)",
+              color: "#9494B8",
+            }}
+          >
+            Practical onboarding · Answer correctly to level up
+          </div>
+        )}
+
         <p className="text-sm mb-8" style={{ color: "#9494B8" }}>
-          Ready to answer questions about this concept?
+          {subItem.difficulty === 1
+            ? "Answer at least 3 questions with 80%+ accuracy to advance."
+            : "Ready to answer questions about this concept?"}
         </p>
 
         <motion.button

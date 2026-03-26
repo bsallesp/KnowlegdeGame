@@ -2,10 +2,11 @@ import { describe, test, expect, vi, beforeEach } from "vitest";
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 const mockFindMany = vi.hoisted(() => vi.fn());
+const mockFindUnique = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    topic: { findMany: mockFindMany },
+    topic: { findMany: mockFindMany, findUnique: mockFindUnique },
   },
 }));
 
@@ -18,6 +19,7 @@ function makeRequest() {
 
 beforeEach(() => {
   mockFindMany.mockReset();
+  mockFindUnique.mockReset();
 });
 
 function makeTopic(overrides: Record<string, unknown> = {}) {
@@ -46,6 +48,11 @@ function makeTopicWithAnswers(correct: number, wrong: number) {
       },
     ],
   });
+}
+
+function makeRequestWithSlug(slug: string) {
+  const { NextRequest } = require("next/server");
+  return new NextRequest(`http://localhost/api/topics?slug=${encodeURIComponent(slug)}`);
 }
 
 describe("GET /api/topics — happy path", () => {
@@ -140,6 +147,73 @@ describe("GET /api/topics — happy path", () => {
     expect(mockFindMany).toHaveBeenCalledWith(
       expect.objectContaining({ orderBy: { createdAt: "desc" } })
     );
+  });
+});
+
+describe("GET /api/topics — slug branch", () => {
+  test("returns 404 when topic not found for slug", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    const res = await GET(makeRequestWithSlug("missing"));
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toContain("Topic not found");
+  });
+
+  test("returns full topic for slug including mapped items/subItems", async () => {
+    mockFindUnique.mockResolvedValue({
+      id: "topic-1",
+      name: "AZ-900",
+      slug: "az-900",
+      createdAt: new Date("2026-01-01"),
+      teachingProfile: JSON.stringify({ style: "scenario_based", register: "technical" }),
+      items: [
+        {
+          id: "item-1",
+          topicId: "topic-1",
+          name: "Cloud Concepts",
+          order: 0,
+          muted: false,
+          subItems: [
+            {
+              id: "sub-1",
+              itemId: "item-1",
+              name: "IaaS",
+              order: 0,
+              muted: false,
+              difficulty: 1,
+              // fields not needed by the route mapping are omitted
+            },
+          ],
+        },
+      ],
+    });
+
+    const res = await GET(makeRequestWithSlug("az-900"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.slug).toBe("az-900");
+    expect(body.createdAt).toBe("2026-01-01T00:00:00.000Z");
+    expect(body.teachingProfile).toEqual({ style: "scenario_based", register: "technical" });
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0].subItems).toHaveLength(1);
+    expect(body.items[0].subItems[0].difficulty).toBe(1);
+  });
+
+  test("returns null teachingProfile when teachingProfile is null in DB", async () => {
+    mockFindUnique.mockResolvedValue({
+      id: "topic-1",
+      name: "AZ-900",
+      slug: "az-900",
+      createdAt: new Date("2026-01-01"),
+      teachingProfile: null,
+      items: [],
+    });
+
+    const res = await GET(makeRequestWithSlug("az-900"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.teachingProfile).toBeNull();
   });
 });
 

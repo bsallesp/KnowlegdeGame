@@ -184,11 +184,19 @@ export async function POST(req: NextRequest) {
 
     logger.info("audiobook", `Audio synthesized (${audioBuffer.length} bytes)`);
 
-    return new NextResponse(audioBuffer.buffer as ArrayBuffer, {
+    // `Buffer.buffer` includes the full underlying ArrayBuffer (may include unrelated bytes).
+    // Slice using byteOffset/byteLength so the response body matches the synthesized audio.
+    const audioBytes = audioBuffer instanceof Uint8Array ? audioBuffer : new Uint8Array(audioBuffer as any);
+    const arrayBuffer = audioBytes.buffer.slice(
+      audioBytes.byteOffset,
+      audioBytes.byteOffset + audioBytes.byteLength
+    );
+
+    return new NextResponse(arrayBuffer, {
       status: 200,
       headers: {
         "Content-Type": "audio/mpeg",
-        "Content-Length": String(audioBuffer.length),
+        "Content-Length": String(audioBytes.byteLength),
       },
     });
   } catch (error) {

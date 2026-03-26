@@ -199,6 +199,26 @@ describe("cache hit", () => {
     expect(res.status).toBe(200);
     expect(mockCreate_llm).not.toHaveBeenCalled();
   });
+
+  test("triggers background refill when cache is low (< REFILL_THRESHOLD)", async () => {
+    // validQuestions.length = 4 >= count(3), but still < REFILL_THRESHOLD(8)
+    mockFindMany.mockResolvedValue([
+      makeDbQuestion({ id: "q-1", type: "multiple_choice", options: '["A","B","C","D"]' }),
+      makeDbQuestion({ id: "q-2", type: "multiple_choice", options: '["A","B","C","D"]' }),
+      makeDbQuestion({ id: "q-3", type: "multiple_choice", options: '["A","B","C","D"]' }),
+      makeDbQuestion({ id: "q-4", type: "multiple_choice", options: '["A","B","C","D"]' }),
+    ]);
+
+    // Background refill fails -> covers logger.warn inside `.catch(...)`.
+    mockCreate_llm.mockRejectedValueOnce(new Error("Background LLM down"));
+
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
+    expect(res.status).toBe(200);
+
+    // Let the background promise run.
+    await new Promise((r) => setTimeout(r, 10));
+    expect(mockCreate_llm).toHaveBeenCalled();
+  });
 });
 
 // ─── Generation path ──────────────────────────────────────────────────────────
@@ -290,6 +310,70 @@ describe("generation path", () => {
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
     expect(res.status).toBe(500);
+  });
+
+  test("handles invalid teachingProfile JSON (still generates questions)", async () => {
+    mockFindUnique.mockResolvedValue({
+      ...mockSubItem,
+      item: {
+        ...mockSubItem.item,
+        topic: {
+          ...mockSubItem.item.topic,
+          teachingProfile: "{ invalid json ",
+        },
+      },
+    });
+
+    mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
+    expect(res.status).toBe(200);
+  });
+
+  test("uses valid teachingProfile JSON when present", async () => {
+    mockFindUnique.mockResolvedValue({
+      ...mockSubItem,
+      item: {
+        ...mockSubItem.item,
+        topic: {
+          ...mockSubItem.item.topic,
+          teachingProfile: JSON.stringify({
+            style: "scenario_based",
+            register: "technical_professional",
+            questionPatterns: ["What happens when..."],
+            contextHint: "Focus on practical scenarios",
+            exampleDomain: "Azure portal",
+            assessmentFocus: "application",
+          }),
+        },
+      },
+    });
+
+    mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
+    expect(res.status).toBe(200);
+  });
+
+  test("returns 500 when Claude returns non-text content", async () => {
+    mockCreate_llm.mockResolvedValue({
+      content: [{ type: "tool_use", id: "x" }],
+    });
+
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
+    expect(res.status).toBe(500);
+  });
+
+  test("logs post-generation background warmup failure after successful generation", async () => {
+    // First call: awaited generation for `count`
+    mockCreate_llm.mockResolvedValueOnce(makeLLMResponse([makeLLMQuestion()]));
+    // Second call: background warmup fails
+    mockCreate_llm.mockRejectedValueOnce(new Error("Warmup LLM down"));
+
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
+    expect(res.status).toBe(200);
+
+    // Let the background promise run so the `.catch(...)` branch can execute.
+    await new Promise((r) => setTimeout(r, 10));
+    expect(mockCreate_llm).toHaveBeenCalledTimes(2);
   });
 });
 

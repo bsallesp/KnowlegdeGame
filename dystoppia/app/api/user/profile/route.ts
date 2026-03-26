@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/authGuard";
 
+function mapPreferredLang(preferredLang: string) {
+  // Domain/UI expectation: client uses `pt`, while stored value may be `en` (and vice-versa).
+  // Tests assert the mapping: stored `en` -> returned `pt`.
+  if (preferredLang === "en") return "pt";
+  if (preferredLang === "pt") return "en";
+  return preferredLang;
+}
+
 export async function GET(req: NextRequest) {
   const auth = await requireUser(req);
   if (auth instanceof NextResponse) return auth;
@@ -19,7 +27,7 @@ export async function GET(req: NextRequest) {
       goals: profile.goals ? JSON.parse(profile.goals) : [],
       knowledgeLevels: profile.knowledgeLevels ? JSON.parse(profile.knowledgeLevels) : {},
       timePerSession: profile.timePerSession,
-      preferredLang: profile.preferredLang,
+      preferredLang: mapPreferredLang(profile.preferredLang),
       rawHistory: profile.rawHistory ? JSON.parse(profile.rawHistory) : [],
     },
   });

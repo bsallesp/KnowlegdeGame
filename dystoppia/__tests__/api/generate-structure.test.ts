@@ -72,6 +72,28 @@ function makeNdjsonStream(lines: string[]) {
   };
 }
 
+function makeLLMStream(chunks: string[]) {
+  let index = 0;
+  return {
+    [Symbol.asyncIterator]() {
+      return {
+        next: async () => {
+          if (index < chunks.length) {
+            return {
+              done: false,
+              value: {
+                type: "content_block_delta",
+                delta: { type: "text_delta", text: chunks[index++] },
+              },
+            };
+          }
+          return { done: true, value: undefined };
+        },
+      };
+    },
+  };
+}
+
 beforeEach(() => {
   mockTopicFindUnique.mockReset();
   mockTopicCreate.mockReset();
@@ -305,5 +327,50 @@ describe("POST /api/generate-structure — credit system", () => {
 
     await POST(makeRequest({ topic: "AZ-900" }));
     expect(mockStream).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/generate-structure — cache miss streaming parse", () => {
+  test("parses profile + item from correct LLM stream chunks (including remaining buffer)", async () => {
+    mockTopicFindUnique.mockResolvedValue(null);
+
+    // Emit profile line with newline, then emit item line without newline so it is parsed in the remaining buffer section.
+    mockStream.mockReturnValue(makeLLMStream([profileLine + "\n", itemLine]));
+
+    const newTopic = {
+      id: "topic-1",
+      name: "AZ-900",
+      slug: "az-900",
+      teachingProfile: null,
+      items: [
+        {
+          id: "item-1",
+          name: "Cloud Concepts",
+          order: 0,
+          subItems: [{ id: "sub-1", name: "IaaS", order: 0, difficulty: 1 }],
+        },
+      ],
+    };
+    mockTopicCreate.mockResolvedValue(newTopic);
+
+    const res = await POST(makeRequest({ topic: "AZ-900" }));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("text/event-stream");
+
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let fullText = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      fullText += decoder.decode(value);
+    }
+
+    // profile and item events are streamed
+    expect(fullText).toContain('"type":"profile"');
+    expect(fullText).toContain('"type":"item"');
+    // done event is streamed and includes teachingProfile
+    expect(fullText).toContain('"type":"done"');
+    expect(fullText).toContain('"style":"scenario_based"');
   });
 });

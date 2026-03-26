@@ -83,4 +83,12 @@ describe("POST /api/auth/forgot-password — happy path", () => {
     const res = await POST(req({ email: "user@test.com" }));
     expect(res.status).toBe(200);
   });
+
+  test("returns 500 when sendOtpEmail throws", async () => {
+    mockSendOtpEmail.mockRejectedValue(new Error("SMTP down"));
+    const res = await POST(req({ email: "user@test.com" }));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toContain("Something went wrong");
+  });
 });
