@@ -4,9 +4,10 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import NeuralTransition from "@/components/NeuralTransition";
-import OnboardingWizard from "@/components/OnboardingWizard";
 import useAppStore from "@/store/useAppStore";
 import { useRequireUser } from "@/lib/useRequireUser";
+import { useCheckUser } from "@/lib/useCheckUser";
+import LandingPage from "@/components/LandingPage";
 import type { Item, Topic } from "@/types";
 import TopicApprovalScreen from "@/components/TopicApprovalScreen";
 
@@ -19,15 +20,32 @@ interface TopicHistory {
   correctRate: number | null;
 }
 
-export default function SearchPage() {
+export default function RootPage() {
+  const { authenticated, loading } = useCheckUser();
+
+  if (loading) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: "#09090E" }}
+      />
+    );
+  }
+
+  if (!authenticated) {
+    return <LandingPage />;
+  }
+
+  return <SearchPage />;
+}
+
+function SearchPage() {
   const { loading: authLoading } = useRequireUser();
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showTransition, setShowTransition] = useState(false);
   const [history, setHistory] = useState<TopicHistory[]>([]);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [pendingTopic, setPendingTopic] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const [resumingSlug, setResumingSlug] = useState<string | null>(null);
@@ -49,12 +67,10 @@ export default function SearchPage() {
     const topic = topicOverride ?? query.trim();
     if (!topic || isLoading) return;
     setError("");
-    setPendingTopic(topic);
-    setShowOnboarding(true);
+    void proceedWithContent(topic, !topicExists(topic));
   };
 
-  const proceedWithContent = async (topic: string, onboardingContext?: string, isNewTopic = false) => {
-    setShowOnboarding(false);
+  const proceedWithContent = async (topic: string, isNewTopic = false) => {
     setIsLoading(true);
     setShowTransition(true);
     resetSession();
@@ -73,7 +89,7 @@ export default function SearchPage() {
       const res = await fetch("/api/generate-structure", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, onboardingContext }),
+        body: JSON.stringify({ topic }),
       });
 
       if (!res.ok || !res.body) {
@@ -204,18 +220,9 @@ export default function SearchPage() {
 
   return (
     <>
-      <NeuralTransition visible={showTransition} topic={pendingTopic || query.trim()} />
+      <NeuralTransition visible={showTransition} topic={query.trim()} />
 
       <AnimatePresence>
-        {showOnboarding && (
-          <OnboardingWizard
-            topic={pendingTopic}
-            pillar="studio"
-            topicExists={topicExists(pendingTopic)}
-            onComplete={(ctx) => proceedWithContent(pendingTopic, ctx, !topicExists(pendingTopic))}
-            onSkip={() => proceedWithContent(pendingTopic)}
-          />
-        )}
         {approvalTopic && (
           <TopicApprovalScreen
             topic={approvalTopic}
@@ -431,3 +438,6 @@ export default function SearchPage() {
     </>
   );
 }
+
+/** Exported for tests — authenticated “search home” UI (see `RootPage`). */
+export { SearchPage };

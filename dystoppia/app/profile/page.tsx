@@ -17,7 +17,8 @@ export default function ProfilePage() {
   const { loading: authLoading } = useRequireUser();
   const router = useRouter();
   const userEmail = useAppStore((s) => s.userEmail);
-  const credits = useAppStore((s) => s.credits);
+  const weeklyRemaining = useAppStore((s) => s.weeklyRemaining);
+  const weeklyUsage = useAppStore((s) => s.weeklyUsage);
   const plan = useAppStore((s) => s.plan);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -106,9 +107,9 @@ export default function ProfilePage() {
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: "#9494B8" }}>Credits</span>
+                <span className="text-xs" style={{ color: "#9494B8" }}>This week</span>
                 <span className="text-sm font-medium" style={{ color: "#818CF8" }}>
-                  {credits}
+                  {weeklyUsage} used · {weeklyRemaining} left
                 </span>
               </div>
             </div>

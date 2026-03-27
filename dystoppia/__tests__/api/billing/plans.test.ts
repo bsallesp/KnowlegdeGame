@@ -29,41 +29,46 @@ describe("GET /api/billing/plans", () => {
     expect(free.price).toBe(0);
   });
 
-  test("learner plan has price 4.99", async () => {
+  test("learner plan has price 7.99", async () => {
     const res = await GET();
     const { plans } = await res.json();
     const learner = plans.find((p: { id: string }) => p.id === "learner");
-    expect(learner.price).toBe(4.99);
+    expect(learner.price).toBe(7.99);
   });
 
-  test("master plan has price 9.99", async () => {
+  test("master plan has price 16.99", async () => {
     const res = await GET();
     const { plans } = await res.json();
     const master = plans.find((p: { id: string }) => p.id === "master");
-    expect(master.price).toBe(9.99);
+    expect(master.price).toBe(16.99);
   });
 
-  test("each plan has questionsPerMonth field", async () => {
+  test("each plan has rate limit fields", async () => {
     const res = await GET();
     const { plans } = await res.json();
     for (const plan of plans) {
-      expect(typeof plan.questionsPerMonth).toBe("number");
-      expect(plan.questionsPerMonth).toBeGreaterThan(0);
+      expect(typeof plan.hourlyLimit).toBe("number");
+      expect(plan.hourlyLimit).toBeGreaterThan(0);
+      expect(typeof plan.weeklyLimit).toBe("number");
+      expect(plan.weeklyLimit).toBeGreaterThan(0);
     }
   });
 
-  test("free plan has 50 questions/month", async () => {
+  test("free plan has 5 hourly and 30 weekly limit", async () => {
     const free = PLANS.find((p) => p.id === "free")!;
-    expect(free.questionsPerMonth).toBe(50);
+    expect(free.hourlyLimit).toBe(5);
+    expect(free.weeklyLimit).toBe(30);
   });
 
-  test("learner plan has 500 questions/month", async () => {
+  test("learner plan has 30 hourly and 250 weekly limit", async () => {
     const learner = PLANS.find((p) => p.id === "learner")!;
-    expect(learner.questionsPerMonth).toBe(500);
+    expect(learner.hourlyLimit).toBe(30);
+    expect(learner.weeklyLimit).toBe(250);
   });
 
-  test("master plan has 2000 questions/month", async () => {
+  test("master plan has 100 hourly and 1000 weekly limit", async () => {
     const master = PLANS.find((p) => p.id === "master")!;
-    expect(master.questionsPerMonth).toBe(2000);
+    expect(master.hourlyLimit).toBe(100);
+    expect(master.weeklyLimit).toBe(1000);
   });
 });

@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/authGuard";
 import type { OnboardingMessage, OnboardingEntry } from "@/types";
+import { logLLMUsage } from "@/lib/llmLogger";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -44,6 +45,13 @@ export async function POST(req: NextRequest) {
       messages: [{ role: "user", content: prompt }],
     });
     text = response.content[0].type === "text" ? response.content[0].text : "";
+    logLLMUsage({
+      userId: auth.userId,
+      model: "claude-haiku-4-5-20251001",
+      endpoint: "onboarding",
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+    });
   } catch {
     return NextResponse.json({ error: "AI request failed" }, { status: 500 });
   }

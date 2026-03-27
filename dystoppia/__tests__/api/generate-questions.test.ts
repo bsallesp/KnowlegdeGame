@@ -39,6 +39,32 @@ vi.mock("@/lib/credits", () => ({
   CreditError: MockCreditError,
 }));
 
+// ─── Rate limit mock (new system) ────────────────────────────────────────────
+const mockCheckRateLimit = vi.hoisted(() => vi.fn());
+
+class MockRateLimitError extends Error {
+  window: "hourly" | "weekly";
+  remaining: number;
+  resetsAt: Date;
+
+  constructor(window: "hourly" | "weekly", remaining: number, resetsAt: Date) {
+    super("Rate limit exceeded");
+    this.window = window;
+    this.remaining = remaining;
+    this.resetsAt = resetsAt;
+  }
+}
+
+vi.mock("@/lib/rateLimit", () => ({
+  checkRateLimit: mockCheckRateLimit,
+  RateLimitError: MockRateLimitError,
+}));
+
+// ─── LLM usage logger mock (avoid Prisma writes) ─────────────────────────────
+vi.mock("@/lib/llmLogger", () => ({
+  logLLMUsage: vi.fn(),
+}));
+
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 const mockSubItem = {
@@ -82,6 +108,7 @@ function makeLLMQuestion(overrides: Record<string, unknown> = {}) {
 function makeLLMResponse(questions: unknown[]) {
   return {
     content: [{ type: "text", text: JSON.stringify({ questions }) }],
+    usage: { input_tokens: 10, output_tokens: 20 },
   };
 }
 
@@ -107,6 +134,14 @@ beforeEach(() => {
   );
   mockRequireUser.mockResolvedValue({ userId: "user-1" });
   mockDeductCredits.mockResolvedValue(47);
+  mockCheckRateLimit.mockResolvedValue({
+    hourlyUsage: 0,
+    hourlyRemaining: 0,
+    hourlyResetsAt: new Date(),
+    weeklyUsage: 0,
+    weeklyRemaining: 0,
+    weeklyResetsAt: new Date(),
+  });
 });
 
 // ─── Input validation ─────────────────────────────────────────────────────────
@@ -397,40 +432,53 @@ describe("auth guard", () => {
   });
 });
 
-// ─── Credit system ────────────────────────────────────────────────────────────
+// ─── Rate limit system ─────────────────────────────────────────────────────────
 
-describe("credit system", () => {
+describe("rate limit system", () => {
   beforeEach(() => {
     mockFindMany.mockResolvedValue([]); // no cache — forces LLM path
     mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
   });
 
-  test("returns 402 when user has insufficient credits", async () => {
-    mockDeductCredits.mockRejectedValue(new MockCreditError(0));
+  test("returns 429 when rate limit is exceeded", async () => {
+    mockCheckRateLimit.mockRejectedValue(
+      new MockRateLimitError("hourly", 0, new Date("2026-01-01T00:00:00.000Z")),
+    );
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
-    expect(res.status).toBe(402);
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.error).toBe("rate_limited");
+    expect(body.window).toBe("hourly");
+    expect(body.remaining).toBe(0);
+    expect(body.upgradeUrl).toBe("/pricing");
   });
 
-  test("includes remaining credits in 402 response body", async () => {
-    mockDeductCredits.mockRejectedValue(new MockCreditError(3));
+  test("includes remaining and resetsAt in 429 response body", async () => {
+    mockCheckRateLimit.mockRejectedValue(
+      new MockRateLimitError("weekly", 3, new Date("2026-01-08T00:00:00.000Z")),
+    );
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
     const body = await res.json();
+    expect(body.window).toBe("weekly");
     expect(body.remaining).toBe(3);
+    expect(typeof body.resetsAt).toBe("string");
   });
 
-  test("deducts credits equal to count on success", async () => {
+  test("calls checkRateLimit with userId/count on success", async () => {
     await POST(makeRequest({ subItemId: "sub-1", count: 4 }));
-    expect(mockDeductCredits).toHaveBeenCalledWith("user-1", 4);
+    expect(mockCheckRateLimit).toHaveBeenCalledWith("user-1", 4, "question");
   });
 
-  test("does not call LLM when credit deduction fails", async () => {
-    mockDeductCredits.mockRejectedValue(new MockCreditError(0));
+  test("does not call LLM when rate limit check fails", async () => {
+    mockCheckRateLimit.mockRejectedValue(
+      new MockRateLimitError("hourly", 0, new Date("2026-01-01T00:00:00.000Z")),
+    );
     await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
     expect(mockCreate_llm).not.toHaveBeenCalled();
   });
 
-  test("returns 500 when credit deduction throws unexpected error", async () => {
-    mockDeductCredits.mockRejectedValue(new Error("DB connection lost"));
+  test("returns 500 when rate limit check throws unexpected error", async () => {
+    mockCheckRateLimit.mockRejectedValue(new Error("DB connection lost"));
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
     expect(res.status).toBe(500);
   });

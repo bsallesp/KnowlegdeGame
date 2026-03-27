@@ -3,7 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { requireUser } from "@/lib/authGuard";
-import { deductCredits, CreditError } from "@/lib/credits";
+import { checkRateLimit, RateLimitError } from "@/lib/rateLimit";
+import { logLLMUsage } from "@/lib/llmLogger";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -163,6 +164,13 @@ Rules:
     messages: [{ role: "user", content: prompt }],
   });
 
+  logLLMUsage({
+    model: "claude-sonnet-4-6",
+    endpoint: "generate-questions",
+    inputTokens: message.usage.input_tokens,
+    outputTokens: message.usage.output_tokens,
+  });
+
   const content = message.content[0];
   if (content.type !== "text") throw new Error("Unexpected response type from LLM");
 
@@ -216,14 +224,20 @@ export async function POST(req: NextRequest) {
     const resolvedDifficulty = difficulty || subItem.difficulty;
     const correctRate = stats?.totalCount > 0 ? (stats.correctCount / stats.totalCount) * 100 : 50;
 
-    // Credit check — deduct before serving (credit = question served, not generated)
+    // Rate limit check — deduct before serving
     try {
-      await deductCredits(auth.userId, count);
+      await checkRateLimit(auth.userId, count, "question");
     } catch (e) {
-      if (e instanceof CreditError) {
+      if (e instanceof RateLimitError) {
         return NextResponse.json(
-          { error: "Insufficient credits", remaining: e.remaining },
-          { status: 402 }
+          {
+            error: "rate_limited",
+            window: e.window,
+            remaining: e.remaining,
+            resetsAt: e.resetsAt,
+            upgradeUrl: "/pricing",
+          },
+          { status: 429 }
         );
       }
       throw e;

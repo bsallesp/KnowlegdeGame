@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import useAppStore from "@/store/useAppStore";
-
 interface PaywallProps {
   onClose: () => void;
 }
@@ -16,26 +14,21 @@ const UPGRADE_PLANS = [
 export default function Paywall({ onClose }: PaywallProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const setCredits = useAppStore((s) => s.setCredits);
-  const setPlan = useAppStore((s) => s.setPlan);
 
   const handleUpgrade = async (planId: string) => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/billing/purchase", {
+      const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan: planId }),
       });
       if (!res.ok) throw new Error("Upgrade failed");
-      const data = await res.json();
-      setCredits(data.user.credits);
-      setPlan(data.user.plan);
-      onClose();
+      const { url } = await res.json();
+      window.location.href = url;
     } catch {
       setError("Upgrade failed. Please try again.");
-    } finally {
       setLoading(false);
     }
   };

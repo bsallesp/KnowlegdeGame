@@ -11,7 +11,7 @@ import QuestionCard from "@/components/QuestionCard";
 import SkeletonBlock from "@/components/ui/SkeletonBlock";
 import AchievementToast from "@/components/AchievementToast";
 import SessionSummary from "@/components/SessionSummary";
-import Paywall from "@/components/Paywall";
+import RateLimitPaywall from "@/components/RateLimitPaywall";
 import DailyGoalBar from "@/components/DailyGoalBar";
 import BossRound from "@/components/BossRound";
 import FlashCard from "@/components/FlashCard";
@@ -48,7 +48,10 @@ export default function SessionPage() {
     streak,
     lives,
     maxLives,
-    credits,
+    weeklyUsage,
+    weeklyRemaining,
+    weeklyResetsAt,
+    plan,
     setCurrentQuestion,
     addToQueue,
     advanceQueue,
@@ -76,6 +79,7 @@ export default function SessionPage() {
   const [showGameOver, setShowGameOver] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [rateLimitInfo, setRateLimitInfo] = useState<{ window: "hourly" | "weekly"; resetsAt: string | null }>({ window: "hourly", resetsAt: null });
   const [showBossIntro, setShowBossIntro] = useState(false);
   const [isBossRound, setIsBossRound] = useState(false);
   const [bossQuestionsLeft, setBossQuestionsLeft] = useState(0);
@@ -125,7 +129,12 @@ export default function SessionPage() {
           }),
         });
 
-        if (res.status === 402) { setShowPaywall(true); return; }
+        if (res.status === 429) {
+          const body = await res.json().catch(() => ({}));
+          setRateLimitInfo({ window: body.window ?? "hourly", resetsAt: body.resetsAt ?? null });
+          setShowPaywall(true);
+          return;
+        }
         if (!res.ok) throw new Error("Failed to generate questions");
         const data = await res.json();
         const questionsWithSubItem: Question[] = data.questions.map((q: Question) => ({ ...q, subItem }));
@@ -353,6 +362,10 @@ export default function SessionPage() {
           subItemStats,
         }),
       });
+      if (res.status === 403) {
+        setAudiobookError("Audiobook is available on Learner and Master plans.");
+        return;
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.details ?? data.error ?? `HTTP ${res.status}`);
@@ -390,9 +403,39 @@ export default function SessionPage() {
       {/* Achievement toasts */}
       <AchievementToast />
 
-      {/* Paywall */}
+      {/* 60% weekly usage nudge — only for free plan */}
       <AnimatePresence>
-        {showPaywall && <Paywall onClose={() => setShowPaywall(false)} />}
+        {plan === "free" && weeklyUsage > 0 && weeklyRemaining / (weeklyUsage + weeklyRemaining) <= 0.4 && weeklyRemaining > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            className="flex items-center justify-between px-4 py-2 text-xs"
+            style={{ backgroundColor: "rgba(129,140,248,0.1)", borderBottom: "1px solid rgba(129,140,248,0.2)" }}
+          >
+            <span style={{ color: "#9494B8" }}>
+              {weeklyRemaining} questions left this week
+            </span>
+            <a
+              href="/pricing"
+              className="font-semibold px-3 py-1 rounded-lg text-xs transition-all"
+              style={{ backgroundColor: "#818CF8", color: "#09090E" }}
+            >
+              Upgrade
+            </a>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Rate limit paywall */}
+      <AnimatePresence>
+        {showPaywall && (
+          <RateLimitPaywall
+            window={rateLimitInfo.window}
+            resetsAt={rateLimitInfo.resetsAt}
+            onClose={() => setShowPaywall(false)}
+          />
+        )}
       </AnimatePresence>
 
       {/* Game over overlay */}
@@ -472,10 +515,13 @@ export default function SessionPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Credits */}
-          <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: credits <= 5 ? "#F97316" : "#818CF8" }}>
+          {/* Weekly usage */}
+          <div
+            className="flex items-center gap-1 text-xs font-semibold"
+            style={{ color: weeklyRemaining <= 6 ? "#F97316" : "#818CF8" }}
+          >
             <span>⚡</span>
-            <span>{credits} left</span>
+            <span>{weeklyRemaining} left this week</span>
           </div>
 
           {/* Daily goal */}

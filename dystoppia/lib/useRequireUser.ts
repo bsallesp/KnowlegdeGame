@@ -8,8 +8,9 @@ export function useRequireUser() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const setUser = useAppStore((s) => s.setUser);
-  const setCredits = useAppStore((s) => s.setCredits);
+  const setRateLimitState = useAppStore((s) => s.setRateLimitState);
   const setPlan = useAppStore((s) => s.setPlan);
+  const setSubscriptionStatus = useAppStore((s) => s.setSubscriptionStatus);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -17,8 +18,16 @@ export function useRequireUser() {
         if (res.ok) {
           const data = await res.json();
           setUser(data.id, data.email);
-          setCredits(data.credits ?? 50);
           setPlan(data.plan ?? "free");
+          setSubscriptionStatus(data.subscriptionStatus ?? "inactive");
+          setRateLimitState({
+            hourlyUsage: data.hourlyUsage ?? 0,
+            hourlyRemaining: data.hourlyRemaining ?? 5,
+            hourlyResetsAt: data.hourlyResetsAt ?? null,
+            weeklyUsage: data.weeklyUsage ?? 0,
+            weeklyRemaining: data.weeklyRemaining ?? 30,
+            weeklyResetsAt: data.weeklyResetsAt ?? null,
+          });
           setLoading(false);
         } else {
           router.replace("/login");

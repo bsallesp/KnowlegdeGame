@@ -61,11 +61,27 @@ model User {
   passwordHash    String?
   emailVerified   Boolean      @default(false)
   createdAt       DateTime     @default(now())
-  credits         Int          @default(50)
-  creditsResetsAt DateTime     @default(now())
   plan            String       @default("free")
-  answers         UserAnswer[]
-  profile         UserProfile?
+
+  // Stripe
+  stripeCustomerId     String?  @unique
+  stripeSubscriptionId String?  @unique
+  subscriptionStatus   String   @default("inactive")
+  // "inactive" | "trialing" | "active" | "past_due" | "canceled"
+
+  // Rate limiting — hourly window
+  hourlyUsage           Int      @default(0)
+  hourlyWindowStart     DateTime @default(now())
+  hourlyCurriculumUsage Int      @default(0)
+
+  // Rate limiting — weekly window
+  weeklyUsage           Int      @default(0)
+  weeklyWindowStart     DateTime @default(now())
+  weeklyCurriculumUsage Int      @default(0)
+
+  answers     UserAnswer[]
+  profile     UserProfile?
+  llmUsage    LLMUsageLog[]
 }
 
 model UserProfile {
@@ -92,6 +108,29 @@ model OtpCode {
   createdAt DateTime @default(now())
 
   @@index([email, type])
+}
+
+model LLMUsageLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  model        String   // "claude-opus-4-5" | "claude-sonnet-4-6" | "claude-haiku-4-5" | "openai-tts" | "azure-tts"
+  endpoint     String   // "generate-structure" | "generate-questions" | "hint" | "onboarding" | "audiobook"
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  characters   Int      @default(0)
+  costUsd      Float    @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+model WaitlistEntry {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  source    String?  // "landing_hero" | "landing_pricing" | "paywall"
+  createdAt DateTime @default(now())
 }
 
 model UserAnswer {

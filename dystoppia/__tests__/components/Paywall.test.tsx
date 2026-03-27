@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import React from "react";
 
 // ─── Framer-motion stub ───────────────────────────────────────────────────────
 vi.mock("framer-motion", () => ({
@@ -9,21 +10,21 @@ vi.mock("framer-motion", () => ({
       const { initial, animate, exit, transition, whileHover, whileTap, ...rest } = p as any;
       return <div {...rest}>{children}</div>;
     },
-    button: ({ children, onClick, disabled, ...p }: React.PropsWithChildren<Record<string, unknown>>) => {
+    button: ({
+      children,
+      onClick,
+      disabled,
+      ...p
+    }: React.PropsWithChildren<Record<string, unknown> & { onClick?: () => void }>) => {
       const { initial, animate, exit, transition, whileHover, whileTap, ...rest } = p as any;
-      return <button onClick={onClick as any} disabled={disabled as any} {...rest}>{children}</button>;
+      return (
+        <button onClick={onClick as any} disabled={disabled as any} {...rest}>
+          {children}
+        </button>
+      );
     },
   },
   AnimatePresence: ({ children }: React.PropsWithChildren) => <>{children}</>,
-}));
-
-// ─── Store mock ───────────────────────────────────────────────────────────────
-const mockSetCredits = vi.hoisted(() => vi.fn());
-const mockSetPlan = vi.hoisted(() => vi.fn());
-
-vi.mock("@/store/useAppStore", () => ({
-  default: (selector: (s: any) => any) =>
-    selector({ setCredits: mockSetCredits, setPlan: mockSetPlan }),
 }));
 
 // ─── fetch mock ───────────────────────────────────────────────────────────────
@@ -32,7 +33,14 @@ vi.stubGlobal("fetch", mockFetch);
 
 import Paywall from "@/components/Paywall";
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  // jsdom often makes location read-only; replace with a minimal stub.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  delete (window as any).location;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as any).location = { href: "" };
+});
 
 describe("Paywall — rendering", () => {
   test("renders 'Out of credits' heading", () => {
@@ -71,51 +79,61 @@ describe("Paywall — interactions", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  test("calls purchase API with learner plan on click", async () => {
+  test("calls checkout API with learner plan on click", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({ user: { credits: 500, plan: "learner" } }),
+      json: async () => ({ url: "https://stripe.test/checkout_learner" }),
     });
     render(<Paywall onClose={vi.fn()} />);
     await userEvent.click(screen.getByText(/Learner — \$4\.99/i));
-    expect(mockFetch).toHaveBeenCalledWith("/api/billing/purchase", expect.objectContaining({
-      method: "POST",
-      body: JSON.stringify({ plan: "learner" }),
-    }));
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/billing/checkout",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ plan: "learner" }),
+      }),
+    );
   });
 
-  test("calls purchase API with master plan on click", async () => {
+  test("calls checkout API with master plan on click", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({ user: { credits: 2000, plan: "master" } }),
+      json: async () => ({ url: "https://stripe.test/checkout_master" }),
     });
     render(<Paywall onClose={vi.fn()} />);
     await userEvent.click(screen.getByText(/Master — \$9\.99/i));
-    expect(mockFetch).toHaveBeenCalledWith("/api/billing/purchase", expect.objectContaining({
-      body: JSON.stringify({ plan: "master" }),
-    }));
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/billing/checkout",
+      expect.objectContaining({
+        body: JSON.stringify({ plan: "master" }),
+      }),
+    );
   });
 
-  test("updates store credits and plan on successful upgrade", async () => {
+  test("redirects to Stripe checkout url on successful upgrade", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({ user: { credits: 500, plan: "learner" } }),
+      json: async () => ({ url: "https://stripe.test/checkout_learner" }),
     });
     render(<Paywall onClose={vi.fn()} />);
     await userEvent.click(screen.getByText(/Learner/i));
-    await waitFor(() => expect(mockSetCredits).toHaveBeenCalledWith(500));
-    expect(mockSetPlan).toHaveBeenCalledWith("learner");
+    await waitFor(() =>
+      expect(window.location.href).toBe("https://stripe.test/checkout_learner"),
+    );
   });
 
-  test("calls onClose after successful upgrade", async () => {
+  test("does not call onClose after successful upgrade", async () => {
     const onClose = vi.fn();
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({ user: { credits: 500, plan: "learner" } }),
+      json: async () => ({ url: "https://stripe.test/checkout_learner" }),
     });
     render(<Paywall onClose={onClose} />);
     await userEvent.click(screen.getByText(/Learner/i));
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(window.location.href).toBe("https://stripe.test/checkout_learner"),
+    );
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   test("shows error message when API returns non-ok", async () => {
@@ -132,15 +150,19 @@ describe("Paywall — interactions", () => {
     await waitFor(() => expect(screen.getByText(/upgrade failed/i)).toBeTruthy());
   });
 
-  test("buttons are disabled while loading", async () => {
+  test("plan buttons are disabled while loading", async () => {
     let resolve: (v: any) => void;
     mockFetch.mockReturnValue(new Promise((r) => (resolve = r)));
     render(<Paywall onClose={vi.fn()} />);
     await userEvent.click(screen.getByText(/Learner/i));
+
     const buttons = screen.getAllByRole("button");
-    const planButtons = buttons.filter((b) => b.hasAttribute("disabled"));
-    expect(planButtons.length).toBeGreaterThan(0);
+    const learnerBtn = buttons.find((b) => (b.textContent || "").includes("Learner"));
+    const masterBtn = buttons.find((b) => (b.textContent || "").includes("Master"));
+
+    expect(learnerBtn?.hasAttribute("disabled") || masterBtn?.hasAttribute("disabled")).toBe(true);
+
     // cleanup
-    resolve!({ ok: true, json: async () => ({ user: { credits: 500, plan: "learner" } }) });
+    resolve!({ ok: true, json: async () => ({ url: "https://stripe.test/checkout_learner" }) });
   });
 });

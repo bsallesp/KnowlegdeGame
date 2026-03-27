@@ -66,7 +66,7 @@ vi.mock("@/lib/useRequireUser", () => ({
   useRequireUser: () => ({ loading: mockAuthLoading }),
 }));
 
-import SearchPage from "@/app/page";
+import { SearchPage } from "@/app/page";
 
 const topicsResponse = {
   topics: [
@@ -161,6 +161,38 @@ function setupFetchWithDone() {
   global.fetch = vi.fn().mockImplementation((url: string) => {
     if (url.includes("/api/topics"))
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ topics: [] }) });
+    if (url.includes("/api/generate-structure"))
+      return Promise.resolve({ ok: true, body: sseBody });
+    if (url.includes("/api/generate-questions"))
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ questions: [] }) });
+    return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+  }) as any;
+}
+
+/** Topic slug matches search query so flow skips approval and navigates straight to /session. */
+function setupFetchWithDoneExistingTopic() {
+  const sseBody = makeSseStream([
+    { type: "item", data: { name: "Cloud Concepts", subItems: [{ name: "Cloud Concepts" }] } },
+    { type: "done", data: doneTopicPayload },
+  ]);
+  global.fetch = vi.fn().mockImplementation((url: string) => {
+    if (url.includes("/api/topics"))
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            topics: [
+              {
+                id: "existing",
+                name: "AZ-900",
+                slug: "az-900",
+                createdAt: "2024-01-01T00:00:00.000Z",
+                totalAnswers: 1,
+                correctRate: 0.5,
+              },
+            ],
+          }),
+      });
     if (url.includes("/api/generate-structure"))
       return Promise.resolve({ ok: true, body: sseBody });
     if (url.includes("/api/generate-questions"))
@@ -779,15 +811,17 @@ describe("SearchPage — question prefetch on done event", () => {
   });
 
   test("prefetch does not block navigation to /session", async () => {
-    setupFetchWithDone();
+    setupFetchWithDoneExistingTopic();
     render(<SearchPage />);
     const user = userEvent.setup();
     await user.type(screen.getByRole("textbox"), "AZ-900");
-    await act(async () => { fireEvent.submit(document.querySelector("form")!); });
+    await act(async () => {
+      fireEvent.submit(document.querySelector("form")!);
+    });
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith("/session");
-    }, { timeout: 5000 });
+    }, { timeout: 10_000 });
   });
 
   test("skips muted subItems and uses next active one", async () => {

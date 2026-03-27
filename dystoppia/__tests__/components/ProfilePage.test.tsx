@@ -37,7 +37,7 @@ global.fetch = vi.fn();
 
 import ProfilePage from "@/app/profile/page";
 
-const baseStore = { userEmail: "user@example.com", credits: 42, plan: "free" };
+const baseStore = { userEmail: "user@example.com", weeklyUsage: 5, weeklyRemaining: 42, plan: "free" };
 
 function setupStore(overrides: Partial<typeof baseStore> = {}) {
   const state = { ...baseStore, ...overrides };
@@ -77,9 +77,9 @@ describe("ProfilePage — account info", () => {
   });
 
   test("shows credits", () => {
-    setupStore({ credits: 99 });
+    setupStore({ weeklyUsage: 1, weeklyRemaining: 99 });
     render(<ProfilePage />);
-    expect(screen.getByText("99")).toBeTruthy();
+    expect(screen.getByText(/99 left/i)).toBeTruthy();
   });
 
   test("shows Free badge for free plan", () => {

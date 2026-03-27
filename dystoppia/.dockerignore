@@ -2,6 +2,8 @@ node_modules
 .next
 .git
 *.db
-.env.local
+.env
+.env.*
 npm-debug.log*
 coverage
+infra/

@@ -36,4 +36,4 @@ COPY startup.sh ./
 RUN chmod +x startup.sh
 
 EXPOSE 8080
-CMD ["sh", "startup.sh"]
+CMD ["/bin/sh", "/app/startup.sh"]

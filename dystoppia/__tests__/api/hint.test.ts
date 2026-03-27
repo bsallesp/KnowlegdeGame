@@ -13,6 +13,11 @@ vi.mock("@/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+// ─── LLM usage logger mock (avoid Prisma writes) ────────────────────────────
+vi.mock("@/lib/llmLogger", () => ({
+  logLLMUsage: vi.fn(),
+}));
+
 import { POST } from "@/app/api/hint/route";
 
 function makeRequest(body: Record<string, unknown>) {
@@ -24,7 +29,10 @@ function makeRequest(body: Record<string, unknown>) {
 }
 
 function mockLLMResponse(text: string) {
-  mockCreate.mockResolvedValue({ content: [{ type: "text", text }] });
+  mockCreate.mockResolvedValue({
+    content: [{ type: "text", text }],
+    usage: { input_tokens: 10, output_tokens: 20 },
+  });
 }
 
 beforeEach(() => {

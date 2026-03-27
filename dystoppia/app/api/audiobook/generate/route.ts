@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { requireUser } from "@/lib/authGuard";
 import { getTTSProvider } from "@/lib/tts";
+import { logLLMUsage } from "@/lib/llmLogger";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -111,6 +112,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "topicId is required" }, { status: 400 });
     }
 
+    // Audiobook is a paid-only feature
+    const user = await prisma.user.findUnique({
+      where: { id: auth.userId },
+      select: { plan: true },
+    });
+    if (!user || user.plan === "free") {
+      return NextResponse.json(
+        { error: "audiobook_locked", upgradeUrl: "/pricing" },
+        { status: 403 }
+      );
+    }
+
     const topic = await prisma.topic.findUnique({
       where: { id: topicId },
       include: { items: { include: { subItems: true } } },
@@ -177,10 +190,26 @@ export async function POST(req: NextRequest) {
     if (content.type !== "text") throw new Error("Unexpected response type from Claude");
     const script = content.text.trim();
 
+    logLLMUsage({
+      userId: auth.userId,
+      model: "claude-sonnet-4-6",
+      endpoint: "audiobook",
+      inputTokens: message.usage.input_tokens,
+      outputTokens: message.usage.output_tokens,
+    });
+
     logger.info("audiobook", `Script generated (${script.length} chars), calling TTS`);
 
+    const ttsProvider = process.env.AZURE_SPEECH_KEY ? "azure-tts" : "openai-tts";
     const tts = getTTSProvider();
     const audioBuffer = await tts.synthesize(script, { voice: "nova", speed: 1.0 });
+
+    logLLMUsage({
+      userId: auth.userId,
+      model: ttsProvider,
+      endpoint: "audiobook",
+      characters: script.length,
+    });
 
     logger.info("audiobook", `Audio synthesized (${audioBuffer.length} bytes)`);
 

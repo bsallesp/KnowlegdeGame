@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 import { requireUser } from "@/lib/authGuard";
-import { deductCredits, CreditError } from "@/lib/credits";
+import { checkRateLimit, RateLimitError } from "@/lib/rateLimit";
+import { logLLMUsage } from "@/lib/llmLogger";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -70,14 +71,20 @@ export async function POST(req: NextRequest) {
 
   logger.info("generate-structure", `No cache — streaming LLM for "${topic}"`);
 
-  // Cache miss: costs 5 credits (Opus call)
+  // Cache miss: costs 1 curriculum call
   try {
-    await deductCredits(auth.userId, 5);
+    await checkRateLimit(auth.userId, 1, "curriculum");
   } catch (e) {
-    if (e instanceof CreditError) {
+    if (e instanceof RateLimitError) {
       return new Response(
-        JSON.stringify({ error: "Insufficient credits", remaining: e.remaining }),
-        { status: 402, headers: { "Content-Type": "application/json" } }
+        JSON.stringify({
+          error: "rate_limited",
+          window: e.window,
+          remaining: e.remaining,
+          resetsAt: e.resetsAt,
+          upgradeUrl: "/pricing",
+        }),
+        { status: 429, headers: { "Content-Type": "application/json" } }
       );
     }
     throw e;
@@ -127,6 +134,16 @@ Rules:
           model: "claude-opus-4-5",
           max_tokens: 2000,
           messages: [{ role: "user", content: prompt }],
+        });
+
+        llmStream.on("message", (msg) => {
+          logLLMUsage({
+            userId: auth.userId,
+            model: "claude-opus-4-5",
+            endpoint: "generate-structure",
+            inputTokens: msg.usage.input_tokens,
+            outputTokens: msg.usage.output_tokens,
+          });
         });
 
         for await (const chunk of llmStream) {

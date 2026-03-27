@@ -46,6 +46,34 @@ vi.mock("@/lib/credits", () => ({
   CreditError: MockCreditError,
 }));
 
+// ─── Rate limit mock (new system) ────────────────────────────────────────────
+const mockCheckRateLimit = vi.hoisted(() => vi.fn());
+
+const MockRateLimitError = vi.hoisted(() => {
+  return class MockRateLimitError extends Error {
+    window: "hourly" | "weekly";
+    remaining: number;
+    resetsAt: Date;
+
+    constructor(window: "hourly" | "weekly", remaining: number, resetsAt: Date) {
+      super("Rate limit exceeded");
+      this.window = window;
+      this.remaining = remaining;
+      this.resetsAt = resetsAt;
+    }
+  };
+});
+
+vi.mock("@/lib/rateLimit", () => ({
+  checkRateLimit: mockCheckRateLimit,
+  RateLimitError: MockRateLimitError,
+}));
+
+// ─── LLM usage logger mock (avoid Prisma writes) ─────────────────────────────
+vi.mock("@/lib/llmLogger", () => ({
+  logLLMUsage: vi.fn(),
+}));
+
 import { POST } from "@/app/api/generate-structure/route";
 
 function makeRequest(body: Record<string, unknown>) {
@@ -74,7 +102,9 @@ function makeNdjsonStream(lines: string[]) {
 
 function makeLLMStream(chunks: string[]) {
   let index = 0;
-  return {
+  const stream: any = {
+    // generate-structure registers `llmStream.on("message", ...)`
+    on: () => stream,
     [Symbol.asyncIterator]() {
       return {
         next: async () => {
@@ -92,6 +122,7 @@ function makeLLMStream(chunks: string[]) {
       };
     },
   };
+  return stream;
 }
 
 beforeEach(() => {
@@ -104,6 +135,15 @@ beforeEach(() => {
   mockDeductCredits.mockReset();
   mockRequireUser.mockResolvedValue({ userId: "user-1" });
   mockDeductCredits.mockResolvedValue(45);
+  mockCheckRateLimit.mockReset();
+  mockCheckRateLimit.mockResolvedValue({
+    hourlyUsage: 0,
+    hourlyRemaining: 0,
+    hourlyResetsAt: new Date(),
+    weeklyUsage: 0,
+    weeklyRemaining: 0,
+    weeklyResetsAt: new Date(),
+  });
 });
 
 const profileLine = JSON.stringify({
@@ -286,44 +326,53 @@ describe("POST /api/generate-structure — auth guard", () => {
   });
 });
 
-// ─── Credit system ────────────────────────────────────────────────────────────
+// ─── Rate limit system ────────────────────────────────────────────────────────
 
-describe("POST /api/generate-structure — credit system", () => {
-  test("does not deduct credits on cache hit", async () => {
+describe("POST /api/generate-structure — rate limit system", () => {
+  test("does not call rate limit on cache hit", async () => {
     mockTopicFindUnique.mockResolvedValue({ id: "t1", slug: "az-900", teachingProfile: null, items: [] });
     await POST(makeRequest({ topic: "AZ-900" }));
-    expect(mockDeductCredits).not.toHaveBeenCalled();
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
   });
 
-  test("deducts 5 credits on cache miss before streaming", async () => {
+  test("calls checkRateLimit on cache miss before streaming", async () => {
     mockTopicFindUnique.mockResolvedValue(null);
     mockStream.mockReturnValue(makeNdjsonStream([]));
     mockTopicCreate.mockResolvedValue({ id: "t1", slug: "az-900" });
 
     await POST(makeRequest({ topic: "AZ-900" }));
-    expect(mockDeductCredits).toHaveBeenCalledWith("user-1", 5);
+    expect(mockCheckRateLimit).toHaveBeenCalledWith("user-1", 1, "curriculum");
   });
 
-  test("returns 402 on cache miss when user has insufficient credits", async () => {
+  test("returns 429 on cache miss when rate limit is exceeded", async () => {
     mockTopicFindUnique.mockResolvedValue(null);
-    mockDeductCredits.mockRejectedValue(new MockCreditError(2));
+    mockCheckRateLimit.mockRejectedValue(
+      new MockRateLimitError("hourly", 2, new Date("2026-01-02T00:00:00.000Z")),
+    );
 
     const res = await POST(makeRequest({ topic: "AZ-900" }));
-    expect(res.status).toBe(402);
+    expect(res.status).toBe(429);
   });
 
-  test("includes remaining credits in 402 response", async () => {
+  test("includes remaining and resetsAt in 429 response", async () => {
     mockTopicFindUnique.mockResolvedValue(null);
-    mockDeductCredits.mockRejectedValue(new MockCreditError(2));
+    mockCheckRateLimit.mockRejectedValue(
+      new MockRateLimitError("weekly", 2, new Date("2026-01-08T00:00:00.000Z")),
+    );
 
     const res = await POST(makeRequest({ topic: "AZ-900" }));
     const body = await res.json();
+    expect(body.error).toBe("rate_limited");
+    expect(body.window).toBe("weekly");
     expect(body.remaining).toBe(2);
+    expect(body.upgradeUrl).toBe("/pricing");
   });
 
-  test("does not call LLM when credits insufficient on cache miss", async () => {
+  test("does not call LLM when rate limit is exceeded on cache miss", async () => {
     mockTopicFindUnique.mockResolvedValue(null);
-    mockDeductCredits.mockRejectedValue(new MockCreditError(0));
+    mockCheckRateLimit.mockRejectedValue(
+      new MockRateLimitError("hourly", 0, new Date("2026-01-02T00:00:00.000Z")),
+    );
 
     await POST(makeRequest({ topic: "AZ-900" }));
     expect(mockStream).not.toHaveBeenCalled();

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "@/lib/logger";
+import { logLLMUsage } from "@/lib/llmLogger";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -31,6 +32,13 @@ Reply in English only. Reply with ONLY the hint text, no preamble.`;
 
     const content = message.content[0];
     if (content.type !== "text") throw new Error("Unexpected response type");
+
+    logLLMUsage({
+      model: "claude-haiku-4-5-20251001",
+      endpoint: "hint",
+      inputTokens: message.usage.input_tokens,
+      outputTokens: message.usage.output_tokens,
+    });
 
     logger.debug("hint", `Generated hint for question in "${subItemName}"`);
     return NextResponse.json({ hint: content.text.trim() });

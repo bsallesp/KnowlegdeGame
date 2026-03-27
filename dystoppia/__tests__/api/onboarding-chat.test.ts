@@ -26,6 +26,11 @@ vi.mock("@anthropic-ai/sdk", () => ({
   },
 }));
 
+// ─── LLM usage logger mock (avoid Prisma writes) ─────────────────────────────
+vi.mock("@/lib/llmLogger", () => ({
+  logLLMUsage: vi.fn(),
+}));
+
 import { POST } from "@/app/api/onboarding/chat/route";
 
 function makeRequest(body: Record<string, unknown>) {
@@ -39,6 +44,8 @@ function makeRequest(body: Record<string, unknown>) {
 function makeAnthropicResponse(jsonContent: object) {
   return {
     content: [{ type: "text", text: JSON.stringify(jsonContent) }],
+    // Route logs `response.usage.input_tokens/output_tokens`
+    usage: { input_tokens: 123, output_tokens: 456 },
   };
 }
 
@@ -231,7 +238,10 @@ describe("POST /api/onboarding/chat — AI error handling", () => {
 
   test("handles JSON wrapped in markdown code fences", async () => {
     const wrapped = "```json\n" + JSON.stringify(turnResponse) + "\n```";
-    mockCreate.mockResolvedValue({ content: [{ type: "text", text: wrapped }] });
+    mockCreate.mockResolvedValue({
+      content: [{ type: "text", text: wrapped }],
+      usage: { input_tokens: 123, output_tokens: 456 },
+    });
     const res = await POST(makeRequest({ topic: "AZ-900", messages: [], pillar: "studio" }));
     const body = await res.json();
     expect(body.readyToCreate).toBe(false);

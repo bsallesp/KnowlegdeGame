@@ -15,8 +15,12 @@ vi.mock("@/lib/tts", () => ({
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 const mockTopicFindUnique = vi.hoisted(() => vi.fn());
+const mockUserFindUnique = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/prisma", () => ({
-  prisma: { topic: { findUnique: mockTopicFindUnique } },
+  prisma: {
+    user: { findUnique: mockUserFindUnique },
+    topic: { findUnique: mockTopicFindUnique },
+  },
 }));
 
 // ─── Auth mock ────────────────────────────────────────────────────────────────
@@ -26,6 +30,11 @@ vi.mock("@/lib/authGuard", () => ({
 
 vi.mock("@/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+// ─── LLM usage logger mock (avoid Prisma writes) ──────────────────────────────
+vi.mock("@/lib/llmLogger", () => ({
+  logLLMUsage: vi.fn(),
 }));
 
 import { POST } from "@/app/api/audiobook/generate/route";
@@ -70,11 +79,15 @@ function makeRequest(body: Record<string, unknown>) {
 }
 
 function mockLLM(text = "This is the audio script.") {
-  mockCreate.mockResolvedValue({ content: [{ type: "text", text }] });
+  mockCreate.mockResolvedValue({
+    content: [{ type: "text", text }],
+    usage: { input_tokens: 10, output_tokens: 20 },
+  });
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockUserFindUnique.mockResolvedValue({ plan: "learner" });
   mockTopicFindUnique.mockResolvedValue(TOPIC);
   mockSynthesize.mockResolvedValue(AUDIO_BUFFER);
   mockLLM();

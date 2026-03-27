@@ -90,12 +90,26 @@ interface AppState {
   // User identity
   userId: string | null;
   userEmail: string | null;
-  credits: number;
   plan: string;
+  subscriptionStatus: string;
+  hourlyUsage: number;
+  hourlyRemaining: number;
+  hourlyResetsAt: string | null;
+  weeklyUsage: number;
+  weeklyRemaining: number;
+  weeklyResetsAt: string | null;
   setUser: (id: string, email: string) => void;
   clearUser: () => void;
-  setCredits: (n: number) => void;
+  setRateLimitState: (state: {
+    hourlyUsage: number;
+    hourlyRemaining: number;
+    hourlyResetsAt: string;
+    weeklyUsage: number;
+    weeklyRemaining: number;
+    weeklyResetsAt: string;
+  }) => void;
   setPlan: (p: string) => void;
+  setSubscriptionStatus: (s: string) => void;
 
   // Achievement actions
   checkAchievements: (context: { correct?: boolean; timeSpent?: number; usedHint?: boolean; bossCompleted?: boolean }) => void;
@@ -140,8 +154,14 @@ const useAppStore = create<AppState>()(
       // User identity
       userId: null,
       userEmail: null,
-      credits: 50,
       plan: "free",
+      subscriptionStatus: "inactive",
+      hourlyUsage: 0,
+      hourlyRemaining: 5,
+      hourlyResetsAt: null,
+      weeklyUsage: 0,
+      weeklyRemaining: 30,
+      weeklyResetsAt: null,
 
       // Achievements — initialize all as locked
       achievements: ACHIEVEMENT_DEFINITIONS.map((a) => ({ ...a, unlockedAt: null })),
@@ -299,8 +319,16 @@ const useAppStore = create<AppState>()(
       resetLives: () => set((state) => ({ lives: state.maxLives })),
       setUser: (id, email) => set({ userId: id, userEmail: email }),
       clearUser: () => set({ userId: null, userEmail: null }),
-      setCredits: (n) => set({ credits: n }),
+      setRateLimitState: (s) => set({
+        hourlyUsage: s.hourlyUsage,
+        hourlyRemaining: s.hourlyRemaining,
+        hourlyResetsAt: s.hourlyResetsAt,
+        weeklyUsage: s.weeklyUsage,
+        weeklyRemaining: s.weeklyRemaining,
+        weeklyResetsAt: s.weeklyResetsAt,
+      }),
       setPlan: (p) => set({ plan: p }),
+      setSubscriptionStatus: (s) => set({ subscriptionStatus: s }),
 
       checkAchievements: ({ correct, timeSpent, usedHint, bossCompleted }) =>
         set((state) => {
@@ -416,8 +444,14 @@ const useAppStore = create<AppState>()(
         maxLives: state.maxLives,
         userId: state.userId,
         userEmail: state.userEmail,
-        credits: state.credits,
         plan: state.plan,
+        subscriptionStatus: state.subscriptionStatus,
+        hourlyUsage: state.hourlyUsage,
+        hourlyRemaining: state.hourlyRemaining,
+        hourlyResetsAt: state.hourlyResetsAt,
+        weeklyUsage: state.weeklyUsage,
+        weeklyRemaining: state.weeklyRemaining,
+        weeklyResetsAt: state.weeklyResetsAt,
         achievements: state.achievements,
         dailyGoal: state.dailyGoal,
         sessionHistory: state.sessionHistory,
