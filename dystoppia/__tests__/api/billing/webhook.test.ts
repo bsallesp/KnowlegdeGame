@@ -152,6 +152,30 @@ describe("POST /api/billing/webhook", () => {
     });
   });
 
+  test("invoice.payment_failed via Stripe 2026 parent.subscription_details format", async () => {
+    mockConstructEvent.mockReturnValue({
+      type: "invoice.payment_failed",
+      data: {
+        object: {
+          parent: {
+            subscription_details: { subscription: "sub_2026" },
+          },
+        },
+      },
+    });
+    mockUserFindFirst.mockResolvedValue({ id: "user-2026" });
+
+    const res = await POST(postEvent("{}"));
+    expect(res.status).toBe(200);
+    expect(mockUserFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { stripeSubscriptionId: "sub_2026" } }),
+    );
+    expect(mockUserUpdate).toHaveBeenCalledWith({
+      where: { id: "user-2026" },
+      data: { subscriptionStatus: "past_due" },
+    });
+  });
+
   test("ignores unhandled event types", async () => {
     mockConstructEvent.mockReturnValue({ type: "charge.succeeded", data: { object: {} } });
     const res = await POST(postEvent("{}"));

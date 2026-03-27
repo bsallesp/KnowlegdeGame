@@ -134,15 +134,18 @@ model WaitlistEntry {
 }
 
 model UserAnswer {
-  id         String   @id @default(cuid())
-  questionId String
-  question   Question @relation(fields: [questionId], references: [id])
-  subItemId  String
-  subItem    SubItem  @relation(fields: [subItemId], references: [id])
-  sessionId  String
-  userId     String?
-  user       User?    @relation(fields: [userId], references: [id])
-  correct    Boolean
-  timeSpent  Int
-  createdAt  DateTime @default(now())
+  id               String   @id @default(cuid())
+  questionId       String
+  question         Question @relation(fields: [questionId], references: [id])
+  subItemId        String
+  subItem          SubItem  @relation(fields: [subItemId], references: [id])
+  sessionId        String
+  idempotencyKey   String?
+  userId           String?
+  user             User?    @relation(fields: [userId], references: [id])
+  correct          Boolean
+  timeSpent        Int
+  createdAt        DateTime @default(now())
+
+  @@unique([sessionId, idempotencyKey])
 }
