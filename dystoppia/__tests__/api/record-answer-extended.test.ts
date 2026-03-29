@@ -7,11 +7,12 @@ const mockFindUnique = vi.hoisted(() => vi.fn());
 const mockFindMany = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
 const mockCreate = vi.hoisted(() => vi.fn());
+const mockAnswerFindUnique = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     subItem: { findUnique: mockFindUnique, updateMany: mockUpdate },
-    userAnswer: { create: mockCreate, findMany: mockFindMany },
+    userAnswer: { create: mockCreate, findMany: mockFindMany, findUnique: mockAnswerFindUnique },
   },
 }));
 
@@ -50,7 +51,9 @@ beforeEach(() => {
   mockFindMany.mockReset();
   mockUpdate.mockReset();
   mockCreate.mockReset();
+  mockAnswerFindUnique.mockReset();
 
+  mockAnswerFindUnique.mockResolvedValue(null);
   mockFindUnique.mockResolvedValue(mockSubItem);
   mockCreate.mockResolvedValue({ id: "answer-1" });
   mockUpdate.mockResolvedValue({ count: 1 });

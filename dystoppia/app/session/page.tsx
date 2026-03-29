@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import useAppStore from "@/store/useAppStore";
 import { useRequireUser } from "@/lib/useRequireUser";
 import TopicDashboard from "@/components/TopicDashboard";
-import ConveyorBelt from "@/components/ConveyorBelt";
 import QuestionCard from "@/components/QuestionCard";
 import SkeletonBlock from "@/components/ui/SkeletonBlock";
 import AchievementToast from "@/components/AchievementToast";
@@ -17,6 +16,7 @@ import BossRound from "@/components/BossRound";
 import FlashCard from "@/components/FlashCard";
 import AudiobookPlayer from "@/components/AudiobookPlayer";
 import AudiobookDialog, { type AudiobookEntry } from "@/components/AudiobookDialog";
+import SettingsDialog from "@/components/SettingsDialog";
 import { selectNextSubItem } from "@/lib/adaptive";
 import { logger } from "@/lib/logger";
 import type { Question } from "@/types";
@@ -91,6 +91,9 @@ export default function SessionPage() {
   const [isGeneratingAudiobook, setIsGeneratingAudiobook] = useState(false);
   const [audiobookError, setAudiobookError] = useState<string | null>(null);
   const [audiobookDialog, setAudiobookDialog] = useState<{ id: string; type: "item" | "subitem"; label: string } | null>(null);
+  const [showMobileStats, setShowMobileStats] = useState(false);
+  const [showMobileTree, setShowMobileTree] = useState(false);
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const generatingRef = useRef(false);
   const isFetchingRef = useRef(false);
 
@@ -514,7 +517,8 @@ export default function SessionPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-4">
+        {/* Desktop stats bar */}
+        <div className="hidden sm:flex items-center gap-4">
           {/* Weekly usage */}
           <div
             className="flex items-center gap-1 text-xs font-semibold"
@@ -570,17 +574,95 @@ export default function SessionPage() {
             </button>
           )}
 
-          <a href="/settings" className="p-1.5 rounded-lg transition-colors" style={{ color: "#9494B8" }}>
+          <button
+            type="button"
+            onClick={() => setShowSettingsDialog(true)}
+            className="p-1.5 rounded-lg transition-colors"
+            style={{ color: "#9494B8" }}
+            aria-label="Settings"
+          >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-          </a>
+          </button>
+        </div>
+
+        {/* Mobile compact bar */}
+        <div className="flex sm:hidden items-center gap-2">
+          {streak > 1 && (
+            <span className="text-xs font-semibold" style={{ color: "#F97316" }}>🔥{streak}</span>
+          )}
+          <div className="flex items-center gap-0.5">
+            {Array.from({ length: maxLives }).map((_, i) => (
+              <span key={i} className="text-xs" style={{ filter: i < lives ? "none" : "grayscale(1) opacity(0.3)" }}>❤️</span>
+            ))}
+          </div>
+          <button
+            onClick={() => setShowMobileStats((v) => !v)}
+            className="p-1.5 rounded-lg"
+            style={{ color: showMobileStats ? "#818CF8" : "#9494B8", backgroundColor: showMobileStats ? "rgba(129,140,248,0.1)" : "transparent" }}
+            aria-label="Stats"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowSettingsDialog(true)}
+            className="p-1.5 rounded-lg"
+            style={{ color: "#9494B8" }}
+            aria-label="Settings"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
         </div>
       </header>
 
-      {/* Conveyor belt */}
-      <ConveyorBelt queue={questionQueue} currentQuestion={currentQuestion} isGenerating={isGenerating} />
+      {/* Mobile stats panel */}
+      <AnimatePresence>
+        {showMobileStats && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="sm:hidden overflow-hidden flex-shrink-0"
+            style={{ backgroundColor: "#12121A", borderBottom: "1px solid #2E2E40" }}
+          >
+            <div className="flex flex-wrap gap-x-4 gap-y-2 px-4 py-3">
+              <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: weeklyRemaining <= 6 ? "#F97316" : "#818CF8" }}>
+                <span>⚡</span><span>{weeklyRemaining} left this week</span>
+              </div>
+              <DailyGoalBar />
+              {sessionXP > 0 && (
+                <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: "#FACC15" }}>
+                  <span>⚡</span><span>{sessionXP} XP</span>
+                </div>
+              )}
+              {totalCount > 0 && (
+                <div className="flex items-center gap-1 text-xs">
+                  <span style={{ color: "#9494B8" }}>Sessão:</span>
+                  <span className="font-semibold" style={{ color: overallRate >= 70 ? "#60A5FA" : overallRate >= 40 ? "#FACC15" : "#F97316" }}>{overallRate}%</span>
+                  <span style={{ color: "#9494B8" }}>({totalCount})</span>
+                </div>
+              )}
+              {answerCount >= 5 && (
+                <button
+                  onClick={() => { handleShowSummary(); setShowMobileStats(false); }}
+                  className="text-xs px-2 py-1 rounded-lg"
+                  style={{ color: "#9494B8", border: "1px solid #2E2E40" }}
+                >
+                  Resumo
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Audiobook dialog */}
       {audiobookDialog && (
@@ -594,6 +676,8 @@ export default function SessionPage() {
           onPlay={(entry) => setActiveAudiobook(entry)}
         />
       )}
+
+      <SettingsDialog open={showSettingsDialog} onClose={() => setShowSettingsDialog(false)} />
 
       {/* Audiobook generating toast */}
       <AnimatePresence>
@@ -634,6 +718,60 @@ export default function SessionPage() {
           onClose={() => setActiveAudiobook(null)}
         />
       )}
+
+      {/* Mobile learning tree drawer */}
+      <AnimatePresence>
+        {showMobileTree && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 md:hidden"
+              style={{ backgroundColor: "rgba(9,9,14,0.7)", backdropFilter: "blur(4px)" }}
+              onClick={() => setShowMobileTree(false)}
+            />
+            <motion.div
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="fixed left-0 top-0 bottom-0 z-50 w-72 overflow-y-auto p-4 md:hidden"
+              style={{ backgroundColor: "#09090E", borderRight: "1px solid #2E2E40" }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#9494B8" }}>Learning Tree</h2>
+                  <p className="text-xs mt-0.5" style={{ color: "#9494B8" }}>⚠ = ponto fraco &nbsp; ✓ = dominado</p>
+                </div>
+                <button onClick={() => setShowMobileTree(false)} className="p-1 rounded" style={{ color: "#9494B8" }}>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <TopicDashboard
+                items={currentTopic.items}
+                subItemStats={subItemStats}
+                onToggleMute={handleToggleMute}
+                onOpenAudiobooks={isPending ? undefined : (id, type, label) => { setAudiobookDialog({ id, type, label }); setShowMobileTree(false); }}
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile floating tree button */}
+      <button
+        onClick={() => setShowMobileTree(true)}
+        className="fixed bottom-6 left-4 z-30 md:hidden flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold shadow-lg"
+        style={{ backgroundColor: "#1C1C28", border: "1px solid #2E2E40", color: "#9494B8" }}
+      >
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+        </svg>
+        Tree
+      </button>
 
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">

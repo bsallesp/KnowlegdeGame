@@ -54,7 +54,7 @@ export default function AudiobookDialog({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.93, y: 10 }}
             transition={{ type: "spring", damping: 22, stiffness: 300 }}
-            className="fixed z-50 left-80 top-1/2 -translate-y-1/2 w-80 rounded-2xl flex flex-col overflow-hidden"
+            className="fixed z-50 left-1/2 -translate-x-1/2 sm:left-80 sm:translate-x-0 top-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] sm:w-80 max-w-sm rounded-2xl flex flex-col overflow-hidden"
             style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}
           >
             {/* Header */}

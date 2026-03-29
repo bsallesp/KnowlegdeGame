@@ -1,15 +1,21 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
+import { calculateSM2 } from "@/lib/adaptive";
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 const mockCreate = vi.hoisted(() => vi.fn());
 const mockFindMany = vi.hoisted(() => vi.fn());
 const mockFindUnique = vi.hoisted(() => vi.fn());
+const mockAnswerFindUnique = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    userAnswer: { create: mockCreate, findMany: mockFindMany },
+    userAnswer: {
+      create: mockCreate,
+      findMany: mockFindMany,
+      findUnique: mockAnswerFindUnique,
+    },
     subItem: { findUnique: mockFindUnique, updateMany: mockUpdate },
   },
 }));
@@ -46,8 +52,10 @@ beforeEach(() => {
   mockCreate.mockReset();
   mockFindMany.mockReset();
   mockFindUnique.mockReset();
+  mockAnswerFindUnique.mockReset();
   mockUpdate.mockReset();
 
+  mockAnswerFindUnique.mockResolvedValue(null);
   mockCreate.mockResolvedValue({ id: "ans-1" });
   mockFindMany.mockResolvedValue([
     { correct: true, createdAt: new Date() },
@@ -226,9 +234,103 @@ describe("POST /api/record-answer — happy path", () => {
   });
 });
 
-describe("POST /api/record-answer — idempotency roadmap", () => {
-  test.todo("rejects duplicate answer submission when idempotency key repeats");
-  test.todo("returns same result for retried submission without duplicating writes");
+describe("POST /api/record-answer — idempotency", () => {
+  const idemBody = { ...validBody, idempotencyKey: "idem-1" };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-27T12:00:00.000Z"));
+    const stored = {
+      difficulty: 2,
+      easeFactor: 2.5,
+      reviewInterval: 1,
+      nextReviewAt: null as Date | null,
+    };
+    mockFindUnique.mockImplementation(async () => {
+      const sm2 = calculateSM2(stored.easeFactor, stored.reviewInterval, true, 8000, 15000);
+      return {
+        difficulty: stored.difficulty,
+        easeFactor: stored.easeFactor,
+        reviewInterval: stored.reviewInterval,
+        nextReviewAt: stored.nextReviewAt ?? sm2.nextReviewAt,
+      };
+    });
+    mockUpdate.mockImplementation(
+      async (args: {
+        data: { difficulty: number; easeFactor: number; reviewInterval: number; nextReviewAt: Date };
+      }) => {
+        const d = args.data;
+        stored.difficulty = d.difficulty;
+        stored.easeFactor = d.easeFactor;
+        stored.reviewInterval = d.reviewInterval;
+        stored.nextReviewAt = d.nextReviewAt;
+        return { count: 1 };
+      }
+    );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("returns 409 when idempotency key repeats for different question", async () => {
+    mockAnswerFindUnique.mockResolvedValue({
+      id: "a1",
+      questionId: "other-q",
+      subItemId: "sub-1",
+      sessionId: "sess-1",
+      idempotencyKey: "idem-1",
+    });
+    const res = await POST(makeRequest(idemBody));
+    expect(res.status).toBe(409);
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  test("persists idempotency key on first create", async () => {
+    await POST(makeRequest(idemBody));
+    expect(mockCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        idempotencyKey: "idem-1",
+        sessionId: "sess-1",
+      }),
+    });
+  });
+
+  test("does not create a second UserAnswer when the same idempotency key is retried", async () => {
+    mockAnswerFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "a1",
+        questionId: "q-1",
+        subItemId: "sub-1",
+        sessionId: "sess-1",
+        idempotencyKey: "idem-1",
+      });
+
+    await POST(makeRequest(idemBody));
+    await POST(makeRequest(idemBody));
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  test("returns the same JSON payload for a retried idempotent submission", async () => {
+    mockAnswerFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "a1",
+        questionId: "q-1",
+        subItemId: "sub-1",
+        sessionId: "sess-1",
+        idempotencyKey: "idem-1",
+      });
+
+    const first = await POST(makeRequest(idemBody));
+    const second = await POST(makeRequest(idemBody));
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(await first.json()).toEqual(await second.json());
+  });
 });
 
 describe("POST /api/record-answer — subItem not found", () => {

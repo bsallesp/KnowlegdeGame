@@ -69,6 +69,61 @@ describe("POST /api/billing/webhook", () => {
     expect(res.status).toBe(400);
   });
 
+  test("returns 500 when a handler throws after valid signature", async () => {
+    mockConstructEvent.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          metadata: { userId: "u1" },
+          subscription: "sub_fail",
+        },
+      },
+    });
+    mockRetrieve.mockResolvedValue({
+      items: { data: [{ price: { id: "price_learner" } }] },
+    });
+    mockUserUpdate.mockRejectedValue(new Error("database locked"));
+
+    const res = await POST(postEvent("{}"));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Handler error");
+  });
+
+  test("checkout.session.completed without userId skips prisma update", async () => {
+    mockConstructEvent.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          metadata: {},
+          subscription: "sub_only",
+        },
+      },
+    });
+
+    const res = await POST(postEvent("{}"));
+    expect(res.status).toBe(200);
+    expect(mockRetrieve).not.toHaveBeenCalled();
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+  });
+
+  test("checkout.session.completed without subscription skips prisma update", async () => {
+    mockConstructEvent.mockReturnValue({
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          metadata: { userId: "u1" },
+          subscription: null,
+        },
+      },
+    });
+
+    const res = await POST(postEvent("{}"));
+    expect(res.status).toBe(200);
+    expect(mockRetrieve).not.toHaveBeenCalled();
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+  });
+
   test("checkout.session.completed updates user", async () => {
     mockConstructEvent.mockReturnValue({
       type: "checkout.session.completed",
@@ -97,6 +152,24 @@ describe("POST /api/billing/webhook", () => {
     });
   });
 
+  test("customer.subscription.updated does nothing when no user matches subscription", async () => {
+    mockConstructEvent.mockReturnValue({
+      type: "customer.subscription.updated",
+      data: {
+        object: {
+          id: "sub_orphan",
+          status: "active",
+          items: { data: [{ price: { id: "price_master" } }] },
+        },
+      },
+    });
+    mockUserFindFirst.mockResolvedValue(null);
+
+    const res = await POST(postEvent("{}"));
+    expect(res.status).toBe(200);
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+  });
+
   test("customer.subscription.updated changes plan", async () => {
     mockConstructEvent.mockReturnValue({
       type: "customer.subscription.updated",
@@ -118,6 +191,18 @@ describe("POST /api/billing/webhook", () => {
     });
   });
 
+  test("customer.subscription.deleted does nothing when no user matches", async () => {
+    mockConstructEvent.mockReturnValue({
+      type: "customer.subscription.deleted",
+      data: { object: { id: "sub_orphan_del" } },
+    });
+    mockUserFindFirst.mockResolvedValue(null);
+
+    const res = await POST(postEvent("{}"));
+    expect(res.status).toBe(200);
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+  });
+
   test("customer.subscription.deleted downgrades to free", async () => {
     mockConstructEvent.mockReturnValue({
       type: "customer.subscription.deleted",
@@ -131,6 +216,34 @@ describe("POST /api/billing/webhook", () => {
       where: { id: "user-y" },
       data: { plan: "free", subscriptionStatus: "canceled" },
     });
+  });
+
+  test("invoice.payment_failed without subscription id skips updates", async () => {
+    mockConstructEvent.mockReturnValue({
+      type: "invoice.payment_failed",
+      data: {
+        object: {},
+      },
+    });
+
+    const res = await POST(postEvent("{}"));
+    expect(res.status).toBe(200);
+    expect(mockUserFindFirst).not.toHaveBeenCalled();
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+  });
+
+  test("invoice.payment_failed does nothing when user not found", async () => {
+    mockConstructEvent.mockReturnValue({
+      type: "invoice.payment_failed",
+      data: {
+        object: { subscription: "sub_unknown" },
+      },
+    });
+    mockUserFindFirst.mockResolvedValue(null);
+
+    const res = await POST(postEvent("{}"));
+    expect(res.status).toBe(200);
+    expect(mockUserUpdate).not.toHaveBeenCalled();
   });
 
   test("invoice.payment_failed sets past_due", async () => {

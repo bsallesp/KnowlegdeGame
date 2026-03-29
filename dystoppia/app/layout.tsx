@@ -9,7 +9,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Dystoppia — Adaptive Knowledge Learning",
-  description: "An adaptive knowledge learning app with a question conveyor belt powered by AI.",
+  description: "An adaptive knowledge learning app powered by AI.",
 };
 
 export default function RootLayout({

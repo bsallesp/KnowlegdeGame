@@ -5,9 +5,39 @@ import { logger } from "@/lib/logger";
 
 const MAX_SUBITEM_UPDATE_RETRIES = 5;
 
+async function buildSuccessResponse(subItemId: string, sessionId: string) {
+  const subItem = await prisma.subItem.findUnique({
+    where: { id: subItemId },
+    select: { difficulty: true, nextReviewAt: true },
+  });
+  if (!subItem) {
+    return null;
+  }
+
+  const allAnswers = await prisma.userAnswer.findMany({
+    where: { subItemId, sessionId },
+  });
+  const totalCount = allAnswers.length;
+  const correctCount = allAnswers.filter((a) => a.correct).length;
+
+  return {
+    success: true,
+    newDifficulty: subItem.difficulty,
+    nextReviewAt: (subItem.nextReviewAt ?? new Date(0)).toISOString(),
+    stats: {
+      correctCount,
+      totalCount,
+      difficulty: subItem.difficulty,
+    },
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { questionId, subItemId, sessionId, correct, timeSpent } = await req.json();
+    const body = await req.json();
+    const { questionId, subItemId, sessionId, correct, timeSpent, idempotencyKey: rawKey } = body;
+    const idempotencyKey =
+      typeof rawKey === "string" && rawKey.trim().length > 0 ? rawKey.trim() : undefined;
 
     if (!questionId || !subItemId || !sessionId) {
       logger.warn("record-answer", "Missing required fields", { questionId, subItemId, sessionId });
@@ -15,12 +45,38 @@ export async function POST(req: NextRequest) {
     }
     logger.debug("record-answer", `Answer received`, { questionId, subItemId, correct, timeSpent });
 
+    if (idempotencyKey) {
+      const existing = await prisma.userAnswer.findUnique({
+        where: {
+          sessionId_idempotencyKey: { sessionId, idempotencyKey },
+        },
+      });
+      if (existing) {
+        if (existing.questionId !== questionId || existing.subItemId !== subItemId) {
+          logger.warn("record-answer", "Idempotency key reused for different answer", {
+            sessionId,
+            idempotencyKey,
+          });
+          return NextResponse.json(
+            { error: "Idempotency key already used for a different answer" },
+            { status: 409 }
+          );
+        }
+        const payload = await buildSuccessResponse(subItemId, sessionId);
+        if (!payload) {
+          return NextResponse.json({ error: "SubItem not found" }, { status: 404 });
+        }
+        return NextResponse.json(payload);
+      }
+    }
+
     // Save the answer
     await prisma.userAnswer.create({
       data: {
         questionId,
         subItemId,
         sessionId,
+        ...(idempotencyKey ? { idempotencyKey } : {}),
         correct: Boolean(correct),
         timeSpent: timeSpent || 0,
       },
@@ -108,21 +164,16 @@ export async function POST(req: NextRequest) {
       logger.info("record-answer", `Difficulty changed`, { subItemId, from: initialDifficulty, to: appliedDifficulty });
     }
 
-    // Get all stats for this subItem
-    const allAnswers = await prisma.userAnswer.findMany({
-      where: { subItemId, sessionId },
-    });
-
-    const totalCount = allAnswers.length;
-    const correctCount = allAnswers.filter((a) => a.correct).length;
-
+    const payload = await buildSuccessResponse(subItemId, sessionId);
+    if (!payload) {
+      return NextResponse.json({ error: "SubItem not found" }, { status: 404 });
+    }
     return NextResponse.json({
-      success: true,
+      ...payload,
       newDifficulty: appliedDifficulty,
       nextReviewAt: appliedSm2.nextReviewAt.toISOString(),
       stats: {
-        correctCount,
-        totalCount,
+        ...payload.stats,
         difficulty: appliedDifficulty,
       },
     });

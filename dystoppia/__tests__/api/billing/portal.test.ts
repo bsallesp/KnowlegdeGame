@@ -37,6 +37,14 @@ describe("POST /api/billing/portal", () => {
     expect(body.error).toMatch(/no active subscription/i);
   });
 
+  test("returns 400 when user row is missing (no stripeCustomerId)", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    const res = await POST(new NextRequest("http://localhost/api/billing/portal", { method: "POST" }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/no active subscription/i);
+  });
+
   test("returns portal url", async () => {
     mockFindUnique.mockResolvedValue({ stripeCustomerId: "cus_123" });
     mockPortalCreate.mockResolvedValue({ url: "https://billing.stripe.com/portal" });
@@ -48,5 +56,16 @@ describe("POST /api/billing/portal", () => {
     });
     const body = await res.json();
     expect(body.url).toBe("https://billing.stripe.com/portal");
+  });
+
+  test("returns 500 when billingPortal.sessions.create throws", async () => {
+    mockFindUnique.mockResolvedValue({ stripeCustomerId: "cus_123" });
+    mockPortalCreate.mockRejectedValue(new Error("portal unavailable"));
+
+    const res = await POST(new NextRequest("http://localhost/api/billing/portal", { method: "POST" }));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Failed to create portal session");
+    expect(String(body.details)).toContain("portal unavailable");
   });
 });

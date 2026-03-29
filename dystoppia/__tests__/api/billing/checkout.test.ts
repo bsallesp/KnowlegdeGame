@@ -94,4 +94,36 @@ describe("POST /api/billing/checkout", () => {
       }),
     );
   });
+
+  test("returns 500 when checkout.sessions.create throws", async () => {
+    mockFindUnique.mockResolvedValue({ email: "a@b.com", stripeCustomerId: "cus_x" });
+    mockCheckoutCreate.mockRejectedValue(new Error("Stripe down"));
+
+    const res = await POST(req({ plan: "learner" }));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Failed to create checkout session");
+    expect(String(body.details)).toContain("Stripe down");
+  });
+
+  test("returns 500 when creating Stripe customer fails", async () => {
+    mockFindUnique.mockResolvedValue({ email: "a@b.com", stripeCustomerId: null });
+    mockCustomersCreate.mockRejectedValue(new Error("invalid email"));
+
+    const res = await POST(req({ plan: "learner" }));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Failed to create checkout session");
+  });
+
+  test("returns 500 when persisting stripeCustomerId fails", async () => {
+    mockFindUnique.mockResolvedValue({ email: "a@b.com", stripeCustomerId: null });
+    mockCustomersCreate.mockResolvedValue({ id: "cus_new" });
+    mockUserUpdate.mockRejectedValue(new Error("constraint"));
+
+    const res = await POST(req({ plan: "learner" }));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Failed to create checkout session");
+  });
 });

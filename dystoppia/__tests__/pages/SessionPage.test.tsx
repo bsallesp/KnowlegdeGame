@@ -65,16 +65,6 @@ vi.mock("@/components/SessionSummary", () => ({
   ),
 }));
 
-vi.mock("@/components/ConveyorBelt", () => ({
-  default: ({ queue, currentQuestion, isGenerating }: { queue: unknown[]; currentQuestion: unknown; isGenerating: boolean }) => (
-    <div
-      data-testid="conveyor-belt"
-      data-queue-length={queue.length}
-      data-is-generating={isGenerating}
-    />
-  ),
-}));
-
 vi.mock("@/components/QuestionCard", () => ({
   default: ({ question, onAnswer, answerShown }: { question: { id: string; text: string }; onAnswer: Function; answerShown: boolean }) => (
     <div data-testid="question-card" data-question-id={question.id} data-answer-shown={answerShown}>
@@ -331,11 +321,10 @@ describe("SessionPage — header rendering", () => {
     expect(mockPush).toHaveBeenCalledWith("/");
   });
 
-  test("shows settings link in header", async () => {
+  test("shows settings control in header", async () => {
     storeState.currentTopic = sampleTopic;
     render(<SessionPage />);
-    const settingsLink = document.querySelector('a[href="/settings"]');
-    expect(settingsLink).toBeTruthy();
+    expect(document.querySelector('button[aria-label="Settings"]')).toBeTruthy();
   });
 });
 
@@ -377,7 +366,8 @@ describe("SessionPage — gamification display", () => {
     storeState.maxLives = 3;
     render(<SessionPage />);
     const hearts = screen.getAllByText("❤️");
-    expect(hearts.length).toBe(3);
+    // Desktop + compact mobile headers each render maxLives hearts (both in DOM with responsive classes).
+    expect(hearts.length).toBe(storeState.maxLives * 2);
   });
 
   test("renders correct number of hearts for maxLives=5", async () => {
@@ -386,7 +376,7 @@ describe("SessionPage — gamification display", () => {
     storeState.maxLives = 5;
     render(<SessionPage />);
     const hearts = screen.getAllByText("❤️");
-    expect(hearts.length).toBe(5);
+    expect(hearts.length).toBe(storeState.maxLives * 2);
   });
 
   test("does not show accuracy when totalCount is 0", async () => {
@@ -559,27 +549,6 @@ describe("SessionPage — sidebar components", () => {
     expect(dashboard.getAttribute("data-item-count")).toBe("1");
   });
 
-  test("renders ConveyorBelt component", async () => {
-    storeState.currentTopic = sampleTopic;
-    render(<SessionPage />);
-    expect(screen.getByTestId("conveyor-belt")).toBeTruthy();
-  });
-
-  test("ConveyorBelt receives queue length", async () => {
-    storeState.currentTopic = sampleTopic;
-    storeState.questionQueue = [sampleQuestion];
-    render(<SessionPage />);
-    const belt = screen.getByTestId("conveyor-belt");
-    expect(belt.getAttribute("data-queue-length")).toBe("1");
-  });
-
-  test("ConveyorBelt reflects isGenerating state", async () => {
-    storeState.currentTopic = sampleTopic;
-    storeState.isGenerating = true;
-    render(<SessionPage />);
-    const belt = screen.getByTestId("conveyor-belt");
-    expect(belt.getAttribute("data-is-generating")).toBe("true");
-  });
 });
 
 // ─── Learning tree heading ────────────────────────────────────────────────────

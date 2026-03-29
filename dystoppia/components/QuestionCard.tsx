@@ -194,49 +194,61 @@ export default function QuestionCard({
       transition={{ duration: 0.35 }}
       className="w-full max-w-2xl mx-auto"
     >
-      {/* Question header */}
-      <div className="flex items-center gap-3 mb-2">
-        <span className="text-xs px-2 py-1 rounded font-medium" style={{ backgroundColor: "#1C1C28", color: "#9494B8" }}>
-          {typeLabel[question.type] || question.type}
-        </span>
-        {question.subItem && (
-          <span className="text-xs px-2 py-1 rounded" style={{ backgroundColor: "#1C1C28", color: "#818CF8" }}>
-            {question.subItem.name}
+      {/* Question header — type + actions on first row; subItem full width below (no ellipsis) */}
+      <div className="flex flex-col gap-2 mb-2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+          <span
+            className="text-xs px-2 py-1 rounded font-medium shrink-0"
+            style={{ backgroundColor: "#1C1C28", color: "#9494B8" }}
+          >
+            {typeLabel[question.type] || question.type}
           </span>
-        )}
-        <div className="ml-auto flex items-center gap-3">
-          {/* Hint button */}
-          {!answerShown && question.type !== "fill_blank" && (
-            <button
-              onClick={handleHint}
-              disabled={hintUsed || hintLoading || xp < HINT_COST}
-              className="flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors"
-              style={{
-                backgroundColor: hintUsed ? "#1C1C28" : "rgba(250,204,21,0.1)",
-                border: `1px solid ${hintUsed ? "#2E2E40" : "rgba(250,204,21,0.3)"}`,
-                color: hintUsed ? "#9494B8" : xp < HINT_COST ? "#9494B8" : "#FACC15",
-                cursor: hintUsed || xp < HINT_COST ? "not-allowed" : "pointer",
-              }}
-              title={xp < HINT_COST ? `Precisa de ${HINT_COST} XP para usar hint` : `Hint (-${HINT_COST} XP)`}
-            >
-              {hintLoading ? "..." : hintError ? "⚠ Error" : hintUsed ? "✓ Hint" : `💡 -${HINT_COST} XP`}
-            </button>
-          )}
+          <div className="flex flex-wrap items-center justify-end gap-2 min-w-0 flex-1">
+            {!answerShown && question.type !== "fill_blank" && (
+              <button
+                onClick={handleHint}
+                disabled={hintUsed || hintLoading || xp < HINT_COST}
+                className="flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors shrink-0"
+                style={{
+                  backgroundColor: hintUsed ? "#1C1C28" : "rgba(250,204,21,0.1)",
+                  border: `1px solid ${hintUsed ? "#2E2E40" : "rgba(250,204,21,0.3)"}`,
+                  color: hintUsed ? "#9494B8" : xp < HINT_COST ? "#9494B8" : "#FACC15",
+                  cursor: hintUsed || xp < HINT_COST ? "not-allowed" : "pointer",
+                }}
+                title={xp < HINT_COST ? `Precisa de ${HINT_COST} XP para usar hint` : `Hint (-${HINT_COST} XP)`}
+              >
+                {hintLoading ? "..." : hintError ? "⚠ Error" : hintUsed ? "✓ Hint" : `💡 -${HINT_COST} XP`}
+              </button>
+            )}
 
-          <div className="flex items-center gap-1">
-            <span className="text-xs" style={{ color: "#9494B8" }}>Difficulty</span>
-            <div className="flex gap-0.5">
-              {[1, 2, 3, 4, 5].map((d) => (
-                <div key={d} className="w-2 h-2 rounded-full" style={{ backgroundColor: d <= question.difficulty ? difficultyColor : "#2E2E40" }} />
-              ))}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="hidden sm:inline text-xs" style={{ color: "#9494B8" }}>Difficulty</span>
+              <div className="flex gap-0.5" aria-hidden>
+                {[1, 2, 3, 4, 5].map((d) => (
+                  <div key={d} className="w-2 h-2 rounded-full" style={{ backgroundColor: d <= question.difficulty ? difficultyColor : "#2E2E40" }} />
+                ))}
+              </div>
             </div>
           </div>
         </div>
+        {question.subItem && (
+          <div
+            className="text-xs px-3 py-2 rounded-lg w-full min-w-0 break-words leading-snug"
+            style={{ backgroundColor: "#1C1C28", color: "#818CF8", border: "1px solid #2E2E40" }}
+          >
+            {question.subItem.name}
+          </div>
+        )}
       </div>
 
-      {/* Timer bar */}
+      {/* Timer bar — time on its own row so it never overlaps the header on small screens */}
       {timerPct !== null && !answerShown && (
-        <div className="mb-3 relative">
+        <div className="mb-3 space-y-1.5">
+          <div className="flex justify-end">
+            <span className="text-xs font-mono font-semibold tabular-nums" style={{ color: timerColor }}>
+              {timeLeft !== null ? formatTime(timeLeft) : ""}
+            </span>
+          </div>
           <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: "#2E2E40" }}>
             <motion.div
               className="h-full rounded-full"
@@ -244,9 +256,6 @@ export default function QuestionCard({
               transition={{ duration: 0.9, ease: "linear" }}
             />
           </div>
-          <span className="absolute right-0 -top-4 text-xs font-mono font-semibold" style={{ color: timerColor }}>
-            {timeLeft !== null ? formatTime(timeLeft) : ""}
-          </span>
         </div>
       )}
 
