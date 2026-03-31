@@ -10,7 +10,7 @@ on:
 
 env:
   ACR_NAME: dystoppiaacr
-  APP_NAME: dystoppia-app
+  APP_NAME: dystoppia-prod-app
   RG: rg-dystoppia-prod
   NEXT_TELEMETRY_DISABLED: "1"
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -80,24 +80,28 @@ jobs:
           docker push $ACR_NAME.azurecr.io/dystoppia:${{ steps.tag.outputs.value }}
           docker push $ACR_NAME.azurecr.io/dystoppia:latest
 
-      - name: Deploy to Container Apps
+      - name: Deploy to App Service
         run: |
-          az containerapp update \
+          az webapp config container set \
             --name $APP_NAME \
             --resource-group $RG \
-            --image $ACR_NAME.azurecr.io/dystoppia:${{ steps.tag.outputs.value }}
+            --docker-custom-image-name $ACR_NAME.azurecr.io/dystoppia:${{ steps.tag.outputs.value }} \
+            --docker-registry-server-url https://$ACR_NAME.azurecr.io
+
+      - name: Restart app
+        run: az webapp restart --name $APP_NAME --resource-group $RG
 
       - name: Show app URL
         id: app_url
         run: |
-          FQDN=$(az containerapp show \
+          FQDN=$(az webapp show \
             --name $APP_NAME \
             --resource-group $RG \
-            --query "properties.configuration.ingress.fqdn" \
+            --query "defaultHostName" \
             -o tsv)
           echo "$FQDN"
           echo "value=$FQDN" >> "$GITHUB_OUTPUT"
 
       - name: Smoke test
         run: |
-          curl -fsS --retry 5 --retry-delay 5 "https://${{ steps.app_url.outputs.value }}/"
+          curl -fsS --retry 10 --retry-delay 10 "https://${{ steps.app_url.outputs.value }}/"
