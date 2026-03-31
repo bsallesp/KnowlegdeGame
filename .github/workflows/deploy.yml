@@ -3,16 +3,25 @@ name: Deploy
 on:
   push:
     branches: [main]
+    paths:
+      - "dystoppia/**"
+      - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
 env:
   ACR_NAME: dystoppiaacr
   APP_NAME: dystoppia-app
   RG: rg-dystoppia-prod
+  NEXT_TELEMETRY_DISABLED: "1"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
 
 jobs:
-  test:
-    name: Test
+  verify:
+    name: Verify
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -29,13 +38,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run lint
+        run: npm run lint
+
       - name: Run tests
         run: npm test
 
+      - name: Build app
+        run: npm run build
+
   deploy:
     name: Build & Deploy
-    needs: test
+    needs: verify
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: dystoppia
@@ -71,9 +88,16 @@ jobs:
             --image $ACR_NAME.azurecr.io/dystoppia:${{ steps.tag.outputs.value }}
 
       - name: Show app URL
+        id: app_url
         run: |
-          az containerapp show \
+          FQDN=$(az containerapp show \
             --name $APP_NAME \
             --resource-group $RG \
             --query "properties.configuration.ingress.fqdn" \
-            -o tsv
+            -o tsv)
+          echo "$FQDN"
+          echo "value=$FQDN" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test
+        run: |
+          curl -fsS --retry 5 --retry-delay 5 "https://${{ steps.app_url.outputs.value }}/"

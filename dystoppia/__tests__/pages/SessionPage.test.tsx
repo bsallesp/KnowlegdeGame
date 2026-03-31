@@ -86,8 +86,10 @@ vi.mock("@/components/QuestionCard", () => ({
 }));
 
 vi.mock("@/components/RateLimitPaywall", () => ({
-  default: ({ window, resetsAt }: { window: string; resetsAt: string | null }) => (
-    <div data-testid="rate-limit-paywall" data-window={window} data-resets-at={resetsAt ?? ""} />
+  default: ({ window, resetsAt, onClose }: { window: string; resetsAt: string | null; onClose: () => void }) => (
+    <div data-testid="rate-limit-paywall" data-window={window} data-resets-at={resetsAt ?? ""}>
+      <button data-testid="close-rate-limit-paywall" onClick={onClose}>Close</button>
+    </div>
   ),
 }));
 
@@ -773,6 +775,28 @@ describe("SessionPage — critical runtime branches", () => {
     });
   });
 
+  test("closes rate-limit paywall via onClose", async () => {
+    storeState.currentTopic = sampleTopic;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/stats")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ stats: {} }) });
+      if (url.includes("/api/generate-questions")) {
+        return Promise.resolve({
+          ok: false,
+          status: 429,
+          json: () => Promise.resolve({ window: "weekly", resetsAt: "2099-01-01T00:00:00.000Z" }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    }) as any;
+
+    render(<SessionPage />);
+    await screen.findByTestId("rate-limit-paywall");
+    fireEvent.click(screen.getByTestId("close-rate-limit-paywall"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("rate-limit-paywall")).toBeNull();
+    });
+  });
+
   test("uses fallback local difficulty update when record-answer request fails", async () => {
     storeState.currentTopic = sampleTopic;
     storeState.currentQuestion = sampleQuestion;
@@ -895,6 +919,77 @@ describe("SessionPage — critical runtime branches", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/available on Learner and Master plans/i)).toBeTruthy();
+    });
+  });
+
+  test("audiobook non-403 error shows details", async () => {
+    storeState.currentTopic = sampleTopic;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/stats")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ stats: {} }) });
+      if (url.includes("/api/generate-questions")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ questions: [] }) });
+      if (url.includes("/api/audiobook/generate")) {
+        return Promise.resolve({
+          ok: false,
+          status: 500,
+          json: () => Promise.resolve({ details: "backend exploded" }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    }) as any;
+
+    render(<SessionPage />);
+    fireEvent.click(screen.getAllByTestId("open-audiobook-dialog")[0]);
+    fireEvent.click(screen.getByTestId("audiobook-generate"));
+    await waitFor(() => {
+      expect(screen.getByText(/Falha: Error: backend exploded/i)).toBeTruthy();
+    });
+  });
+
+  test("pending topic does not open audiobook dialog from dashboard", () => {
+    storeState.currentTopic = { ...sampleTopic, id: "pending_1" };
+    render(<SessionPage />);
+    fireEvent.click(screen.getAllByTestId("open-audiobook-dialog")[0]);
+    expect(screen.queryByTestId("audiobook-dialog")).toBeNull();
+  });
+
+  test("opens mobile tree drawer", () => {
+    storeState.currentTopic = sampleTopic;
+    render(<SessionPage />);
+
+    fireEvent.click(screen.getByText("Tree"));
+    expect(screen.getAllByText(/Learning Tree/i).length).toBeGreaterThan(1);
+  });
+
+  test("opening audiobook from mobile drawer closes drawer and opens dialog", async () => {
+    storeState.currentTopic = sampleTopic;
+    render(<SessionPage />);
+
+    fireEvent.click(screen.getByText("Tree"));
+    expect(screen.getAllByText(/Learning Tree/i).length).toBeGreaterThan(1);
+
+    fireEvent.click(screen.getAllByTestId("open-audiobook-dialog")[1]);
+    await waitFor(() => {
+      expect(screen.getByTestId("audiobook-dialog")).toBeTruthy();
+    });
+    expect(screen.getAllByText(/Learning Tree/i).length).toBe(1);
+  });
+
+  test("mobile stats summary button appears after 5 answers and opens summary", async () => {
+    storeState.currentTopic = sampleTopic;
+    storeState.currentQuestion = sampleQuestion;
+    render(<SessionPage />);
+
+    for (let i = 0; i < 5; i += 1) {
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("answer-btn"));
+      });
+    }
+
+    fireEvent.click(screen.getByLabelText("Stats"));
+    fireEvent.click(screen.getByText("Summary"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("session-summary")).toBeTruthy();
     });
   });
 });
