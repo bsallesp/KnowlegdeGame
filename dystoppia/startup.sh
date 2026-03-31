@@ -7,9 +7,10 @@ echo "[startup] DATABASE_URL set: $([ -n "$DATABASE_URL" ] && echo YES || echo N
 echo "[startup] server.js exists: $([ -f server.js ] && echo YES || echo NO)"
 
 echo "[startup] Running database migrations..."
-node node_modules/.bin/prisma migrate deploy \
-  || node node_modules/.bin/prisma db push --skip-generate \
-  || echo "[startup] WARNING: migration failed, continuing anyway"
+if ! node node_modules/.bin/prisma migrate deploy; then
+  echo "[startup] FATAL: prisma migrate deploy failed — fix DB / migrations before the app can start."
+  exit 1
+fi
 
 echo "[startup] Starting Next.js..."
 node server.js

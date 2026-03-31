@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "dystoppia/**"
+      - "infra/**"
       - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
@@ -67,6 +68,25 @@ jobs:
       - name: ACR login
         run: az acr login --name $ACR_NAME
 
+      - name: Deploy monitoring (Log Analytics, App Insights, diagnostics)
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -e
+          az deployment group create \
+            --resource-group "$RG" \
+            --name "dystoppia-monitoring" \
+            --template-file infra/monitoring.bicep \
+            --parameters webAppName="$APP_NAME"
+          CONN=$(az deployment group show \
+            --resource-group "$RG" \
+            --name "dystoppia-monitoring" \
+            --query "properties.outputs.connectionString.value" \
+            -o tsv)
+          az webapp config appsettings set \
+            --resource-group "$RG" \
+            --name "$APP_NAME" \
+            --settings APPLICATIONINSIGHTS_CONNECTION_STRING="$CONN"
+
       - name: Set image tag
         id: tag
         run: echo "value=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
@@ -104,4 +124,4 @@ jobs:
 
       - name: Smoke test
         run: |
-          curl -fsS --retry 10 --retry-delay 10 "https://${{ steps.app_url.outputs.value }}/"
+          curl -fsS --retry 10 --retry-delay 10 "https://${{ steps.app_url.outputs.value }}/api/health"
