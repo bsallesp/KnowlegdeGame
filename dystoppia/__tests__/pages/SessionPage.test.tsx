@@ -967,7 +967,7 @@ describe("SessionPage — critical runtime branches", () => {
     fireEvent.click(screen.getByText("Tree"));
     expect(screen.getAllByText(/Learning Tree/i).length).toBeGreaterThan(1);
 
-    fireEvent.click(screen.getAllByTestId("open-audiobook-dialog")[1]);
+    fireEvent.click(screen.getAllByTestId("open-audiobook-dialog")[0]);
     await waitFor(() => {
       expect(screen.getByTestId("audiobook-dialog")).toBeTruthy();
     });
@@ -986,7 +986,8 @@ describe("SessionPage — critical runtime branches", () => {
     }
 
     fireEvent.click(screen.getByLabelText("Stats"));
-    fireEvent.click(screen.getByText("Summary"));
+    // Two "Summary" buttons exist (desktop header + mobile stats panel); click the mobile panel one
+    fireEvent.click(screen.getAllByText("Summary")[1]);
 
     await waitFor(() => {
       expect(screen.getByTestId("session-summary")).toBeTruthy();
