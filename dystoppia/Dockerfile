@@ -32,6 +32,11 @@ COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/clie
 COPY --from=builder /app/node_modules/@prisma/adapter-pg ./node_modules/@prisma/adapter-pg
 COPY --from=builder /app/node_modules/pg ./node_modules/pg
 
+# Recreate the .bin/prisma symlink so startup.sh can call prisma migrate deploy
+RUN mkdir -p node_modules/.bin && \
+    ln -sf /app/node_modules/prisma/build/index.js node_modules/.bin/prisma && \
+    chmod +x node_modules/prisma/build/index.js
+
 COPY startup.sh ./
 RUN chmod +x startup.sh
 
