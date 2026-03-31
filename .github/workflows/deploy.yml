@@ -124,4 +124,19 @@ jobs:
 
       - name: Smoke test
         run: |
-          curl -fsS --retry 10 --retry-delay 10 "https://${{ steps.app_url.outputs.value }}/api/health"
+          set -e
+          BASE="https://${{ steps.app_url.outputs.value }}"
+          # curl --retry does NOT retry on HTTP 404; during rollout the old container may 404 on /api/health until the new image is live.
+          for i in $(seq 1 36); do
+            code=$(curl -sS -o /tmp/health.body -w "%{http_code}" "$BASE/api/health" || echo "000")
+            if [ "$code" = "200" ] || [ "$code" = "503" ]; then
+              echo "OK: GET /api/health -> HTTP $code"
+              cat /tmp/health.body
+              exit 0
+            fi
+            echo "attempt $i: HTTP $code (waiting for new container / route)..."
+            sleep 10
+          done
+          echo "GET /api/health never returned 200 or 503 (last body:)"
+          cat /tmp/health.body 2>/dev/null || true
+          exit 1
