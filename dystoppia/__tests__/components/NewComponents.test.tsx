@@ -122,7 +122,7 @@ describe("DailyGoalBar", () => {
       dailyGoal: { target: 20, progress: 5, date: today },
     });
     render(<DailyGoalBar />);
-    expect(screen.getByTitle(/5\/20/)).toBeTruthy();
+    expect(screen.getByText("🎯 5/20")).toBeTruthy();
   });
 
   test("shows trophy icon when goal is reached", () => {
@@ -169,13 +169,13 @@ describe("BossRound", () => {
   test("calls onReady when button is clicked", () => {
     const onReady = vi.fn();
     render(<BossRound onReady={onReady} />);
-    fireEvent.click(screen.getByText(/Enfrentar o Boss/));
+    fireEvent.click(screen.getByText(/Face the Boss/i));
     expect(onReady).toHaveBeenCalledOnce();
   });
 
-  test("shows XP em dobro text", () => {
+  test("shows 2x XP text", () => {
     render(<BossRound onReady={vi.fn()} />);
-    expect(screen.getByText(/XP em dobro/)).toBeTruthy();
+    expect(screen.getByText(/2× XP/)).toBeTruthy();
   });
 });
 

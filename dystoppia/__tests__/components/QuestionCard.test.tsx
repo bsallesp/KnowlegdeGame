@@ -354,7 +354,7 @@ describe("QuestionCard — hint button", () => {
         xp={2}
       />
     );
-    const btn = screen.getByTitle(/Precisa de/i);
+    const btn = screen.getByTitle(/Need 5 XP/i);
     expect(btn).toBeTruthy();
   });
 

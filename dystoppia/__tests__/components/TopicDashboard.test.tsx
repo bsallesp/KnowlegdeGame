@@ -150,7 +150,7 @@ describe("TopicDashboard — onOpenAudiobooks", () => {
         onOpenAudiobooks={vi.fn()}
       />
     );
-    expect(screen.getByLabelText("Abrir audiobooks do item")).toBeInTheDocument();
+    expect(screen.getByLabelText("Open chapter audiobooks")).toBeInTheDocument();
   });
 
   test("renders headphone buttons for subitems when onOpenAudiobooks is provided", () => {
@@ -162,14 +162,14 @@ describe("TopicDashboard — onOpenAudiobooks", () => {
         onOpenAudiobooks={vi.fn()}
       />
     );
-    const btns = screen.getAllByLabelText("Abrir audiobooks do subitem");
+    const btns = screen.getAllByLabelText("Open concept audiobooks");
     expect(btns.length).toBe(2);
   });
 
   test("does NOT render headphone buttons when onOpenAudiobooks is undefined", () => {
     render(<TopicDashboard items={[makeItem()]} subItemStats={emptyStats} onToggleMute={vi.fn()} />);
-    expect(screen.queryByLabelText("Abrir audiobooks do item")).toBeNull();
-    expect(screen.queryByLabelText("Abrir audiobooks do subitem")).toBeNull();
+    expect(screen.queryByLabelText("Open chapter audiobooks")).toBeNull();
+    expect(screen.queryByLabelText("Open concept audiobooks")).toBeNull();
   });
 
   test("calls onOpenAudiobooks with item id, 'item', and item name", async () => {
@@ -182,7 +182,7 @@ describe("TopicDashboard — onOpenAudiobooks", () => {
         onOpenAudiobooks={onOpenAudiobooks}
       />
     );
-    await userEvent.click(screen.getByLabelText("Abrir audiobooks do item"));
+    await userEvent.click(screen.getByLabelText("Open chapter audiobooks"));
     expect(onOpenAudiobooks).toHaveBeenCalledWith("item-1", "item", "Cloud Concepts");
   });
 
@@ -196,9 +196,33 @@ describe("TopicDashboard — onOpenAudiobooks", () => {
         onOpenAudiobooks={onOpenAudiobooks}
       />
     );
-    const btns = screen.getAllByLabelText("Abrir audiobooks do subitem");
+    const btns = screen.getAllByLabelText("Open concept audiobooks");
     await userEvent.click(btns[0]);
     expect(onOpenAudiobooks).toHaveBeenCalledWith("sub-1", "subitem", "IaaS vs PaaS");
+  });
+});
+
+describe("TopicDashboard — proficiency markers", () => {
+  test("shows weak spot warning marker when performance is below 50% with enough attempts", () => {
+    render(
+      <TopicDashboard
+        items={[makeItem()]}
+        subItemStats={{ "sub-1": { correctCount: 1, totalCount: 4, difficulty: 1 } }}
+        onToggleMute={vi.fn()}
+      />
+    );
+    expect(screen.getByText(/⚠ IaaS vs PaaS/)).toBeInTheDocument();
+  });
+
+  test("shows mastered marker when performance is at least 80% with 10+ attempts", () => {
+    render(
+      <TopicDashboard
+        items={[makeItem()]}
+        subItemStats={{ "sub-2": { correctCount: 9, totalCount: 10, difficulty: 4 } }}
+        onToggleMute={vi.fn()}
+      />
+    );
+    expect(screen.getByText(/✓ SaaS overview/)).toBeInTheDocument();
   });
 });
 

@@ -27,8 +27,18 @@ vi.mock("framer-motion", () => ({
 
 // ─── Child component mocks ────────────────────────────────────────────────────
 vi.mock("@/components/TopicDashboard", () => ({
-  default: ({ items, onToggleMute }: { items: unknown[]; onToggleMute: Function }) => (
-    <div data-testid="topic-dashboard" data-item-count={items.length} />
+  default: ({ items, onToggleMute, onOpenAudiobooks }: { items: unknown[]; onToggleMute: Function; onOpenAudiobooks?: Function }) => (
+    <div data-testid="topic-dashboard" data-item-count={items.length}>
+      <button data-testid="toggle-item-mute" onClick={() => onToggleMute("item-1", "item")}>
+        Toggle item
+      </button>
+      <button
+        data-testid="open-audiobook-dialog"
+        onClick={() => onOpenAudiobooks?.("item-1", "item", "Cloud Concepts")}
+      >
+        Open audiobook
+      </button>
+    </div>
   ),
 }));
 
@@ -66,12 +76,44 @@ vi.mock("@/components/SessionSummary", () => ({
 }));
 
 vi.mock("@/components/QuestionCard", () => ({
-  default: ({ question, onAnswer, answerShown }: { question: { id: string; text: string }; onAnswer: Function; answerShown: boolean }) => (
+  default: ({ question, onAnswer, answerShown, onHintUsed }: { question: { id: string; text: string }; onAnswer: Function; answerShown: boolean; onHintUsed?: () => void }) => (
     <div data-testid="question-card" data-question-id={question.id} data-answer-shown={answerShown}>
       <span>{question.text}</span>
       <button onClick={() => onAnswer("answer", 1000)} data-testid="answer-btn">Answer</button>
+      <button onClick={() => onHintUsed?.()} data-testid="hint-btn">Hint</button>
     </div>
   ),
+}));
+
+vi.mock("@/components/RateLimitPaywall", () => ({
+  default: ({ window, resetsAt }: { window: string; resetsAt: string | null }) => (
+    <div data-testid="rate-limit-paywall" data-window={window} data-resets-at={resetsAt ?? ""} />
+  ),
+}));
+
+vi.mock("@/components/SettingsDialog", () => ({
+  default: ({ open }: { open: boolean }) => (open ? <div data-testid="settings-dialog" /> : null),
+}));
+
+vi.mock("@/components/AudiobookDialog", () => ({
+  default: ({ open, onGenerate, onPlay, audios }: { open: boolean; onGenerate: () => void; onPlay: (entry: any) => void; audios: any[] }) =>
+    open ? (
+      <div data-testid="audiobook-dialog">
+        <button data-testid="audiobook-generate" onClick={onGenerate}>Generate</button>
+        <button
+          data-testid="audiobook-play"
+          onClick={() => {
+            if (audios.length > 0) onPlay(audios[0]);
+          }}
+        >
+          Play
+        </button>
+      </div>
+    ) : null,
+}));
+
+vi.mock("@/components/AudiobookPlayer", () => ({
+  default: () => <div data-testid="audiobook-player" />,
 }));
 
 vi.mock("@/components/ui/SkeletonBlock", () => ({
@@ -145,6 +187,10 @@ let storeState = {
   streak: 0,
   lives: 3,
   maxLives: 3,
+  weeklyUsage: 0,
+  weeklyRemaining: 30,
+  weeklyResetsAt: null as string | null,
+  plan: "free" as "free" | "pro",
   reviewMode: false,
   achievements: [] as any[],
   pendingAchievements: [] as string[],
@@ -203,6 +249,10 @@ function resetStoreState() {
     streak: 0,
     lives: 3,
     maxLives: 3,
+    weeklyUsage: 0,
+    weeklyRemaining: 30,
+    weeklyResetsAt: null,
+    plan: "free",
     reviewMode: false,
     achievements: [],
     pendingAchievements: [],
@@ -447,7 +497,7 @@ describe("SessionPage — game over overlay", () => {
 
   test("game over overlay has 'Ver resumo' button", async () => {
     await triggerGameOver();
-    expect(screen.getByText(/Ver resumo/i)).toBeTruthy();
+    expect(screen.getByText(/View summary/i)).toBeTruthy();
   });
 
   test("'Continue anyway' hides game over overlay", async () => {
@@ -562,7 +612,7 @@ describe("SessionPage — learning tree section", () => {
   test("shows legend in sidebar", async () => {
     storeState.currentTopic = sampleTopic;
     render(<SessionPage />);
-    expect(screen.getByText(/ponto fraco|dominado/i)).toBeTruthy();
+    expect(screen.getByText(/weak spot|mastered/i)).toBeTruthy();
   });
 });
 
@@ -583,7 +633,7 @@ describe("SessionPage — new header components", () => {
   test("does not show Resumo button when answerCount < 5", () => {
     storeState.currentTopic = sampleTopic;
     render(<SessionPage />);
-    expect(screen.queryByText("Resumo")).toBeNull();
+    expect(screen.queryByText("Summary")).toBeNull();
   });
 
   test("shows BOSS badge in header during boss round", async () => {
@@ -637,7 +687,35 @@ describe("SessionPage — session summary", () => {
       fireEvent.click(screen.getByTestId("answer-btn"));
       vi.advanceTimersByTime(1000);
     });
-    expect(screen.getByText(/Ver resumo/i)).toBeTruthy();
+    expect(screen.getByText(/View summary/i)).toBeTruthy();
+    vi.useRealTimers();
+  });
+
+  test("clicking 'View summary' opens summary and saves session entry", async () => {
+    vi.useFakeTimers();
+    storeState.currentTopic = sampleTopic;
+    storeState.currentQuestion = sampleQuestion;
+    storeState.lives = 0;
+    storeState.sessionXP = 120;
+    (mockUseAppStore as any).getState = () => ({ lives: 0, questionQueue: [], currentQuestion: sampleQuestion });
+    render(<SessionPage />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("answer-btn"));
+      vi.advanceTimersByTime(1000);
+    });
+
+    fireEvent.click(screen.getByText(/View summary/i));
+
+    expect(screen.getByTestId("session-summary")).toBeTruthy();
+    expect(mockSaveSessionEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        topicId: "topic-1",
+        totalCount: 1,
+        correctCount: 0,
+        xpEarned: 120,
+      })
+    );
     vi.useRealTimers();
   });
 });
@@ -662,6 +740,162 @@ describe("SessionPage — achievement & daily goal integration", () => {
       fireEvent.click(screen.getByTestId("answer-btn"));
     });
     expect(mockIncrementDailyProgress).toHaveBeenCalled();
+  });
+});
+
+describe("SessionPage — critical runtime branches", () => {
+  test("does not redirect before hydration completes", async () => {
+    storeState._hasHydrated = false;
+    storeState.currentTopic = null;
+    render(<SessionPage />);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(mockPush).not.toHaveBeenCalledWith("/");
+  });
+
+  test("shows rate-limit paywall when generate-questions returns 429", async () => {
+    storeState.currentTopic = sampleTopic;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/stats")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ stats: {} }) });
+      if (url.includes("/api/generate-questions")) {
+        return Promise.resolve({
+          ok: false,
+          status: 429,
+          json: () => Promise.resolve({ window: "weekly", resetsAt: "2099-01-01T00:00:00.000Z" }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    }) as any;
+
+    render(<SessionPage />);
+    await waitFor(() => {
+      const paywall = screen.getByTestId("rate-limit-paywall");
+      expect(paywall.getAttribute("data-window")).toBe("weekly");
+    });
+  });
+
+  test("uses fallback local difficulty update when record-answer request fails", async () => {
+    storeState.currentTopic = sampleTopic;
+    storeState.currentQuestion = sampleQuestion;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/stats")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ stats: {} }) });
+      if (url.includes("/api/record-answer")) return Promise.reject(new Error("backend down"));
+      if (url.includes("/api/generate-questions")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ questions: [] }) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    }) as any;
+
+    render(<SessionPage />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("answer-btn"));
+    });
+    expect(mockUpdateSubItemStats).toHaveBeenCalledWith("sub-1", false, 1);
+  });
+
+  test("applies hint penalty and hint achievement tracking", async () => {
+    storeState.currentTopic = sampleTopic;
+    storeState.currentQuestion = sampleQuestion;
+    render(<SessionPage />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("hint-btn"));
+    });
+    expect(mockAddXP).toHaveBeenCalledWith(-5);
+    expect(mockCheckAchievements).toHaveBeenCalledWith({ usedHint: true });
+  });
+
+  test("toggle mute sends request to API", async () => {
+    storeState.currentTopic = sampleTopic;
+    render(<SessionPage />);
+    fireEvent.click(screen.getByTestId("toggle-item-mute"));
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/toggle-mute",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+  });
+
+  test("shows free-plan weekly usage nudge when remaining ratio is low", () => {
+    storeState.currentTopic = sampleTopic;
+    storeState.plan = "free";
+    storeState.weeklyUsage = 10;
+    storeState.weeklyRemaining = 4;
+    render(<SessionPage />);
+    expect(screen.getByText(/4 questions left this week/i)).toBeTruthy();
+    expect(screen.getByText("Upgrade")).toBeTruthy();
+  });
+
+  test("does not show weekly usage nudge for pro users", () => {
+    storeState.currentTopic = sampleTopic;
+    storeState.plan = "pro";
+    storeState.weeklyUsage = 10;
+    storeState.weeklyRemaining = 2;
+    render(<SessionPage />);
+    expect(screen.queryByText(/questions left this week/i)).toBeNull();
+  });
+
+  test("opens settings dialog from settings button", () => {
+    storeState.currentTopic = sampleTopic;
+    render(<SessionPage />);
+    fireEvent.click(screen.getAllByLabelText("Settings")[0]);
+    expect(screen.getByTestId("settings-dialog")).toBeTruthy();
+  });
+
+  test("toggles mobile stats panel", () => {
+    storeState.currentTopic = sampleTopic;
+    storeState.weeklyRemaining = 17;
+    render(<SessionPage />);
+    expect(screen.getAllByText(/17 left this week/i).length).toBe(1);
+    fireEvent.click(screen.getByLabelText("Stats"));
+    expect(screen.getAllByText(/17 left this week/i).length).toBeGreaterThan(1);
+  });
+
+  test("audiobook success path opens player", async () => {
+    storeState.currentTopic = sampleTopic;
+    const createObjectURLSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:audio");
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/stats")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ stats: {} }) });
+      if (url.includes("/api/generate-questions")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ questions: [] }) });
+      if (url.includes("/api/audiobook/generate")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          blob: () => Promise.resolve(new Blob(["audio"])),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    }) as any;
+
+    render(<SessionPage />);
+    fireEvent.click(screen.getAllByTestId("open-audiobook-dialog")[0]);
+    fireEvent.click(screen.getByTestId("audiobook-generate"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("audiobook-player")).toBeTruthy();
+    });
+    createObjectURLSpy.mockRestore();
+  });
+
+  test("audiobook 403 shows plan error", async () => {
+    storeState.currentTopic = sampleTopic;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/stats")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ stats: {} }) });
+      if (url.includes("/api/generate-questions")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ questions: [] }) });
+      if (url.includes("/api/audiobook/generate")) {
+        return Promise.resolve({
+          ok: false,
+          status: 403,
+          json: () => Promise.resolve({ error: "forbidden" }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    }) as any;
+
+    render(<SessionPage />);
+    fireEvent.click(screen.getAllByTestId("open-audiobook-dialog")[0]);
+    fireEvent.click(screen.getByTestId("audiobook-generate"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/available on Learner and Master plans/i)).toBeTruthy();
+    });
   });
 });
 
