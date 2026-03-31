@@ -1,0 +1,32 @@
+name: Backup Production DB
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    name: Dump PostgreSQL to Blob
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Run backup script
+        env:
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          STORAGE_ACCOUNT_NAME: ${{ secrets.BACKUP_STORAGE_ACCOUNT_NAME }}
+          STORAGE_ACCOUNT_KEY: ${{ secrets.BACKUP_STORAGE_ACCOUNT_KEY }}
+          BACKUP_CONTAINER: ${{ secrets.BACKUP_CONTAINER }}
+        run: bash scripts/backup-postgres-to-blob.sh
