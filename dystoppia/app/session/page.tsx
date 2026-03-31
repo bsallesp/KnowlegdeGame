@@ -14,6 +14,7 @@ import RateLimitPaywall from "@/components/RateLimitPaywall";
 import DailyGoalBar from "@/components/DailyGoalBar";
 import BossRound from "@/components/BossRound";
 import FlashCard from "@/components/FlashCard";
+import InfoButton from "@/components/InfoButton";
 import AudiobookPlayer from "@/components/AudiobookPlayer";
 import AudiobookDialog, { type AudiobookEntry } from "@/components/AudiobookDialog";
 import SettingsDialog from "@/components/SettingsDialog";
@@ -81,6 +82,7 @@ export default function SessionPage() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [rateLimitInfo, setRateLimitInfo] = useState<{ window: "hourly" | "weekly"; resetsAt: string | null }>({ window: "hourly", resetsAt: null });
   const [showBossIntro, setShowBossIntro] = useState(false);
+  const [isBossGenerating, setIsBossGenerating] = useState(false);
   const [isBossRound, setIsBossRound] = useState(false);
   const [bossQuestionsLeft, setBossQuestionsLeft] = useState(0);
   const [showFlashCard, setShowFlashCard] = useState(false);
@@ -310,7 +312,8 @@ export default function SessionPage() {
   };
 
   const handleBossReady = async () => {
-    setShowBossIntro(false);
+    if (isBossGenerating) return;
+    setIsBossGenerating(true);
     setIsBossRound(true);
     setBossQuestionsLeft(BOSS_QUESTIONS);
 
@@ -322,6 +325,11 @@ export default function SessionPage() {
         await generateQuestionsForSubItem(subItemId, BOSS_QUESTIONS, 5);
       }
     }
+
+    // Dismiss intro only after questions are ready — prevents the previously-answered
+    // question from flashing briefly while the API call is in flight.
+    setShowBossIntro(false);
+    setIsBossGenerating(false);
     advanceQueue();
   };
 
@@ -471,7 +479,7 @@ export default function SessionPage() {
                   onClick={handleShowSummary}
                   className="w-full py-3 rounded-xl font-semibold text-sm"
                   style={{ backgroundColor: "#1C1C28", color: "#9494B8", border: "1px solid #2E2E40" }}>
-                  Ver resumo
+                  View summary
                 </motion.button>
               </div>
             </motion.div>
@@ -481,7 +489,7 @@ export default function SessionPage() {
 
       {/* Boss round intro */}
       <AnimatePresence>
-        {showBossIntro && <BossRound onReady={handleBossReady} />}
+        {showBossIntro && <BossRound onReady={handleBossReady} isLoading={isBossGenerating} />}
       </AnimatePresence>
 
       {/* Session summary */}
@@ -511,8 +519,13 @@ export default function SessionPage() {
             <span className="text-xs px-2 py-0.5 rounded-full animate-pulse" style={{ backgroundColor: "rgba(129,140,248,0.15)", color: "#818CF8" }}>loading...</span>
           )}
           {isBossRound && (
-            <span className="text-xs px-2 py-0.5 rounded-full font-bold animate-pulse" style={{ backgroundColor: "rgba(239,68,68,0.15)", color: "#EF4444" }}>
+            <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-bold animate-pulse" style={{ backgroundColor: "rgba(239,68,68,0.15)", color: "#EF4444" }}>
               ⚔️ BOSS ({bossQuestionsLeft})
+              <InfoButton
+                title="Boss Round"
+                content="Every 10 answers, 3 maximum-difficulty questions appear with 2× XP. Answer all 3 to earn the Boss Slayer achievement."
+                side="below"
+              />
             </span>
           )}
         </div>
@@ -526,6 +539,11 @@ export default function SessionPage() {
           >
             <span>⚡</span>
             <span>{weeklyRemaining} left this week</span>
+            <InfoButton
+              title="Weekly Questions"
+              content="How many AI-generated questions you have left this week. The counter resets every 7 days. Upgrade your plan for a higher limit."
+              side="below"
+            />
           </div>
 
           {/* Daily goal */}
@@ -535,6 +553,11 @@ export default function SessionPage() {
           {sessionXP > 0 && (
             <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: "#FACC15" }}>
               <span>⚡</span><span>{sessionXP} XP</span>
+              <InfoButton
+                title="Session XP"
+                content="XP earned this session. Correct answers give 10 × difficulty × streak bonus. Boss Round questions give 2× XP."
+                side="below"
+              />
             </div>
           )}
 
@@ -542,6 +565,11 @@ export default function SessionPage() {
           {streak > 1 && (
             <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: "#F97316" }}>
               <span>🔥</span><span>{streak}</span>
+              <InfoButton
+                title="Daily Streak"
+                content="Consecutive days you've studied. Miss a day and it resets to 1. Reach 7 days to earn the Strong Week achievement."
+                side="below"
+              />
             </div>
           )}
 
@@ -550,6 +578,11 @@ export default function SessionPage() {
             {Array.from({ length: maxLives }).map((_, i) => (
               <span key={i} className="text-sm" style={{ filter: i < lives ? "none" : "grayscale(1) opacity(0.3)" }}>❤️</span>
             ))}
+            <InfoButton
+              title="Lives"
+              content="You have 3 lives per session. Each wrong answer costs one life. Run out and you'll see Game Over — but you can always continue anyway."
+              side="below"
+            />
           </div>
 
           {/* Session accuracy */}
@@ -560,6 +593,11 @@ export default function SessionPage() {
                 {overallRate}%
               </span>
               <span style={{ color: "#9494B8" }}>({totalCount} answered)</span>
+              <InfoButton
+                title="Session Accuracy"
+                content="Percentage of correct answers so far this session. The app uses this — along with time spent — to adapt question difficulty per concept."
+                side="below"
+              />
             </div>
           )}
 
@@ -570,7 +608,7 @@ export default function SessionPage() {
               className="text-xs px-2 py-1 rounded-lg transition-colors"
               style={{ color: "#9494B8", border: "1px solid #2E2E40" }}
             >
-              Resumo
+              Summary
             </button>
           )}
 
@@ -645,7 +683,7 @@ export default function SessionPage() {
               )}
               {totalCount > 0 && (
                 <div className="flex items-center gap-1 text-xs">
-                  <span style={{ color: "#9494B8" }}>Sessão:</span>
+                  <span style={{ color: "#9494B8" }}>Session:</span>
                   <span className="font-semibold" style={{ color: overallRate >= 70 ? "#60A5FA" : overallRate >= 40 ? "#FACC15" : "#F97316" }}>{overallRate}%</span>
                   <span style={{ color: "#9494B8" }}>({totalCount})</span>
                 </div>
@@ -656,7 +694,7 @@ export default function SessionPage() {
                   className="text-xs px-2 py-1 rounded-lg"
                   style={{ color: "#9494B8", border: "1px solid #2E2E40" }}
                 >
-                  Resumo
+                  Summary
                 </button>
               )}
             </div>
@@ -741,8 +779,15 @@ export default function SessionPage() {
             >
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#9494B8" }}>Learning Tree</h2>
-                  <p className="text-xs mt-0.5" style={{ color: "#9494B8" }}>⚠ = ponto fraco &nbsp; ✓ = dominado</p>
+                  <div className="flex items-center gap-1.5">
+                    <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#9494B8" }}>Learning Tree</h2>
+                    <InfoButton
+                      title="Learning Tree"
+                      content="Your curriculum organized by chapters and concepts. ⚠ = weak spot (< 50% correct, 3+ attempts). ✓ = mastered (≥ 80%, 10+ attempts). Mute any item to skip it."
+                      side="below"
+                    />
+                  </div>
+                  <p className="text-xs mt-0.5" style={{ color: "#9494B8" }}>⚠ = weak spot &nbsp; ✓ = mastered</p>
                 </div>
                 <button onClick={() => setShowMobileTree(false)} className="p-1 rounded" style={{ color: "#9494B8" }}>
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -778,8 +823,14 @@ export default function SessionPage() {
         {/* Left sidebar */}
         <aside className="w-72 flex-shrink-0 overflow-y-auto p-4 hidden md:block" style={{ backgroundColor: "#09090E", borderRight: "1px solid #2E2E40" }}>
           <div className="mb-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "#9494B8" }}>Learning Tree</h2>
-            <p className="text-xs" style={{ color: "#9494B8" }}>⚠ = ponto fraco &nbsp; ✓ = dominado</p>
+            <div className="flex items-center gap-1.5 mb-1">
+              <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#9494B8" }}>Learning Tree</h2>
+              <InfoButton
+                title="Learning Tree"
+                content="Your curriculum organized by chapters and concepts. ⚠ = weak spot (< 50% correct, 3+ attempts). ✓ = mastered (≥ 80%, 10+ attempts). Mute any item to skip it."
+              />
+            </div>
+            <p className="text-xs" style={{ color: "#9494B8" }}>⚠ = weak spot &nbsp; ✓ = mastered</p>
           </div>
           <TopicDashboard
             items={currentTopic.items}

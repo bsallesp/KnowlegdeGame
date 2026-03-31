@@ -4,9 +4,10 @@ import { motion } from "framer-motion";
 
 interface BossRoundProps {
   onReady: () => void;
+  isLoading?: boolean;
 }
 
-export default function BossRound({ onReady }: BossRoundProps) {
+export default function BossRound({ onReady, isLoading }: BossRoundProps) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -58,7 +59,7 @@ export default function BossRound({ onReady }: BossRoundProps) {
           style={{ color: "#9494B8" }}
         >
           <div className="flex items-center gap-1">
-            <span style={{ color: "#FACC15" }}>⚡</span> XP em dobro
+            <span style={{ color: "#FACC15" }}>⚡</span> 2× XP
           </div>
           <div className="flex items-center gap-1">
             <span style={{ color: "#EF4444" }}>💀</span> Maximum difficulty
@@ -69,13 +70,14 @@ export default function BossRound({ onReady }: BossRoundProps) {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.7 }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={onReady}
+          whileHover={isLoading ? {} : { scale: 1.05 }}
+          whileTap={isLoading ? {} : { scale: 0.95 }}
+          onClick={isLoading ? undefined : onReady}
+          disabled={isLoading}
           className="px-10 py-3 rounded-xl font-bold text-sm"
-          style={{ backgroundColor: "#EF4444", color: "white" }}
+          style={{ backgroundColor: "#EF4444", color: "white", opacity: isLoading ? 0.7 : 1, cursor: isLoading ? "not-allowed" : "pointer" }}
         >
-          Enfrentar o Boss →
+          {isLoading ? "Generating..." : "Face the Boss →"}
         </motion.button>
       </motion.div>
     </motion.div>

@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import useAppStore from "@/store/useAppStore";
+import InfoButton from "@/components/InfoButton";
 
 export default function DailyGoalBar() {
   const { dailyGoal } = useAppStore();
@@ -12,7 +13,7 @@ export default function DailyGoalBar() {
   const done = progress >= dailyGoal.target;
 
   return (
-    <div className="flex items-center gap-2" title={`Daily goal: ${progress}/${dailyGoal.target} questions`}>
+    <div className="flex items-center gap-2">
       <span className="text-xs font-medium" style={{ color: done ? "#60A5FA" : "#9494B8" }}>
         {done ? "🎖️" : "🎯"} {progress}/{dailyGoal.target}
       </span>
@@ -28,6 +29,11 @@ export default function DailyGoalBar() {
           transition={{ duration: 0.5 }}
         />
       </div>
+      <InfoButton
+        title="Daily Goal"
+        content={`Your daily practice target: ${dailyGoal.target} questions. Complete it to build a consistent study habit. Adjust the target in Settings.`}
+        side="below"
+      />
     </div>
   );
 }

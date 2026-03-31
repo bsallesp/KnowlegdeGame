@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Question } from "@/types";
+import InfoButton from "@/components/InfoButton";
 
 interface QuestionCardProps {
   question: Question;
@@ -215,7 +216,7 @@ export default function QuestionCard({
                   color: hintUsed ? "#9494B8" : xp < HINT_COST ? "#9494B8" : "#FACC15",
                   cursor: hintUsed || xp < HINT_COST ? "not-allowed" : "pointer",
                 }}
-                title={xp < HINT_COST ? `Precisa de ${HINT_COST} XP para usar hint` : `Hint (-${HINT_COST} XP)`}
+                title={xp < HINT_COST ? `Need ${HINT_COST} XP to use hint` : `Hint (-${HINT_COST} XP)`}
               >
                 {hintLoading ? "..." : hintError ? "⚠ Error" : hintUsed ? "✓ Hint" : `💡 -${HINT_COST} XP`}
               </button>
@@ -228,6 +229,11 @@ export default function QuestionCard({
                   <div key={d} className="w-2 h-2 rounded-full" style={{ backgroundColor: d <= question.difficulty ? difficultyColor : "#2E2E40" }} />
                 ))}
               </div>
+              <InfoButton
+                title="Question Difficulty"
+                content="Rated 1 (easiest) to 5 (hardest). The app automatically adjusts this based on your recent performance on each concept."
+                side="below"
+              />
             </div>
           </div>
         </div>

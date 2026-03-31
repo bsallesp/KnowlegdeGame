@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import useAppStore from "@/store/useAppStore";
+import InfoButton from "@/components/InfoButton";
 
 interface SessionSummaryProps {
   answerCount: number;
@@ -96,9 +97,15 @@ export default function SessionSummary({
         {/* Achievements */}
         {unlockedThisSession.length > 0 && (
           <div className="mx-6 mb-4">
-            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "#9494B8" }}>
-              Session achievements
-            </p>
+            <div className="flex items-center gap-1.5 mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#9494B8" }}>
+                Session achievements
+              </p>
+              <InfoButton
+                title="Achievements"
+                content="Badges unlocked during this session. Each has specific criteria — e.g. 10-answer streak, 7-day streak, Boss Slayer, Speed Demon (correct in under 10s), and more."
+              />
+            </div>
             <div className="flex flex-wrap gap-2">
               {unlockedThisSession.map((a) => (
                 <div
@@ -117,9 +124,15 @@ export default function SessionSummary({
         {/* Weak spots */}
         {weakSpots.length > 0 && (
           <div className="mx-6 mb-6">
-            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "#9494B8" }}>
-              Review more
-            </p>
+            <div className="flex items-center gap-1.5 mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#9494B8" }}>
+                Review more
+              </p>
+              <InfoButton
+                title="Weak Spots"
+                content="Concepts where you scored below 50% (with at least 3 attempts). The app automatically prioritizes these in upcoming sessions so you can improve."
+              />
+            </div>
             <div className="space-y-1">
               {weakSpots.map(([id, s]) => (
                 <div key={id} className="flex items-center justify-between px-3 py-1.5 rounded-lg" style={{ backgroundColor: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.2)" }}>

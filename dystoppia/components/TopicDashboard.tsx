@@ -138,8 +138,8 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute, onOp
                     onClick={(e) => { e.stopPropagation(); onOpenAudiobooks(item.id, "item", item.name); }}
                     className="flex-shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                     style={{ color: "#818CF8" }}
-                    title="Audiobooks deste capítulo"
-                    aria-label="Abrir audiobooks do item"
+                    title="Audiobooks for this chapter"
+                    aria-label="Open chapter audiobooks"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 18v-6a9 9 0 0118 0v6" />
@@ -216,8 +216,8 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute, onOp
                                     onClick={() => onOpenAudiobooks(sub.id, "subitem", sub.name)}
                                     className="flex-shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                                     style={{ color: "#818CF8" }}
-                                    title="Audiobooks deste conceito"
-                                    aria-label="Abrir audiobooks do subitem"
+                                    title="Audiobooks for this concept"
+                                    aria-label="Open concept audiobooks"
                                   >
                                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 18v-6a9 9 0 0118 0v6" />
