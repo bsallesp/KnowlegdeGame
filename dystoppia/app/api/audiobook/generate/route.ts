@@ -219,7 +219,7 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = audioBytes.buffer.slice(
       audioBytes.byteOffset,
       audioBytes.byteOffset + audioBytes.byteLength
-    );
+    ) as ArrayBuffer;
 
     return new NextResponse(arrayBuffer, {
       status: 200,
