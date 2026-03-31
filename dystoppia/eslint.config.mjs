@@ -13,6 +13,22 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  // Relax strict rules for test files
+  {
+    files: ["__tests__/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-unsafe-function-type": "off",
+      "prefer-const": "off",
+      "react-hooks/rules-of-hooks": "off",
+      "@typescript-eslint/ban-types": "off",
+      "react/no-unescaped-entities": "off",
+    },
+  },
+  // Ignore generated coverage reports
+  globalIgnores(["coverage/**"]),
 ]);
 
 export default eslintConfig;

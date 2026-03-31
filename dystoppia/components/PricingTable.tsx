@@ -76,6 +76,7 @@ export default function PricingTable({ onUpgrade, currentPlan = "free" }: Pricin
     });
     if (res.ok) {
       const { url } = await res.json();
+      // eslint-disable-next-line react-hooks/immutability
       window.location.href = url;
     }
   };

@@ -173,7 +173,7 @@ export default function OnboardingWizard({
                 color: "#9494B8",
               }}
             >
-              You have studied this topic before. Let's personalize your new session.
+              You have studied this topic before. Let&apos;s personalize your new session.
             </motion.div>
           )}
 

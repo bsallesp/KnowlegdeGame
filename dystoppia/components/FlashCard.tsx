@@ -64,7 +64,7 @@ export default function FlashCard({ subItem, topicName, onReady }: FlashCardProp
           className="px-8 py-3 rounded-xl font-semibold text-sm"
           style={{ backgroundColor: "#818CF8", color: "white" }}
         >
-          Let's go →
+          Let&apos;s go →
         </motion.button>
       </div>
     </motion.div>

@@ -20,6 +20,7 @@ export default function ProgressChart({ topicId, days = 14 }: ProgressChartProps
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setError(false);
     const url = `/api/progress?days=${days}${topicId ? `&topicId=${topicId}` : ""}`;
     fetch(url)

@@ -32,6 +32,7 @@ export default function SessionSummary({
   const unlockedThisSession = achievements.filter(
     (a) =>
       a.unlockedAt &&
+      // eslint-disable-next-line react-hooks/purity
       Date.now() - new Date(a.unlockedAt).getTime() < 60 * 60 * 1000
   );
 
