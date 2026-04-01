@@ -126,17 +126,18 @@ jobs:
         run: |
           set -e
           BASE="https://${{ steps.app_url.outputs.value }}"
-          # curl --retry does NOT retry on HTTP 404; during rollout the old container may 404 on /api/health until the new image is live.
+          # Azure returns HTTP 503 + HTML "Application Error" when the container never binds — do NOT treat 503 as success.
+          # Retry 404/502 while the new image rolls out; require 200 + JSON from our route.
           for i in $(seq 1 36); do
             code=$(curl -sS -o /tmp/health.body -w "%{http_code}" "$BASE/api/health" || echo "000")
-            if [ "$code" = "200" ] || [ "$code" = "503" ]; then
+            if [ "$code" = "200" ] && grep -qE '"ok"[[:space:]]*:[[:space:]]*true' /tmp/health.body; then
               echo "OK: GET /api/health -> HTTP $code"
               cat /tmp/health.body
               exit 0
             fi
-            echo "attempt $i: HTTP $code (waiting for new container / route)..."
+            echo "attempt $i: HTTP $code (waiting for healthy app / rollout)..."
             sleep 10
           done
-          echo "GET /api/health never returned 200 or 503 (last body:)"
+          echo "GET /api/health never returned 200 with ok:true (last body:)"
           cat /tmp/health.body 2>/dev/null || true
           exit 1

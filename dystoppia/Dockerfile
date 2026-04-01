@@ -14,6 +14,9 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
+# TLS para PostgreSQL Azure + engines Prisma no Alpine
+RUN apk add --no-cache ca-certificates openssl libc6-compat
+
 ENV NODE_ENV=production
 ENV PORT=8080
 ENV HOSTNAME=0.0.0.0
@@ -38,7 +41,7 @@ RUN mkdir -p node_modules/.bin && \
     chmod +x node_modules/prisma/build/index.js
 
 COPY startup.sh ./
-RUN chmod +x startup.sh
+RUN sed -i 's/\r$//' /app/startup.sh && chmod +x /app/startup.sh
 
 EXPOSE 8080
 CMD ["/bin/sh", "/app/startup.sh"]

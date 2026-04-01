@@ -5,5 +5,9 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (!process.env.APPLICATIONINSIGHTS_CONNECTION_STRING?.trim()) return;
-  await import("./lib/appInsightsServer");
+  try {
+    await import("./lib/appInsightsServer");
+  } catch (e) {
+    console.error("[instrumentation] Application Insights failed to start:", e);
+  }
 }
