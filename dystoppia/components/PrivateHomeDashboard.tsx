@@ -85,6 +85,7 @@ interface Conversation {
   questions: ClarifyingQuestion[];
   questionRound: number;
   answersByQuestion: Record<string, string>;
+  remarks: string[];
   userAnswers: string;
   phase: Phase;
   createdAt: string;
@@ -186,6 +187,14 @@ function normalizeAnswersByQuestion(input: unknown): Record<string, string> {
     }
     return acc;
   }, {});
+}
+
+function normalizeStringList(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function normalizeAnalysis(input: unknown): PersonaAnalysis | null {
@@ -303,6 +312,7 @@ function loadConversations(): Conversation[] {
           questions?: unknown;
           questionRound?: unknown;
           answersByQuestion?: unknown;
+          remarks?: unknown;
           userAnswers?: unknown;
           phase?: unknown;
           createdAt?: unknown;
@@ -337,6 +347,7 @@ function loadConversations(): Conversation[] {
         const answersByQuestion = normalizeAnswersByQuestion(
           rawConversation.answersByQuestion
         );
+        const remarks = normalizeStringList(rawConversation.remarks);
         const userAnswers =
           typeof rawConversation.userAnswers === "string"
             ? rawConversation.userAnswers
@@ -357,6 +368,7 @@ function loadConversations(): Conversation[] {
           questions,
           questionRound,
           answersByQuestion,
+          remarks,
           userAnswers,
           phase:
             normalizePhase(rawConversation.phase),
@@ -574,12 +586,15 @@ export default function PrivateHomeDashboard() {
   const [answersByQuestion, setAnswersByQuestion] = useState<
     Record<string, string>
   >({});
+  const [remarks, setRemarks] = useState<string[]>([]);
+  const [composerInput, setComposerInput] = useState("");
   const [hasHydrated, setHasHydrated] = useState(false);
   const [userAnswers, setUserAnswers] = useState("");
   const [visiblePersonas, setVisiblePersonas] = useState(0);
   const [visibleDebate, setVisibleDebate] = useState(0);
   const [visibleRefinedDebate, setVisibleRefinedDebate] = useState(0);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const debateEndRef = useRef<HTMLDivElement>(null);
   const refinedDebateEndRef = useRef<HTMLDivElement>(null);
@@ -605,6 +620,7 @@ export default function PrivateHomeDashboard() {
         setQuestions(activeConversation.questions ?? []);
         setQuestionRound(activeConversation.questionRound ?? 1);
         setAnswersByQuestion(activeConversation.answersByQuestion ?? {});
+        setRemarks(activeConversation.remarks ?? []);
         setUserAnswers(activeConversation.userAnswers ?? "");
         setPhase(activeConversation.phase ?? "idle");
         setVisiblePersonas(activeConversation.analysis?.personas.length ?? 0);
@@ -717,6 +733,7 @@ export default function PrivateHomeDashboard() {
       questions,
       questionRound,
       answersByQuestion,
+      remarks,
       userAnswers,
       phase,
     });
@@ -728,6 +745,7 @@ export default function PrivateHomeDashboard() {
     questions,
     questionRound,
     answersByQuestion,
+    remarks,
     userAnswers,
     phase,
   ]);
@@ -758,11 +776,14 @@ export default function PrivateHomeDashboard() {
     setQuestions([]);
     setQuestionRound(1);
     setAnswersByQuestion({});
+    setRemarks([]);
+    setComposerInput("");
     setUserAnswers("");
     setVisibleRefinedDebate(0);
     setVisiblePersonas(0);
     setVisibleDebate(0);
     setError("");
+    setNotice("");
   }
 
   function loadConversation(convo: Conversation) {
@@ -773,12 +794,15 @@ export default function PrivateHomeDashboard() {
     setQuestions(convo.questions ?? convo.analysis?.clarifyingQuestions ?? []);
     setQuestionRound(convo.questionRound ?? 1);
     setAnswersByQuestion(convo.answersByQuestion ?? {});
+    setRemarks(convo.remarks ?? []);
+    setComposerInput("");
     setUserAnswers(convo.userAnswers ?? "");
     setPhase(convo.phase ?? (convo.analysis ? "questions" : "idle"));
     setVisiblePersonas(convo.analysis?.personas.length ?? 0);
     setVisibleDebate(convo.analysis?.initialDebate.length ?? 0);
     setVisibleRefinedDebate(convo.refinement?.refinedDebate.length ?? 0);
     setError("");
+    setNotice("");
   }
 
   function deleteConversation(id: string) {
@@ -793,9 +817,9 @@ export default function PrivateHomeDashboard() {
   /* ── Submit ─────────────────────────────────────────────────── */
 
   const handleSubmit = useCallback(
-    async (e?: React.FormEvent) => {
+    async (e?: React.FormEvent, manualText?: string) => {
       if (e) e.preventDefault();
-      const text = prompt.trim();
+      const text = (manualText ?? prompt).trim();
       if (!text || phase === "analyzing" || phase === "refining") return;
 
       // Create conversation
@@ -809,6 +833,7 @@ export default function PrivateHomeDashboard() {
         questions: [],
         questionRound: 1,
         answersByQuestion: {},
+        remarks: [],
         userAnswers: "",
         phase: "analyzing",
         createdAt: new Date().toISOString(),
@@ -823,6 +848,8 @@ export default function PrivateHomeDashboard() {
       setQuestions([]);
       setQuestionRound(1);
       setAnswersByQuestion({});
+      setRemarks([]);
+      setComposerInput("");
       setUserAnswers("");
       setVisibleRefinedDebate(0);
       setVisiblePersonas(0);
@@ -855,6 +882,7 @@ export default function PrivateHomeDashboard() {
         setQuestions(initialQuestions);
         setQuestionRound(1);
         setPhase("personas-revealed");
+        setNotice("");
 
         // Persist to conversation
         setConversations((prev) =>
@@ -865,6 +893,7 @@ export default function PrivateHomeDashboard() {
                   analysis: data,
                   questions: initialQuestions,
                   questionRound: 1,
+                  remarks: [],
                   phase: "personas-revealed",
                 }
               : c
@@ -872,6 +901,7 @@ export default function PrivateHomeDashboard() {
         );
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
+        setNotice("");
         setPhase("idle");
         // Remove failed conversation
         setConversations((prev) => prev.filter((c) => c.id !== id));
@@ -881,7 +911,7 @@ export default function PrivateHomeDashboard() {
     [prompt, phase]
   );
 
-  const handleRefine = useCallback(async () => {
+  const handleRefine = useCallback(async (input?: unknown) => {
     if (!analysis || !prompt.trim()) return;
     if (phase === "refining" || phase === "analyzing") return;
     if (questions.length === 0) {
@@ -889,22 +919,68 @@ export default function PrivateHomeDashboard() {
       return;
     }
 
+    let note = "";
+    let allowPartial = false;
+    if (typeof input === "string") {
+      note = input;
+    } else if (input && typeof input === "object") {
+      const raw = input as { note?: unknown; allowPartial?: unknown };
+      note = typeof raw.note === "string" ? raw.note : "";
+      allowPartial = raw.allowPartial === true;
+    }
+
     const unanswered = questions.filter(
       (question) => !answersByQuestion[question.id]?.trim()
     );
-    if (unanswered.length > 0) {
+    if (unanswered.length > 0 && !allowPartial) {
       setError(
         `Please answer all questions before continuing (${unanswered.length} remaining).`
+      );
+      setNotice(
+        `Still missing ${unanswered.length} answer(s). You can answer them or use "Proceed with assumptions".`
       );
       return;
     }
 
-    const qaHistory = questions.map((question) => ({
-      question: question.question,
-      answer: answersByQuestion[question.id]?.trim() || "",
+    const trimmedNote = typeof note === "string" ? note.trim() : "";
+    const nextRemarks = trimmedNote ? [...remarks, trimmedNote] : remarks;
+    if (trimmedNote) {
+      setRemarks(nextRemarks);
+    }
+
+    const qaHistory = questions
+      .map((question) => {
+        const answer = answersByQuestion[question.id]?.trim() || "";
+        if (answer) {
+          return {
+            question: question.question,
+            answer,
+          };
+        }
+        if (allowPartial) {
+          return {
+            question: question.question,
+            answer:
+              "[Not answered by user. Infer a realistic assumption and list it in estimateAssumptions.]",
+          };
+        }
+        return null;
+      })
+      .filter(
+        (
+          item
+        ): item is {
+          question: string;
+          answer: string;
+        } => item !== null
+      );
+    const noteHistory = nextRemarks.map((remark, i) => ({
+      question: `User remark ${i + 1}`,
+      answer: remark,
     }));
 
     setError("");
+    setNotice("");
     setPhase("refining");
     setVisibleRefinedDebate(0);
 
@@ -921,8 +997,10 @@ export default function PrivateHomeDashboard() {
             reason: persona.reason,
           })),
           projectSummary: analysis.projectSummary,
-          qaHistory,
+          qaHistory: [...qaHistory, ...noteHistory],
           iteration: questionRound,
+          existingMvpProposal: refinement?.mvpProposal ?? null,
+          allowAssumptions: allowPartial,
         }),
       });
 
@@ -944,9 +1022,19 @@ export default function PrivateHomeDashboard() {
       setPhase("refined-debate");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Refinement failed");
+      setNotice("");
       setPhase("questions");
     }
-  }, [analysis, prompt, phase, questions, answersByQuestion, questionRound]);
+  }, [
+    analysis,
+    prompt,
+    phase,
+    questions,
+    answersByQuestion,
+    questionRound,
+    remarks,
+    refinement,
+  ]);
 
   if (loading) {
     return (
@@ -997,10 +1085,54 @@ export default function PrivateHomeDashboard() {
     unansweredCount === 0 &&
     phase !== "refining" &&
     phase !== "analyzing";
+  const canProceedWithAssumptions =
+    questions.length > 0 &&
+    answeredCount > 0 &&
+    unansweredCount > 0 &&
+    phase !== "refining" &&
+    phase !== "analyzing";
   const visibleRefinedMessages =
     phase === "refined-debate"
       ? visibleRefinedDebate
       : refinement?.refinedDebate.length ?? 0;
+  const isComposerBusy = phase === "analyzing" || phase === "refining";
+  const canSendComposer = composerInput.trim().length > 0 && !isComposerBusy;
+  const composerPlaceholder = !analysis
+    ? "Describe your app idea..."
+    : phase === "proposal"
+      ? "Add remarks to revisit this MVP..."
+      : "Add context or send a note to the team...";
+  const composerActionLabel = !analysis
+    ? "Analyze"
+    : phase === "proposal"
+      ? "Re-discuss MVP"
+      : "Send";
+
+  async function handleComposerSubmit(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const text = composerInput.trim();
+    if (!text || isComposerBusy) return;
+
+    setComposerInput("");
+    setError("");
+
+    if (!analysis) {
+      setNotice("");
+      await handleSubmit(undefined, text);
+      return;
+    }
+
+    if (phase === "questions" && unansweredCount > 0) {
+      setRemarks((prev) => [...prev, text]);
+      setNotice(
+        `Remark saved. Answer the remaining ${unansweredCount} question(s) to continue.`
+      );
+      return;
+    }
+
+    setNotice("Remark sent. Team is re-discussing internally...");
+    await handleRefine(text);
+  }
 
   /* ── Render ─────────────────────────────────────────────────── */
 
@@ -1196,6 +1328,21 @@ export default function PrivateHomeDashboard() {
 
         {/* Content */}
         <main className="flex-1 flex flex-col items-center overflow-y-auto px-6 pb-8">
+          {error && phase !== "idle" && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="w-full max-w-4xl mt-2 mb-4 text-sm px-4 py-2 rounded-lg"
+              style={{
+                backgroundColor: "rgba(249,115,22,0.1)",
+                border: "1px solid rgba(249,115,22,0.3)",
+                color: "#F97316",
+              }}
+            >
+              {error}
+            </motion.p>
+          )}
+
           {/* Idle / Input state */}
           {phase === "idle" && !activeId && (
             <div className="flex-1 flex flex-col items-center justify-center w-full max-w-2xl">
@@ -1408,6 +1555,36 @@ export default function PrivateHomeDashboard() {
                   {prompt}
                 </div>
               </motion.div>
+
+              {remarks.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-6"
+                >
+                  <p
+                    className="text-xs font-semibold uppercase tracking-widest mb-3"
+                    style={{ color: "#38BDF8" }}
+                  >
+                    User Remarks ({remarks.length})
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {remarks.slice(-4).map((remark, i) => (
+                      <div
+                        key={`${remark}_${i}`}
+                        className="px-4 py-3 rounded-xl text-sm"
+                        style={{
+                          backgroundColor: "#12121A",
+                          border: "1px solid #2E2E40",
+                          color: "#BFD9FF",
+                        }}
+                      >
+                        {remark}
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
 
               {/* Project summary */}
               <motion.div
@@ -1794,7 +1971,9 @@ export default function PrivateHomeDashboard() {
                       </p>
                       <button
                         type="button"
-                        onClick={handleRefine}
+                        onClick={() => {
+                          void handleRefine();
+                        }}
                         disabled={!canContinueToRefinement}
                         className="px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
                         style={{
@@ -1806,6 +1985,22 @@ export default function PrivateHomeDashboard() {
                           ? "Check MVP Readiness"
                           : "Re-check MVP Readiness"}
                       </button>
+                      {canProceedWithAssumptions && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleRefine({ allowPartial: true });
+                          }}
+                          className="px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+                          style={{
+                            backgroundColor: "rgba(129,140,248,0.18)",
+                            border: "1px solid rgba(129,140,248,0.35)",
+                            color: "#C7D2FE",
+                          }}
+                        >
+                          Proceed with assumptions
+                        </button>
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -2070,12 +2265,97 @@ export default function PrivateHomeDashboard() {
                           </ol>
                         </div>
                       )}
+
+                      <div
+                        className="mt-5 rounded-lg px-3 py-2 text-xs"
+                        style={{
+                          backgroundColor: "rgba(56,189,248,0.08)",
+                          border: "1px solid rgba(56,189,248,0.25)",
+                          color: "#7DD3FC",
+                        }}
+                      >
+                        Want changes? Send remarks in the input box below and
+                        the team will re-discuss this MVP.
+                      </div>
                     </div>
                   </motion.div>
                 )}
             </div>
           )}
         </main>
+
+        {notice && (
+          <div className="px-6 pb-2">
+            <p
+              className="text-xs px-3 py-2 rounded-lg"
+              style={{
+                backgroundColor: "rgba(56,189,248,0.08)",
+                border: "1px solid rgba(56,189,248,0.25)",
+                color: "#7DD3FC",
+              }}
+            >
+              {notice}
+            </p>
+          </div>
+        )}
+
+        <div
+          className="px-6 pb-4 pt-3"
+          style={{
+            borderTop: "1px solid #1C1C28",
+            backgroundColor: "rgba(9,9,14,0.75)",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <form onSubmit={handleComposerSubmit} className="w-full max-w-4xl mx-auto">
+            <div
+              className="rounded-2xl overflow-hidden"
+              style={{
+                backgroundColor: "#12121A",
+                border: "1px solid #2E2E40",
+              }}
+            >
+              <textarea
+                rows={2}
+                value={composerInput}
+                onChange={(e) => setComposerInput(e.target.value)}
+                placeholder={composerPlaceholder}
+                disabled={isComposerBusy}
+                className="w-full resize-none bg-transparent px-4 py-3 text-sm outline-none disabled:opacity-60"
+                style={{ color: "#EEEEFF" }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleComposerSubmit();
+                  }
+                }}
+              />
+              <div
+                className="flex items-center justify-between px-4 py-2"
+                style={{ borderTop: "1px solid #1C1C28" }}
+              >
+                <p className="text-xs" style={{ color: "#6B6B8A" }}>
+                  {!analysis
+                    ? "Start a new onboarding conversation"
+                    : phase === "proposal"
+                      ? "Send a remark to re-discuss this MVP"
+                      : "Send context to the internal team"}
+                </p>
+                <button
+                  type="submit"
+                  disabled={!canSendComposer}
+                  className="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
+                  style={{
+                    backgroundColor: "#38BDF8",
+                    color: "#09090E",
+                  }}
+                >
+                  {composerActionLabel}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
       </div>
 
       <style jsx global>{`

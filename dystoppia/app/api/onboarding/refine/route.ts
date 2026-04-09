@@ -97,6 +97,8 @@ export async function POST(req: NextRequest) {
     userAnswers?: string;
     projectSummary: string;
     iteration?: number;
+    existingMvpProposal?: unknown;
+    allowAssumptions?: boolean;
   };
 
   if (!body.originalPrompt) {
@@ -119,6 +121,7 @@ export async function POST(req: NextRequest) {
     typeof body.iteration === "number" && body.iteration > 0
       ? Math.floor(body.iteration)
       : 1;
+  const allowAssumptions = body.allowAssumptions === true;
 
   const qaHistoryText =
     normalizedQaHistory.length > 0
@@ -129,6 +132,11 @@ export async function POST(req: NextRequest) {
           )
           .join("\n\n")
       : body.userAnswers?.trim() || "";
+
+  const existingProposalText =
+    body.existingMvpProposal && typeof body.existingMvpProposal === "object"
+      ? JSON.stringify(body.existingMvpProposal, null, 2)
+      : "";
 
   if (!qaHistoryText) {
     return NextResponse.json(
@@ -164,6 +172,9 @@ ${legacyQuestions.length > 0 ? legacyQuestions.map((q, i) => `${i + 1}. ${q}`).j
 
 ## User's answers
 ${qaHistoryText}
+
+## Existing MVP proposal (if any)
+${existingProposalText || "none"}
 
 Return ONLY valid JSON in this exact format:
 {
@@ -230,6 +241,8 @@ Rules:
 - The refinedDebate should have 4-6 messages.
 - If readiness.readyForMvp is false, mvpProposal must be null and nextQuestions must contain 2-4 targeted follow-up questions.
 - If readiness.readyForMvp is true, nextQuestions must be [] and mvpProposal must be fully populated with cost and estimate fields.
+- If an existing MVP proposal is provided, treat this as a revision cycle: keep what still works, adjust what the user's remarks challenge, and explain tradeoffs.
+- If allowAssumptions is true (${allowAssumptions}), you may proceed with a best-effort MVP using explicit assumptions instead of blocking for more questions.
 - Be specific, concrete, and realistic. No fluff.`;
 
   try {
