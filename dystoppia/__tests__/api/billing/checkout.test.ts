@@ -19,6 +19,16 @@ vi.mock("@/lib/stripe", () => ({
     checkout: { sessions: { create: mockCheckoutCreate } },
   },
   STRIPE_PLAN_PRICES: { learner: "price_learner", master: "price_master" },
+  getCreditPackage: (packageId: string) =>
+    packageId === "builder_300"
+      ? {
+          id: "builder_300",
+          name: "Builder 300",
+          credits: 300,
+          unitAmountCents: 3900,
+          description: "Balanced package",
+        }
+      : null,
 }));
 
 import { POST } from "@/app/api/billing/checkout/route";
@@ -52,7 +62,14 @@ describe("POST /api/billing/checkout", () => {
     const res = await POST(req({ plan: "enterprise" }));
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe("Invalid plan");
+    expect(body.error).toBe("Invalid billing selection");
+  });
+
+  test("returns 400 for invalid credit package", async () => {
+    const res = await POST(req({ packageId: "unknown_pack" }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("Invalid credit package");
   });
 
   test("returns 404 when user missing", async () => {
@@ -90,9 +107,33 @@ describe("POST /api/billing/checkout", () => {
       expect.objectContaining({
         customer: "cus_x",
         line_items: [{ price: "price_master", quantity: 1 }],
-        metadata: { userId: "user-1", plan: "master" },
+        metadata: { userId: "user-1", plan: "master", purchaseType: "subscription" },
       }),
     );
+  });
+
+  test("creates payment checkout for credit package", async () => {
+    mockFindUnique.mockResolvedValue({ email: "a@b.com", stripeCustomerId: "cus_x" });
+    mockCheckoutCreate.mockResolvedValue({ url: "https://stripe.test/credits" });
+
+    const res = await POST(req({ packageId: "builder_300" }));
+
+    expect(res.status).toBe(200);
+    expect(mockCheckoutCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: "payment",
+        customer: "cus_x",
+        metadata: {
+          userId: "user-1",
+          purchaseType: "credits",
+          packageId: "builder_300",
+          credits: "300",
+          unitAmountCents: "3900",
+        },
+      })
+    );
+    const body = await res.json();
+    expect(body.kind).toBe("credits");
   });
 
   test("returns 500 when checkout.sessions.create throws", async () => {

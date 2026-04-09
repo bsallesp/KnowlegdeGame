@@ -3,10 +3,25 @@ import { NextRequest, NextResponse } from "next/server";
 
 const mockRequireUser = vi.hoisted(() => vi.fn());
 const mockFindUnique = vi.hoisted(() => vi.fn());
+const mockGetCurrentCreditBalance = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/authGuard", () => ({ requireUser: mockRequireUser }));
 vi.mock("@/lib/prisma", () => ({
   prisma: { user: { findUnique: mockFindUnique } },
+}));
+vi.mock("@/lib/credits", () => ({
+  getCurrentCreditBalance: mockGetCurrentCreditBalance,
+}));
+vi.mock("@/lib/stripe", () => ({
+  CREDIT_PACKAGES: [
+    {
+      id: "builder_300",
+      name: "Builder 300",
+      credits: 300,
+      unitAmountCents: 3900,
+      description: "Balanced package",
+    },
+  ],
 }));
 
 import { GET } from "@/app/api/billing/status/route";
@@ -18,6 +33,8 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-01-15T12:30:00.000Z"));
   mockRequireUser.mockResolvedValue({ userId: "user-1" });
   mockFindUnique.mockReset();
+  mockGetCurrentCreditBalance.mockReset();
+  mockGetCurrentCreditBalance.mockResolvedValue(180);
 });
 
 afterEach(() => {
@@ -54,6 +71,8 @@ describe("GET /api/billing/status", () => {
     expect(body.hourlyRemaining).toBe(3);
     expect(body.weeklyUsage).toBe(10);
     expect(body.weeklyRemaining).toBe(20);
+    expect(body.creditBalance).toBe(180);
+    expect(body.creditPackages).toHaveLength(1);
   });
 
   test("resets hourly counter when hour window expired", async () => {

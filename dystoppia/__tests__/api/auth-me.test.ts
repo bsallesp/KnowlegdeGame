@@ -92,6 +92,9 @@ describe("GET /api/auth/me — valid token", () => {
   const weeklyWindowStart = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
 
   function makeUser(params: Partial<{
+    role: string;
+    status: string;
+    isInternal: boolean;
     plan: string;
     subscriptionStatus: string;
     hourlyUsage: number;
@@ -100,6 +103,9 @@ describe("GET /api/auth/me — valid token", () => {
     return {
       id: "user-1",
       email: "test@example.com",
+      role: params.role ?? "customer",
+      status: params.status ?? "active",
+      isInternal: params.isInternal ?? false,
       plan: params.plan ?? "free",
       subscriptionStatus: params.subscriptionStatus ?? "inactive",
       hourlyUsage: params.hourlyUsage ?? 2,
@@ -126,6 +132,9 @@ describe("GET /api/auth/me — valid token", () => {
     const data = await res.json();
     expect(data.id).toBe("user-1");
     expect(data.email).toBe("test@example.com");
+    expect(data.role).toBe("customer");
+    expect(data.status).toBe("active");
+    expect(data.isInternal).toBe(false);
     expect(data.plan).toBe("free");
     expect(data.subscriptionStatus).toBe("inactive");
   });
@@ -169,6 +178,9 @@ describe("GET /api/auth/me — valid token", () => {
       select: {
         id: true,
         email: true,
+        role: true,
+        status: true,
+        isInternal: true,
         plan: true,
         subscriptionStatus: true,
         hourlyUsage: true,

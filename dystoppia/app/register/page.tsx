@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import useAppStore from "@/store/useAppStore";
 
 type Step = "form" | "verify";
+const SHOULD_AUTO_FETCH_DEV_CODE = process.env.NODE_ENV !== "production";
 
 export default function RegisterPage() {
   const [step, setStep] = useState<Step>("form");
@@ -16,8 +17,10 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
+  const [devCode, setDevCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const attemptedDevCodeFetchRef = useRef(false);
 
   const router = useRouter();
   const setUser = useAppStore((s) => s.setUser);
@@ -33,6 +36,14 @@ export default function RegisterPage() {
     const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
     return () => clearTimeout(timer);
   }, [resendCooldown]);
+
+  useEffect(() => {
+    if (!SHOULD_AUTO_FETCH_DEV_CODE || step !== "verify" || devCode || !email) return;
+    if (attemptedDevCodeFetchRef.current) return;
+    attemptedDevCodeFetchRef.current = true;
+    void requestVerificationCode({ ignoreCooldown: true, showErrors: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, devCode, email]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,6 +70,7 @@ export default function RegisterPage() {
         setError(data.error || "Something went wrong.");
         return;
       }
+      setDevCode(typeof data.devCode === "string" ? data.devCode : null);
       setStep("verify");
       setResendCooldown(60);
     } catch {
@@ -92,19 +104,34 @@ export default function RegisterPage() {
     }
   };
 
-  const handleResend = async () => {
-    if (resendCooldown > 0) return;
-    setError("");
+  const requestVerificationCode = async ({
+    ignoreCooldown = false,
+    showErrors = true,
+  }: {
+    ignoreCooldown?: boolean;
+    showErrors?: boolean;
+  } = {}) => {
+    if (!ignoreCooldown && resendCooldown > 0) return;
+    if (showErrors) setError("");
+
     try {
-      await fetch("/api/auth/resend-verification", {
+      const res = await fetch("/api/auth/resend-verification", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (typeof data.devCode === "string") {
+        setDevCode(data.devCode);
+      }
       setResendCooldown(60);
     } catch {
-      setError("Failed to resend. Try again.");
+      if (showErrors) setError("Failed to resend. Try again.");
     }
+  };
+
+  const handleResend = async () => {
+    await requestVerificationCode();
   };
 
   return (
@@ -267,6 +294,22 @@ export default function RegisterPage() {
                   </p>
                   <p className="text-sm font-semibold" style={{ color: "#EEEEFF" }}>{email}</p>
                 </div>
+
+                {devCode && (
+                  <div
+                    className="rounded-xl px-4 py-3 text-center text-xs"
+                    style={{
+                      backgroundColor: "rgba(129,140,248,0.1)",
+                      border: "1px solid rgba(129,140,248,0.3)",
+                      color: "#9494B8",
+                    }}
+                  >
+                    Local development code:{" "}
+                    <span className="font-bold" style={{ color: "#EEEEFF" }}>
+                      {devCode}
+                    </span>
+                  </div>
+                )}
 
                 <input
                   type="text"

@@ -143,3 +143,163 @@ export interface UserProfile {
   preferredLang: string;
   rawHistory?: OnboardingEntry[];
 }
+
+export interface BuilderEstimate {
+  complexity: "small" | "medium" | "large" | "unsafe_or_unknown";
+  actionClass: "read_only" | "analysis_only" | "billable_generation" | "privileged_execution";
+  estimatedInputTokens: number;
+  estimatedOutputTokens: number;
+  providerCostUsd: number;
+  overheadUsd: number;
+  safetyBufferUsd: number;
+  totalCostUsd: number;
+  estimatedCredits: number;
+  viabilityStatus: "approved" | "approved_with_warning" | "reduce_scope" | "reject";
+  confidence: "low" | "medium" | "high";
+  reasons: string[];
+}
+
+export interface BuilderStructuredResult {
+  requestUnderstanding: string;
+  assumptions: string[];
+  recommendedScope: string;
+  architecture: string[];
+  developmentPlan: string[];
+  devopsPlan: string[];
+  businessNotes: string[];
+  competitiveAssessment: string;
+  costSummary: {
+    estimatedCredits: number;
+    estimatedCostUsd: number;
+    viabilityStatus: string;
+    confidence: string;
+  };
+  warnings: string[];
+  nextSteps: string[];
+}
+
+export interface BuilderRequestRecord {
+  id: string;
+  userId: string;
+  module: string;
+  prompt: string;
+  normalizedIntent?: string | null;
+  requestClass: string;
+  actionClass: string;
+  status: string;
+  viabilityStatus?: string | null;
+  estimatedCostUsd: number;
+  estimatedCredits: number;
+  finalCostUsd: number;
+  finalCredits: number;
+  resultJson?: string | null;
+  warningsJson?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string | null;
+}
+
+export interface CreditPackage {
+  id: string;
+  name: string;
+  credits: number;
+  unitAmountCents: number;
+  description: string;
+}
+
+export interface CreditLedgerEntry {
+  id: string;
+  eventType: string;
+  amount: number;
+  balanceAfter: number;
+  reason: string;
+  metadataJson?: string | null;
+  createdAt: string;
+}
+
+export interface ApprovalGateRecord {
+  id: string;
+  requestId: string;
+  gateType: string;
+  status: string;
+  requiredRole: string;
+  reason: string;
+  resolvedByUserId?: string | null;
+  resolvedAt?: string | null;
+  createdAt: string;
+  request?: {
+    id: string;
+    prompt: string;
+    actionClass: string;
+    status: string;
+  };
+}
+
+export interface AuditLogRecord {
+  id: string;
+  actorUserId?: string | null;
+  actorRole?: string | null;
+  eventType: string;
+  targetType?: string | null;
+  targetId?: string | null;
+  requestId?: string | null;
+  metadataJson?: string | null;
+  createdAt: string;
+}
+
+export interface ReportingOverview {
+  ownAccountability: {
+    currentCreditBalance: number;
+    purchasedCredits: number;
+    deductedCredits: number;
+    requestCount: number;
+    actualCostUsd: number;
+    pendingApprovalGates: number;
+  };
+  platformOverview: {
+    userCount: number;
+    requestCount: number;
+    purchasedCredits: number;
+    deductedCredits: number;
+    actualCostUsd: number;
+    pendingApprovalGates: number;
+  };
+  recentAuditEvents: AuditLogRecord[];
+}
+
+export interface UsageEventRecord {
+  id: string;
+  provider: string;
+  serviceType: string;
+  quantity: number;
+  unit: string;
+  estimatedCostUsd: number;
+  actualCostUsd?: number | null;
+  metadataJson?: string | null;
+  createdAt: string;
+}
+
+export interface BuilderRequestDetail extends BuilderRequestRecord {
+  approvalGates: ApprovalGateRecord[];
+  usageEvents: UsageEventRecord[];
+  auditLogs: AuditLogRecord[];
+  creditLedger: CreditLedgerEntry[];
+}
+
+export interface ExecutionPolicyRecord {
+  target:
+    | "planning_only"
+    | "research_read_only"
+    | "artifact_generation"
+    | "infrastructure_mutation"
+    | "domain_mutation"
+    | "ads_mutation"
+    | "unknown_external_execution";
+  policyStatus: "allowed" | "approval_required" | "manual_only" | "blocked";
+  executorType: "none" | "external_research_executor";
+  allowedInMvp: boolean;
+  requiresApproval: boolean;
+  requiresEnv: boolean;
+  recommendedExecutionMode: "dry_run" | "live";
+  reasons: string[];
+}

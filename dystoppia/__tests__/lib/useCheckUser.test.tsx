@@ -40,6 +40,9 @@ describe("useCheckUser", () => {
         Promise.resolve({
           id: "id-1",
           email: "e@e.com",
+          role: "master",
+          status: "active",
+          isInternal: false,
           plan: "learner",
           subscriptionStatus: "active",
           hourlyUsage: 1,
@@ -54,7 +57,7 @@ describe("useCheckUser", () => {
     const { result } = renderHook(() => useCheckUser());
     await waitFor(() => expect(result.current.authenticated).toBe(true));
 
-    expect(mockSetUser).toHaveBeenCalledWith("id-1", "e@e.com");
+    expect(mockSetUser).toHaveBeenCalledWith("id-1", "e@e.com", "master", "active", false);
     expect(mockSetPlan).toHaveBeenCalledWith("learner");
     expect(mockSetSubscriptionStatus).toHaveBeenCalledWith("active");
     expect(mockSetRateLimitState).toHaveBeenCalled();

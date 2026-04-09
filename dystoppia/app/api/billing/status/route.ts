@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/authGuard";
+import { getCurrentCreditBalance } from "@/lib/credits";
+import { CREDIT_PACKAGES } from "@/lib/stripe";
 
 const PLAN_LIMITS: Record<string, { hourly: number; weekly: number }> = {
   free: { hourly: 5, weekly: 30 },
@@ -34,6 +36,7 @@ export async function GET(req: NextRequest) {
 
     const now = new Date();
     const limits = PLAN_LIMITS[user.plan] ?? PLAN_LIMITS["free"];
+    const creditBalance = await getCurrentCreditBalance(auth.userId);
 
     const hourlyExpired = now.getTime() - user.hourlyWindowStart.getTime() >= HOUR_MS;
     const weeklyExpired = now.getTime() - user.weeklyWindowStart.getTime() >= WEEK_MS;
@@ -50,6 +53,14 @@ export async function GET(req: NextRequest) {
       weeklyUsage,
       weeklyRemaining: limits.weekly - weeklyUsage,
       weeklyResetsAt: new Date(user.weeklyWindowStart.getTime() + WEEK_MS).toISOString(),
+      creditBalance,
+      creditPackages: CREDIT_PACKAGES.map((pkg) => ({
+        id: pkg.id,
+        name: pkg.name,
+        credits: pkg.credits,
+        unitAmountCents: pkg.unitAmountCents,
+        description: pkg.description,
+      })),
     });
   } catch (error) {
     return NextResponse.json(

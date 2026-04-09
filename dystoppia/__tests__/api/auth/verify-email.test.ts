@@ -119,6 +119,20 @@ describe("POST /api/auth/verify-email — success", () => {
     await POST(req({ email: "user@test.com", code: "  123456  " }));
     expect(mockVerifyOtp).toHaveBeenCalledWith("user@test.com", "123456", "VERIFY_EMAIL");
   });
+
+  test("sets secure cookie in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+
+    await POST(req({ email: "user@test.com", code: "123456" }));
+
+    expect(mockSet).toHaveBeenCalledWith(
+      "dystoppia_uid",
+      "signed-token",
+      expect.objectContaining({ secure: true })
+    );
+
+    vi.unstubAllEnvs();
+  });
 });
 
 // ─── Error handling ───────────────────────────────────────────────────────────

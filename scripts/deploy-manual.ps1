@@ -11,6 +11,8 @@ param(
 	[string]$AppName = "dystoppia-prod-app",
 	[string]$ResourceGroup = "rg-dystoppia-prod",
 	[string]$ImageName = "dystoppia",
+	[string]$NextPublicAppUrl = "https://www.dystoppia.com",
+	[bool]$EnableResearchExecutor = $false,
 	[int]$MaxAttempts = 6,
 	[int]$DelaySeconds = 10,
 	[switch]$SkipBuild
@@ -80,7 +82,9 @@ Invoke-WithRetry -Label "webapp registry appsettings" -Action {
 		--settings `
 			"DOCKER_REGISTRY_SERVER_URL=https://$registry" `
 			"DOCKER_REGISTRY_SERVER_USERNAME=$acrUser" `
-			"DOCKER_REGISTRY_SERVER_PASSWORD=$acrPass"
+			"DOCKER_REGISTRY_SERVER_PASSWORD=$acrPass" `
+			"NEXT_PUBLIC_APP_URL=$NextPublicAppUrl" `
+			"DYSTOPPIA_ENABLE_RESEARCH_EXECUTOR=$EnableResearchExecutor"
 }
 Invoke-WithRetry -Label "webapp container image" -Action {
 	az webapp config container set `

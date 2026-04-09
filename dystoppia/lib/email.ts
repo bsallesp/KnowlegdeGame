@@ -1,6 +1,21 @@
 import { EmailClient } from "@azure/communication-email";
 
-const FROM_ADDRESS = "DoNotReply@49056c6a-2022-4812-8cdd-a9617428d269.azurecomm.net";
+const FROM_ADDRESS =
+  process.env.AZURE_COMM_FROM_ADDRESS ??
+  "DoNotReply@49056c6a-2022-4812-8cdd-a9617428d269.azurecomm.net";
+
+export function isOtpEmailConfigured() {
+  return Boolean(process.env.AZURE_COMM_CONNECTION_STRING);
+}
+
+export function getDevOtp(code: string) {
+  if (process.env.NODE_ENV === "production" || isOtpEmailConfigured()) {
+    return undefined;
+  }
+
+  console.info(`[dev-email] Azure Email is not configured. Use OTP ${code}`);
+  return code;
+}
 
 function getClient(): EmailClient {
   const connectionString = process.env.AZURE_COMM_CONNECTION_STRING;

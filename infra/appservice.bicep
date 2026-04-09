@@ -20,6 +20,12 @@ param imageTag string = 'latest'
 @description('Key Vault name')
 param keyVaultName string = 'kv-dystoppia-prod'
 
+@description('Public base URL used by redirects and Stripe return URLs')
+param nextPublicAppUrl string = 'https://www.dystoppia.com'
+
+@description('Enable the live research executor in production')
+param enableResearchExecutor bool = false
+
 param location string = resourceGroup().location
 
 resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' existing = {
@@ -79,6 +85,14 @@ resource appService 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'COOKIE_SECRET'
           value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=COOKIE-SECRET)'
+        }
+        {
+          name: 'NEXT_PUBLIC_APP_URL'
+          value: nextPublicAppUrl
+        }
+        {
+          name: 'DYSTOPPIA_ENABLE_RESEARCH_EXECUTOR'
+          value: string(enableResearchExecutor)
         }
       ]
     }

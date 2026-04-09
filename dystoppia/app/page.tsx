@@ -8,6 +8,7 @@ import useAppStore from "@/store/useAppStore";
 import { useRequireUser } from "@/lib/useRequireUser";
 import { useCheckUser } from "@/lib/useCheckUser";
 import LandingPage from "@/components/LandingPage";
+import PrivateHomeDashboard from "@/components/PrivateHomeDashboard";
 import type { Item, Topic } from "@/types";
 import TopicApprovalScreen from "@/components/TopicApprovalScreen";
 
@@ -36,7 +37,7 @@ export default function RootPage() {
     return <LandingPage />;
   }
 
-  return <SearchPage />;
+  return <PrivateHomeDashboard />;
 }
 
 function SearchPage() {

@@ -90,6 +90,9 @@ interface AppState {
   // User identity
   userId: string | null;
   userEmail: string | null;
+  userRole: string;
+  userStatus: string;
+  isInternalUser: boolean;
   plan: string;
   subscriptionStatus: string;
   hourlyUsage: number;
@@ -98,7 +101,7 @@ interface AppState {
   weeklyUsage: number;
   weeklyRemaining: number;
   weeklyResetsAt: string | null;
-  setUser: (id: string, email: string) => void;
+  setUser: (id: string, email: string, role?: string, status?: string, isInternal?: boolean) => void;
   clearUser: () => void;
   setRateLimitState: (state: {
     hourlyUsage: number;
@@ -154,6 +157,9 @@ const useAppStore = create<AppState>()(
       // User identity
       userId: null,
       userEmail: null,
+      userRole: "customer",
+      userStatus: "active",
+      isInternalUser: false,
       plan: "free",
       subscriptionStatus: "inactive",
       hourlyUsage: 0,
@@ -317,8 +323,22 @@ const useAppStore = create<AppState>()(
       setReviewMode: (val) => set({ reviewMode: val }),
       loseLife: () => set((state) => ({ lives: Math.max(0, state.lives - 1) })),
       resetLives: () => set((state) => ({ lives: state.maxLives })),
-      setUser: (id, email) => set({ userId: id, userEmail: email }),
-      clearUser: () => set({ userId: null, userEmail: null }),
+      setUser: (id, email, role = "customer", status = "active", isInternal = false) =>
+        set({
+          userId: id,
+          userEmail: email,
+          userRole: role,
+          userStatus: status,
+          isInternalUser: isInternal,
+        }),
+      clearUser: () =>
+        set({
+          userId: null,
+          userEmail: null,
+          userRole: "customer",
+          userStatus: "active",
+          isInternalUser: false,
+        }),
       setRateLimitState: (s) => set({
         hourlyUsage: s.hourlyUsage,
         hourlyRemaining: s.hourlyRemaining,
@@ -444,6 +464,9 @@ const useAppStore = create<AppState>()(
         maxLives: state.maxLives,
         userId: state.userId,
         userEmail: state.userEmail,
+        userRole: state.userRole,
+        userStatus: state.userStatus,
+        isInternalUser: state.isInternalUser,
         plan: state.plan,
         subscriptionStatus: state.subscriptionStatus,
         hourlyUsage: state.hourlyUsage,

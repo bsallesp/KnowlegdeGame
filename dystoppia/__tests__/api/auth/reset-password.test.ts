@@ -125,6 +125,20 @@ describe("POST /api/auth/reset-password — success", () => {
     await POST(req({ email: "user@test.com", code: "123456", password: "newpassword1" }));
     expect(mockVerifyOtp).toHaveBeenCalledWith("user@test.com", "123456", "RESET_PASSWORD");
   });
+
+  test("sets secure cookie in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+
+    await POST(req({ email: "user@test.com", code: "123456", password: "newpassword1" }));
+
+    expect(mockSet).toHaveBeenCalledWith(
+      "dystoppia_uid",
+      "signed-token",
+      expect.objectContaining({ secure: true })
+    );
+
+    vi.unstubAllEnvs();
+  });
 });
 
 // ─── Error handling ───────────────────────────────────────────────────────────

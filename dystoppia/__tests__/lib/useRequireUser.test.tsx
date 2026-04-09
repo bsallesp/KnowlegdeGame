@@ -49,6 +49,9 @@ describe("useRequireUser", () => {
         Promise.resolve({
           id: "u1",
           email: "a@b.com",
+          role: "master",
+          status: "active",
+          isInternal: true,
           plan: "learner",
           subscriptionStatus: "active",
           hourlyUsage: 0,
@@ -63,7 +66,7 @@ describe("useRequireUser", () => {
     const { result } = renderHook(() => useRequireUser());
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    expect(mockSetUser).toHaveBeenCalledWith("u1", "a@b.com");
+    expect(mockSetUser).toHaveBeenCalledWith("u1", "a@b.com", "master", "active", true);
     expect(mockSetPlan).toHaveBeenCalledWith("learner");
     expect(mockSetSubscriptionStatus).toHaveBeenCalledWith("active");
     expect(mockSetRateLimitState).toHaveBeenCalledWith(

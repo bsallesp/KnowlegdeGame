@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { sign } from "@/lib/cookieToken";
 import { requestLogger } from "@/lib/logger";
+import { getSessionCookieOptions, SESSION_COOKIE_NAME } from "@/lib/sessionCookie";
 
 const GENERIC_ERROR = "Invalid email or password.";
 
@@ -31,12 +32,7 @@ export async function POST(req: NextRequest) {
     }
 
     const cookieStore = await cookies();
-    cookieStore.set("dystoppia_uid", sign(user.id), {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-    });
+    cookieStore.set(SESSION_COOKIE_NAME, sign(user.id), getSessionCookieOptions());
 
     return NextResponse.json({ id: user.id, email: user.email });
   } catch (err) {

@@ -156,6 +156,20 @@ describe("POST /api/auth/login — success", () => {
       expect.objectContaining({ where: { email: "user@test.com" } })
     );
   });
+
+  test("sets secure cookie in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+
+    await POST(req({ email: "user@test.com", password: "password123" }));
+
+    expect(mockSet).toHaveBeenCalledWith(
+      "dystoppia_uid",
+      "signed-token",
+      expect.objectContaining({ secure: true })
+    );
+
+    vi.unstubAllEnvs();
+  });
 });
 
 // ─── Error handling ───────────────────────────────────────────────────────────

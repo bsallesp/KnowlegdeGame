@@ -3,12 +3,122 @@ import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { stripe, planFromPriceId } from "@/lib/stripe";
 import { logger } from "@/lib/logger";
+import { appendCreditLedgerEventInTransaction } from "@/lib/credits";
+import { logAuditEvent } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
-async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+async function markEventAsProcessed(event: Stripe.Event, userId?: string) {
+  try {
+    await prisma.processedStripeEvent.create({
+      data: {
+        eventId: event.id,
+        eventType: event.type,
+        userId: userId ?? null,
+        metadataJson: JSON.stringify({
+          livemode: event.livemode,
+          created: event.created,
+        }),
+      },
+    });
+    return true;
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error &&
+      "code" in error &&
+      (error as { code?: string }).code === "P2002"
+    ) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function handleCreditCheckoutCompleted(session: Stripe.Checkout.Session, event: Stripe.Event) {
+  const userId = session.metadata?.userId;
+  const credits = Number(session.metadata?.credits ?? "0");
+  const packageId = session.metadata?.packageId ?? "unknown";
+
+  if (!userId || !Number.isInteger(credits) || credits <= 0) return;
+  if (session.payment_status !== "paid") return;
+
+  let ledgerEntry: { balanceAfter: number } | null = null;
+
+  try {
+    ledgerEntry = await prisma.$transaction(async (tx) => {
+      await tx.processedStripeEvent.create({
+        data: {
+          eventId: event.id,
+          eventType: event.type,
+          userId,
+          metadataJson: JSON.stringify({
+            livemode: event.livemode,
+            created: event.created,
+          }),
+        },
+      });
+
+      return appendCreditLedgerEventInTransaction(tx, {
+        userId,
+        eventType: "top_up",
+        amount: credits,
+        reason: `Stripe credit purchase (${packageId})`,
+        metadata: {
+          stripeEventId: event.id,
+          stripeSessionId: session.id,
+          packageId,
+          amountTotal: session.amount_total ?? null,
+          currency: session.currency ?? "usd",
+        },
+      });
+    });
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error &&
+      "code" in error &&
+      (error as { code?: string }).code === "P2002"
+    ) {
+      logger.info("webhook", `duplicate credit checkout ignored: eventId=${event.id}`);
+      return;
+    }
+    throw error;
+  }
+
+  if (!ledgerEntry) return;
+
+  await logAuditEvent({
+    actorUserId: userId,
+    actorRole: "customer",
+    eventType: "billing.credit_purchase.completed",
+    targetType: "user",
+    targetId: userId,
+    metadata: {
+      stripeEventId: event.id,
+      stripeSessionId: session.id,
+      packageId,
+      credits,
+      balanceAfter: ledgerEntry.balanceAfter,
+      amountTotal: session.amount_total ?? null,
+    },
+  });
+
+  logger.info(
+    "webhook",
+    `credit checkout completed: userId=${userId} package=${packageId} credits=${credits}`
+  );
+}
+
+async function handleSubscriptionCheckoutCompleted(session: Stripe.Checkout.Session, event: Stripe.Event) {
   const userId = session.metadata?.userId;
   if (!userId || !session.subscription) return;
+
+  const shouldProcess = await markEventAsProcessed(event, userId);
+  if (!shouldProcess) {
+    logger.info("webhook", `duplicate subscription checkout ignored: eventId=${event.id}`);
+    return;
+  }
 
   const subscriptionId =
     typeof session.subscription === "string"
@@ -25,13 +135,22 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       stripeSubscriptionId: subscriptionId,
       subscriptionStatus: "active",
       plan,
-      // Reset weekly window so the new subscriber starts fresh
       weeklyUsage: 0,
       weeklyWindowStart: new Date(),
     },
   });
 
   logger.info("webhook", `checkout.session.completed: userId=${userId} plan=${plan}`);
+}
+
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session, event: Stripe.Event) {
+  const purchaseType = session.metadata?.purchaseType;
+  if (purchaseType === "credits") {
+    await handleCreditCheckoutCompleted(session, event);
+    return;
+  }
+
+  await handleSubscriptionCheckoutCompleted(session, event);
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
@@ -119,7 +238,7 @@ export async function POST(req: NextRequest) {
   try {
     switch (event.type) {
       case "checkout.session.completed":
-        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session, event);
         break;
       case "customer.subscription.updated":
         await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
@@ -131,7 +250,6 @@ export async function POST(req: NextRequest) {
         await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
         break;
       default:
-        // Ignore unhandled events
         break;
     }
   } catch (err) {

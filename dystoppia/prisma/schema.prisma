@@ -61,6 +61,9 @@ model User {
   passwordHash    String?
   emailVerified   Boolean      @default(false)
   createdAt       DateTime     @default(now())
+  role            String       @default("customer")
+  status          String       @default("active")
+  isInternal      Boolean      @default(false)
   plan            String       @default("free")
 
   // Stripe
@@ -79,9 +82,16 @@ model User {
   weeklyWindowStart     DateTime @default(now())
   weeklyCurriculumUsage Int      @default(0)
 
-  answers     UserAnswer[]
-  profile     UserProfile?
-  llmUsage    LLMUsageLog[]
+  answers                  UserAnswer[]
+  profile                  UserProfile?
+  llmUsage                 LLMUsageLog[]
+  executionRequests        ExecutionRequest[]
+  creditLedgerEntries      CreditLedger[]    @relation("CreditLedgerUser")
+  createdCreditEntries     CreditLedger[]    @relation("CreditLedgerCreatedBy")
+  usageEvents              UsageEvent[]
+  auditEvents              AuditLog[]        @relation("AuditActor")
+  resolvedApprovalGates    ApprovalGate[]    @relation("ApprovalResolvedBy")
+  processedStripeEvents    ProcessedStripeEvent[]
 }
 
 model UserProfile {
@@ -148,4 +158,119 @@ model UserAnswer {
   createdAt        DateTime @default(now())
 
   @@unique([sessionId, idempotencyKey])
+}
+
+model ExecutionRequest {
+  id               String         @id @default(cuid())
+  userId           String
+  user             User           @relation(fields: [userId], references: [id])
+  module           String         @default("builder")
+  prompt           String
+  normalizedIntent String?
+  requestClass     String         @default("builder")
+  actionClass      String         @default("analysis_only")
+  status           String         @default("pending")
+  viabilityStatus  String?
+  estimatedCostUsd Float          @default(0)
+  estimatedCredits Int            @default(0)
+  finalCostUsd     Float          @default(0)
+  finalCredits     Int            @default(0)
+  resultJson       String?
+  warningsJson     String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  completedAt      DateTime?
+  creditLedger     CreditLedger[]
+  usageEvents      UsageEvent[]
+  auditLogs        AuditLog[]
+  approvalGates    ApprovalGate[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model CreditLedger {
+  id              String            @id @default(cuid())
+  userId          String
+  user            User              @relation("CreditLedgerUser", fields: [userId], references: [id])
+  requestId       String?
+  request         ExecutionRequest? @relation(fields: [requestId], references: [id])
+  eventType       String
+  amount          Int
+  balanceAfter    Int
+  reason          String
+  metadataJson    String?
+  createdByUserId String?
+  createdByUser   User?             @relation("CreditLedgerCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime          @default(now())
+
+  @@index([userId, createdAt])
+  @@index([requestId])
+}
+
+model UsageEvent {
+  id               String            @id @default(cuid())
+  userId           String
+  user             User              @relation(fields: [userId], references: [id])
+  requestId        String
+  request          ExecutionRequest  @relation(fields: [requestId], references: [id])
+  provider         String
+  serviceType      String
+  quantity         Float
+  unit             String
+  estimatedCostUsd Float             @default(0)
+  actualCostUsd    Float?
+  metadataJson     String?
+  createdAt        DateTime          @default(now())
+
+  @@index([userId, createdAt])
+  @@index([requestId, createdAt])
+}
+
+model AuditLog {
+  id          String            @id @default(cuid())
+  actorUserId String?
+  actorUser   User?             @relation("AuditActor", fields: [actorUserId], references: [id])
+  actorRole   String?
+  eventType   String
+  targetType  String?
+  targetId    String?
+  requestId   String?
+  request     ExecutionRequest? @relation(fields: [requestId], references: [id])
+  metadataJson String?
+  createdAt   DateTime          @default(now())
+
+  @@index([actorUserId, createdAt])
+  @@index([requestId, createdAt])
+  @@index([eventType, createdAt])
+}
+
+model ApprovalGate {
+  id               String           @id @default(cuid())
+  requestId        String
+  request          ExecutionRequest @relation(fields: [requestId], references: [id])
+  gateType         String
+  status           String           @default("pending")
+  requiredRole     String
+  reason           String
+  resolvedByUserId String?
+  resolvedByUser   User?            @relation("ApprovalResolvedBy", fields: [resolvedByUserId], references: [id])
+  resolvedAt       DateTime?
+  createdAt        DateTime         @default(now())
+
+  @@index([requestId, createdAt])
+  @@index([status, createdAt])
+}
+
+model ProcessedStripeEvent {
+  id           String   @id @default(cuid())
+  eventId      String   @unique
+  eventType    String
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  metadataJson String?
+  processedAt  DateTime @default(now())
+
+  @@index([userId, processedAt])
+  @@index([eventType, processedAt])
 }

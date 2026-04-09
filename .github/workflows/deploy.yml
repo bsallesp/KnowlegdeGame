@@ -13,6 +13,8 @@ env:
   ACR_NAME: dystoppiaacr
   APP_NAME: dystoppia-prod-app
   RG: rg-dystoppia-prod
+  NEXT_PUBLIC_APP_URL: https://www.dystoppia.com
+  DYSTOPPIA_ENABLE_RESEARCH_EXECUTOR: "false"
   NEXT_TELEMETRY_DISABLED: "1"
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -86,6 +88,15 @@ jobs:
             --resource-group "$RG" \
             --name "$APP_NAME" \
             --settings APPLICATIONINSIGHTS_CONNECTION_STRING="$CONN"
+
+      - name: Set production app settings
+        run: |
+          az webapp config appsettings set \
+            --resource-group "$RG" \
+            --name "$APP_NAME" \
+            --settings \
+              NEXT_PUBLIC_APP_URL="$NEXT_PUBLIC_APP_URL" \
+              DYSTOPPIA_ENABLE_RESEARCH_EXECUTOR="$DYSTOPPIA_ENABLE_RESEARCH_EXECUTOR"
 
       - name: Set image tag
         id: tag

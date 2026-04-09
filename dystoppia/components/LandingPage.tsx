@@ -1,264 +1,352 @@
 "use client";
 
+import { useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import PricingTable from "./PricingTable";
-import WaitlistForm from "./WaitlistForm";
 
-const HOW_IT_WORKS = [
-  {
-    step: "01",
-    title: "Type any topic",
-    description:
-      "Enter any subject — from AWS certifications to Roman history. Dystoppia builds a structured curriculum in seconds.",
-    icon: "🔍",
-  },
-  {
-    step: "02",
-    title: "AI designs your curriculum",
-    description:
-      "Claude analyzes the domain and generates a teaching profile. Questions adapt to the pedagogy of your subject.",
-    icon: "🧠",
-  },
-  {
-    step: "03",
-    title: "Questions adapt to you",
-    description:
-      "Spaced repetition and difficulty scaling keep you in the learning zone. Hard when you're ready, gentle when you're stuck.",
-    icon: "⚡",
-  },
+/* ── Neural graph background ─────────────────────────────────── */
+
+interface Node {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  color: string;
+  pulsePhase: number;
+}
+
+const COLORS = ["#818CF8", "#38BDF8", "#60A5FA", "#A78BFA", "#6366F1"];
+const NODE_COUNT = 70;
+const CONNECTION_DIST = 140;
+
+function useNeuralCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
+  const nodesRef = useRef<Node[]>([]);
+  const frameRef = useRef(0);
+  const mouseRef = useRef({ x: -1000, y: -1000 });
+
+  const init = useCallback((w: number, h: number) => {
+    nodesRef.current = Array.from({ length: NODE_COUNT }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      vx: (Math.random() - 0.5) * 0.6,
+      vy: (Math.random() - 0.5) * 0.6,
+      radius: Math.random() * 2.5 + 1,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      pulsePhase: Math.random() * Math.PI * 2,
+    }));
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      ctx.scale(dpr, dpr);
+      if (nodesRef.current.length === 0) init(window.innerWidth, window.innerHeight);
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    const onMouse = (e: MouseEvent) => {
+      mouseRef.current = { x: e.clientX, y: e.clientY };
+    };
+    window.addEventListener("mousemove", onMouse);
+
+    let time = 0;
+
+    const draw = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      ctx.clearRect(0, 0, w, h);
+      time += 0.01;
+
+      const nodes = nodesRef.current;
+      const mx = mouseRef.current.x;
+      const my = mouseRef.current.y;
+
+      // update positions
+      for (const n of nodes) {
+        // gentle mouse repulsion
+        const dmx = n.x - mx;
+        const dmy = n.y - my;
+        const dmDist = Math.sqrt(dmx * dmx + dmy * dmy);
+        if (dmDist < 180 && dmDist > 0) {
+          const force = (1 - dmDist / 180) * 0.3;
+          n.vx += (dmx / dmDist) * force;
+          n.vy += (dmy / dmDist) * force;
+        }
+
+        // damping
+        n.vx *= 0.995;
+        n.vy *= 0.995;
+
+        n.x += n.vx;
+        n.y += n.vy;
+
+        // wrap edges softly
+        if (n.x < -20) n.x = w + 20;
+        if (n.x > w + 20) n.x = -20;
+        if (n.y < -20) n.y = h + 20;
+        if (n.y > h + 20) n.y = -20;
+      }
+
+      // draw connections
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const dx = nodes[i].x - nodes[j].x;
+          const dy = nodes[i].y - nodes[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < CONNECTION_DIST) {
+            const alpha = (1 - dist / CONNECTION_DIST) * 0.25;
+            ctx.beginPath();
+            ctx.moveTo(nodes[i].x, nodes[i].y);
+            ctx.lineTo(nodes[j].x, nodes[j].y);
+            ctx.strokeStyle = `rgba(129, 140, 248, ${alpha})`;
+            ctx.lineWidth = 0.6;
+            ctx.stroke();
+          }
+        }
+      }
+
+      // draw nodes with pulse
+      for (const n of nodes) {
+        const pulse = Math.sin(time * 2 + n.pulsePhase) * 0.3 + 0.7;
+        const r = n.radius * pulse;
+
+        // glow
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, r * 3, 0, Math.PI * 2);
+        ctx.fillStyle = n.color + "0A";
+        ctx.fill();
+
+        // core
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = n.color + "CC";
+        ctx.fill();
+      }
+
+      frameRef.current = requestAnimationFrame(draw);
+    };
+
+    draw();
+
+    return () => {
+      cancelAnimationFrame(frameRef.current);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("mousemove", onMouse);
+    };
+  }, [canvasRef, init]);
+}
+
+/* ── Suggestions ─────────────────────────────────────────────── */
+
+const SUGGESTIONS = [
+  "What can Dystoppia do?",
+  "Build me an app that...",
+  "Help me learn AWS",
+  "Analyze a business idea",
 ];
 
+/* ── Landing Page ────────────────────────────────────────────── */
+
 export default function LandingPage() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useNeuralCanvas(canvasRef);
+
   return (
     <div
-      className="min-h-screen flex flex-col"
-      style={{ backgroundColor: "#09090E", color: "#EEEEFF" }}
+      className="relative min-h-screen flex flex-col overflow-hidden"
+      style={{ backgroundColor: "#09090E" }}
     >
+      {/* Animated neural graph background */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{ opacity: 0.45 }}
+      />
+
+      {/* Radial glow from top */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse 70% 40% at 50% 0%, rgba(99, 102, 241, 0.12) 0%, transparent 70%)",
+        }}
+      />
+
+      {/* Bottom fade */}
+      <div
+        className="absolute bottom-0 left-0 right-0 h-40 pointer-events-none"
+        style={{
+          background:
+            "linear-gradient(to top, #09090E 0%, transparent 100%)",
+        }}
+      />
+
       {/* Nav */}
-      <nav
-        className="flex items-center justify-between px-6 py-4 max-w-6xl mx-auto w-full"
-      >
-        <span className="font-bold text-lg tracking-tight" style={{ color: "#EEEEFF" }}>
+      <nav className="relative z-10 flex items-center justify-between px-6 py-5 max-w-6xl mx-auto w-full">
+        <span
+          className="font-bold text-lg tracking-tight"
+          style={{ color: "#EEEEFF" }}
+        >
           Dystoppia
         </span>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <Link
             href="/login"
-            className="text-sm transition-colors"
+            className="text-sm px-4 py-2 rounded-lg transition-colors"
             style={{ color: "#9494B8" }}
           >
             Log in
           </Link>
           <Link
             href="/register"
-            className="text-sm font-semibold px-4 py-2 rounded-xl transition-all"
-            style={{ backgroundColor: "#818CF8", color: "#09090E" }}
+            className="text-sm font-semibold px-5 py-2 rounded-xl transition-all"
+            style={{
+              backgroundColor: "rgba(129, 140, 248, 0.15)",
+              border: "1px solid rgba(129, 140, 248, 0.3)",
+              color: "#818CF8",
+            }}
           >
-            Start free
+            Sign up
           </Link>
         </div>
       </nav>
 
-      {/* Hero */}
-      <section className="flex-1 flex flex-col items-center justify-center text-center px-6 py-24 max-w-3xl mx-auto w-full">
+      {/* Main content — centered */}
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 pb-24">
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.7, ease: "easeOut" }}
+          className="w-full max-w-2xl flex flex-col items-center"
         >
-          <div
-            className="inline-block text-xs font-semibold px-3 py-1 rounded-full mb-6"
+          {/* Brand */}
+          <h1
+            className="text-5xl md:text-6xl font-bold tracking-tight mb-3"
             style={{
-              backgroundColor: "rgba(129,140,248,0.12)",
-              border: "1px solid rgba(129,140,248,0.3)",
-              color: "#818CF8",
+              background: "linear-gradient(135deg, #818CF8 0%, #38BDF8 50%, #818CF8 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundSize: "200% 200%",
+              animation: "gradientShift 6s ease infinite",
             }}
           >
-            AI-powered adaptive learning
-          </div>
-
-          <h1
-            className="text-4xl md:text-6xl font-bold leading-tight mb-6"
-            style={{ color: "#EEEEFF" }}
-          >
-            Learn anything.{" "}
-            <span style={{ color: "#818CF8" }}>Adapt to you.</span>
+            Dystoppia
           </h1>
 
-          <p className="text-lg mb-10 max-w-xl mx-auto" style={{ color: "#9494B8" }}>
-            AI-powered quiz engine that adjusts to your pace, your weak spots, and your
-            learning style — in real time.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/register"
-              className="px-8 py-3 rounded-xl font-semibold text-sm transition-all"
-              style={{ backgroundColor: "#818CF8", color: "#09090E" }}
-            >
-              Start for free
-            </Link>
-            <a
-              href="#how-it-works"
-              className="px-8 py-3 rounded-xl font-semibold text-sm transition-all"
-              style={{
-                backgroundColor: "transparent",
-                border: "1px solid #2E2E40",
-                color: "#9494B8",
-              }}
-            >
-              See how it works
-            </a>
-          </div>
-        </motion.div>
-
-        {/* Product preview card */}
-        <motion.div
-          initial={{ opacity: 0, y: 32 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.6 }}
-          className="mt-16 w-full max-w-lg rounded-2xl p-6 text-left"
-          style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}
-        >
-          <div
-            className="text-xs font-semibold mb-3 px-2 py-1 rounded-md inline-block"
-            style={{ backgroundColor: "rgba(129,140,248,0.1)", color: "#818CF8" }}
+          <p
+            className="text-base md:text-lg mb-10 text-center"
+            style={{ color: "#9494B8" }}
           >
-            Question 3 of 5 · AWS Solutions Architect
-          </div>
-          <p className="text-sm font-medium mb-4" style={{ color: "#EEEEFF" }}>
-            Which AWS service should you use to decouple a high-throughput order processing
-            system so that downstream services are not overwhelmed?
+            What can I help you with?
           </p>
-          <div className="grid grid-cols-2 gap-2">
-            {["Amazon SNS", "Amazon SQS", "AWS Lambda", "Amazon EventBridge"].map((opt, i) => (
-              <div
-                key={opt}
-                className="text-xs px-3 py-2.5 rounded-xl"
+
+          {/* Chat-style input */}
+          <div
+            className="w-full rounded-2xl overflow-hidden transition-shadow"
+            style={{
+              backgroundColor: "#12121A",
+              border: "1px solid #2E2E40",
+              boxShadow:
+                "0 0 0 1px rgba(129, 140, 248, 0.05), 0 8px 40px rgba(0, 0, 0, 0.5)",
+            }}
+          >
+            <textarea
+              rows={3}
+              placeholder="Message Dystoppia..."
+              className="w-full resize-none bg-transparent px-5 py-4 text-base outline-none placeholder-opacity-50"
+              style={{ color: "#EEEEFF" }}
+              onFocus={(e) => {
+                const parent = e.currentTarget.parentElement;
+                if (parent) parent.style.borderColor = "rgba(129, 140, 248, 0.4)";
+              }}
+              onBlur={(e) => {
+                const parent = e.currentTarget.parentElement;
+                if (parent) parent.style.borderColor = "#2E2E40";
+              }}
+            />
+
+            <div
+              className="flex items-center justify-between px-5 py-3"
+              style={{ borderTop: "1px solid #1C1C28" }}
+            >
+              <span className="text-xs" style={{ color: "#6B6B8A" }}>
+                Sign up to start
+              </span>
+              <Link
+                href="/register"
+                className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all"
+                style={{ backgroundColor: "#818CF8", color: "#09090E" }}
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13 7l5 5m0 0l-5 5m5-5H6"
+                  />
+                </svg>
+                Start
+              </Link>
+            </div>
+          </div>
+
+          {/* Suggestion chips */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="mt-5 flex flex-wrap gap-2 justify-center"
+          >
+            {SUGGESTIONS.map((s) => (
+              <Link
+                href="/register"
+                key={s}
+                className="px-4 py-2 rounded-full text-xs font-medium transition-all hover:border-opacity-60"
                 style={{
-                  backgroundColor: i === 1 ? "rgba(129,140,248,0.15)" : "#1C1C28",
-                  border: `1px solid ${i === 1 ? "#818CF8" : "#2E2E40"}`,
-                  color: i === 1 ? "#818CF8" : "#9494B8",
+                  backgroundColor: "rgba(28, 28, 40, 0.6)",
+                  border: "1px solid #2E2E40",
+                  color: "#9494B8",
+                  backdropFilter: "blur(8px)",
                 }}
               >
-                {opt}
-              </div>
+                {s}
+              </Link>
             ))}
-          </div>
+          </motion.div>
         </motion.div>
-      </section>
+      </main>
 
-      {/* How it works */}
-      <section
-        id="how-it-works"
-        className="py-24 px-6"
-        style={{ backgroundColor: "#0D0D15" }}
-      >
-        <div className="max-w-5xl mx-auto">
-          <motion.h2
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-3xl font-bold text-center mb-16"
-            style={{ color: "#EEEEFF" }}
-          >
-            How it works
-          </motion.h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {HOW_IT_WORKS.map((step, i) => (
-              <motion.div
-                key={step.step}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.15 }}
-                className="flex flex-col"
-              >
-                <div className="text-3xl mb-4">{step.icon}</div>
-                <div
-                  className="text-xs font-mono font-semibold mb-2"
-                  style={{ color: "#818CF8" }}
-                >
-                  {step.step}
-                </div>
-                <h3 className="font-bold text-lg mb-2" style={{ color: "#EEEEFF" }}>
-                  {step.title}
-                </h3>
-                <p className="text-sm leading-relaxed" style={{ color: "#9494B8" }}>
-                  {step.description}
-                </p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing */}
-      <section id="pricing" className="py-24 px-6">
-        <div className="max-w-5xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-3xl font-bold mb-3" style={{ color: "#EEEEFF" }}>
-              Simple pricing
-            </h2>
-            <p className="text-sm" style={{ color: "#9494B8" }}>
-              Cancel anytime. No hidden fees.
-            </p>
-          </motion.div>
-
-          <PricingTable />
-        </div>
-      </section>
-
-      {/* Waitlist */}
-      <section
-        id="waitlist"
-        className="py-24 px-6"
-        style={{ backgroundColor: "#0D0D15" }}
-      >
-        <div className="max-w-xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-2xl font-bold mb-3" style={{ color: "#EEEEFF" }}>
-              Stay in the loop
-            </h2>
-            <p className="text-sm mb-8" style={{ color: "#9494B8" }}>
-              Get notified when new features drop. No spam.
-            </p>
-            <div className="flex justify-center">
-              <WaitlistForm source="landing_waitlist" />
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Footer */}
+      {/* Minimal footer */}
       <footer
-        className="py-8 px-6 text-center text-xs"
-        style={{ color: "#6B6B8A", borderTop: "1px solid #2E2E40" }}
+        className="relative z-10 py-4 px-6 text-center text-xs"
+        style={{ color: "#6B6B8A" }}
       >
-        <div className="flex items-center justify-center gap-6 mb-3">
-          <Link href="/login" className="hover:opacity-80 transition-opacity">
-            Log in
-          </Link>
-          <Link href="/register" className="hover:opacity-80 transition-opacity">
-            Sign up
-          </Link>
-          <Link href="/privacy" className="hover:opacity-80 transition-opacity">
-            Privacy
-          </Link>
-        </div>
-        <p>© {new Date().getFullYear()} Dystoppia. All rights reserved.</p>
+        © {new Date().getFullYear()} Dystoppia
       </footer>
+
+      {/* Gradient shift keyframes */}
+      <style jsx global>{`
+        @keyframes gradientShift {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+      `}</style>
     </div>
   );
 }

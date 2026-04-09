@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { sign } from "@/lib/cookieToken";
+import { getSessionCookieOptions, SESSION_COOKIE_NAME } from "@/lib/sessionCookie";
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -10,6 +11,13 @@ function isValidEmail(email: string): boolean {
 
 export async function POST(req: NextRequest) {
   try {
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        { error: "Legacy user bootstrap is disabled in production. Use the authenticated auth flow." },
+        { status: 403 }
+      );
+    }
+
     const { email, sessionId } = await req.json();
 
     if (!email || !isValidEmail(email)) {
@@ -32,12 +40,7 @@ export async function POST(req: NextRequest) {
     }
 
     const cookieStore = await cookies();
-    cookieStore.set("dystoppia_uid", sign(user.id), {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365, // 1 year
-    });
+    cookieStore.set(SESSION_COOKIE_NAME, sign(user.id), getSessionCookieOptions());
 
     return NextResponse.json({ id: user.id, email: user.email, isNew });
   } catch (error) {

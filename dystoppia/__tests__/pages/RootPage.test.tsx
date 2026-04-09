@@ -14,6 +14,10 @@ vi.mock("@/components/LandingPage", () => ({
   default: () => <div data-testid="landing-mock" />,
 }));
 
+vi.mock("@/components/PrivateHomeDashboard", () => ({
+  default: () => <div data-testid="private-dashboard-mock" />,
+}));
+
 vi.mock("@/lib/useRequireUser", () => ({
   useRequireUser: () => ({ loading: false }),
 }));
@@ -100,6 +104,6 @@ describe("RootPage", () => {
   test("renders authenticated home when user is signed in", async () => {
     mockUseCheckUser.mockReturnValue({ loading: false, authenticated: true });
     render(<RootPage />);
-    await screen.findByRole("heading", { name: /dystoppia/i });
+    expect(await screen.findByTestId("private-dashboard-mock")).toBeTruthy();
   });
 });

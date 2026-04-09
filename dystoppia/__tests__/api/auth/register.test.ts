@@ -15,7 +15,8 @@ vi.mock("@/lib/otp", () => ({ createOtp: mockCreateOtp }));
 
 // ─── Email mock ───────────────────────────────────────────────────────────────
 const mockSendOtpEmail = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/email", () => ({ sendOtpEmail: mockSendOtpEmail }));
+const mockGetDevOtp = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/email", () => ({ getDevOtp: mockGetDevOtp, sendOtpEmail: mockSendOtpEmail }));
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 const mockFindUnique = vi.hoisted(() => vi.fn());
@@ -39,6 +40,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockCreateOtp.mockResolvedValue("123456");
   mockSendOtpEmail.mockResolvedValue(undefined);
+  mockGetDevOtp.mockReturnValue(undefined);
   mockFindUnique.mockResolvedValue(null);
   mockCreate.mockResolvedValue({ id: "u1", email: "test@example.com" });
 });
@@ -75,19 +77,19 @@ describe("POST /api/auth/register — validation", () => {
 
 describe("POST /api/auth/register — existing user", () => {
   test("returns 200 even when email already registered (anti-enumeration)", async () => {
-    mockFindUnique.mockResolvedValue({ id: "u-existing", email: "exists@test.com" });
+    mockFindUnique.mockResolvedValue({ id: "u-existing", email: "exists@test.com", emailVerified: true });
     const res = await POST(req({ email: "exists@test.com", password: "password123" }));
     expect(res.status).toBe(200);
   });
 
   test("does NOT create a new user when email already exists", async () => {
-    mockFindUnique.mockResolvedValue({ id: "u-existing", email: "exists@test.com" });
+    mockFindUnique.mockResolvedValue({ id: "u-existing", email: "exists@test.com", emailVerified: true });
     await POST(req({ email: "exists@test.com", password: "password123" }));
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
   test("does NOT send OTP when email already exists", async () => {
-    mockFindUnique.mockResolvedValue({ id: "u-existing", email: "exists@test.com" });
+    mockFindUnique.mockResolvedValue({ id: "u-existing", email: "exists@test.com", emailVerified: true });
     await POST(req({ email: "exists@test.com", password: "password123" }));
     expect(mockSendOtpEmail).not.toHaveBeenCalled();
   });

@@ -55,6 +55,16 @@ beforeEach(() => {
 });
 
 describe("POST /api/users — validation", () => {
+  test("returns 403 in production because legacy bootstrap is disabled", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+
+    const res = await POST(makeRequest({ email: "test@example.com" }));
+
+    expect(res.status).toBe(403);
+
+    vi.unstubAllEnvs();
+  });
+
   test("returns 400 when email is missing", async () => {
     const res = await POST(makeRequest({ sessionId: "sess_1" }));
     expect(res.status).toBe(400);
@@ -217,5 +227,21 @@ describe("POST /api/users — signed cookie", () => {
       expect.any(String),
       expect.objectContaining({ sameSite: "lax" })
     );
+  });
+
+  test("sets secure cookie in production for non-production-only flows", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue({ id: "user-1", email: "test@example.com" });
+
+    await POST(makeRequest({ email: "test@example.com" }));
+
+    expect(mockCookieSet).toHaveBeenCalledWith(
+      "dystoppia_uid",
+      expect.any(String),
+      expect.objectContaining({ secure: false })
+    );
+
+    vi.unstubAllEnvs();
   });
 });

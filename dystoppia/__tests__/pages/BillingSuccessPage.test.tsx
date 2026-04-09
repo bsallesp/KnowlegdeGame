@@ -46,6 +46,7 @@ beforeEach(() => {
         Promise.resolve({
           plan: "learner",
           subscriptionStatus: "active",
+          creditBalance: 480,
           hourlyUsage: 0,
           hourlyRemaining: 30,
           hourlyResetsAt: "2026-01-01T01:00:00.000Z",
@@ -60,11 +61,14 @@ beforeEach(() => {
 describe("BillingSuccessPage", () => {
   test("fetches billing status and updates store", async () => {
     render(<BillingSuccessPage />);
-    expect(screen.getByRole("heading", { name: /you're in/i })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /back to learning/i })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("heading", { name: /billing updated/i })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /back to builder/i })).toHaveAttribute("href", "/builder");
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith("/api/billing/status");
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/Current credit balance: 480/i)).toBeTruthy();
     });
     await waitFor(() => {
       expect(mockSetPlan).toHaveBeenCalledWith("learner");

@@ -21,7 +21,13 @@ export function useCheckUser() {
       .then(async (res) => {
         if (res.ok) {
           const data = await res.json();
-          setUser(data.id, data.email);
+          setUser(
+            data.id,
+            data.email,
+            data.role ?? "customer",
+            data.status ?? "active",
+            data.isInternal ?? false
+          );
           setPlan(data.plan ?? "free");
           setSubscriptionStatus(data.subscriptionStatus ?? "inactive");
           setRateLimitState({

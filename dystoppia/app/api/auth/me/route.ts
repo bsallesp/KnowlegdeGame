@@ -22,6 +22,9 @@ export async function GET() {
       select: {
         id: true,
         email: true,
+        role: true,
+        status: true,
+        isInternal: true,
         plan: true,
         subscriptionStatus: true,
         hourlyUsage: true,
@@ -55,6 +58,9 @@ export async function GET() {
     return NextResponse.json({
       id: user.id,
       email: user.email,
+      role: user.role,
+      status: user.status,
+      isInternal: user.isInternal,
       plan: user.plan,
       subscriptionStatus: user.subscriptionStatus,
       hourlyUsage,

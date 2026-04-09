@@ -1,0 +1,8 @@
+⨯ Another next dev server is already running.
+
+- Local:        http://localhost:3000
+- PID:          10988
+- Dir:          C:\Users\bsall\OneDrive\Área de Trabalho\Dystoppia 1.0\KnowlegdeGame\dystoppia
+- Log:          .next\dev\logs\next-development.log
+
+Run taskkill /PID 10988 /F to stop it.

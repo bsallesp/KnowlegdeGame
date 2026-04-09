@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/authGuard";
-import { stripe, STRIPE_PLAN_PRICES } from "@/lib/stripe";
+import { stripe, STRIPE_PLAN_PRICES, getCreditPackage } from "@/lib/stripe";
 
 export async function POST(req: NextRequest) {
   try {
     const auth = await requireUser(req);
     if (auth instanceof NextResponse) return auth;
 
-    const { plan } = await req.json();
+    const { plan, packageId } = await req.json();
+    const selectedPackage = packageId ? getCreditPackage(packageId) : null;
+    const priceId = plan ? STRIPE_PLAN_PRICES[plan] : undefined;
 
-    const priceId = STRIPE_PLAN_PRICES[plan];
-    if (!priceId) {
-      return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
+    if (packageId && !selectedPackage) {
+      return NextResponse.json({ error: "Invalid credit package" }, { status: 400 });
+    }
+
+    if (!packageId && (!plan || !priceId)) {
+      return NextResponse.json({ error: "Invalid billing selection" }, { status: 400 });
     }
 
     const user = await prisma.user.findUnique({
@@ -37,14 +42,55 @@ export async function POST(req: NextRequest) {
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
+    if (packageId) {
+      const creditPackage = selectedPackage;
+      if (!creditPackage) {
+        return NextResponse.json({ error: "Invalid credit package" }, { status: 400 });
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        payment_method_types: ["card"],
+        customer: customerId,
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: `${creditPackage.name} credits`,
+                description: creditPackage.description,
+              },
+              unit_amount: creditPackage.unitAmountCents,
+            },
+            quantity: 1,
+          },
+        ],
+        success_url: `${appUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}&kind=credits`,
+        cancel_url: `${appUrl}/builder`,
+        metadata: {
+          userId: auth.userId,
+          purchaseType: "credits",
+          packageId: creditPackage.id,
+          credits: String(creditPackage.credits),
+          unitAmountCents: String(creditPackage.unitAmountCents),
+        },
+      });
+
+      return NextResponse.json({
+        url: session.url,
+        kind: "credits",
+        packageId: creditPackage.id,
+      });
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${appUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${appUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}&kind=subscription`,
       cancel_url: `${appUrl}/`,
-      metadata: { userId: auth.userId, plan },
+      metadata: { userId: auth.userId, plan, purchaseType: "subscription" },
     });
 
     return NextResponse.json({ url: session.url });

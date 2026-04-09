@@ -44,8 +44,11 @@ describe("LandingPage", () => {
     expect(screen.getByRole("link", { name: /start free/i })).toHaveAttribute("href", "/register");
   });
 
-  test("includes pricing and waitlist sections", () => {
+  test("renders an LLM-style prompt composer and suggestions", () => {
     render(<LandingPage />);
+    expect(screen.getByRole("heading", { name: /what do you want to learn today/i })).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: /learning prompt/i })).toBeTruthy();
+    expect(screen.getByText(/build a learning plan/i)).toBeTruthy();
     expect(screen.getByTestId("pricing-table")).toBeTruthy();
     expect(screen.getByTestId("waitlist-form")).toBeTruthy();
   });

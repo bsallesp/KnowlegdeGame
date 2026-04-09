@@ -5,6 +5,10 @@ const mockConstructEvent = vi.hoisted(() => vi.fn());
 const mockRetrieve = vi.hoisted(() => vi.fn());
 const mockUserUpdate = vi.hoisted(() => vi.fn());
 const mockUserFindFirst = vi.hoisted(() => vi.fn());
+const mockProcessedEventCreate = vi.hoisted(() => vi.fn());
+const mockAppendCreditLedgerEventInTransaction = vi.hoisted(() => vi.fn());
+const mockLogAuditEvent = vi.hoisted(() => vi.fn());
+const mockTransaction = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -13,7 +17,17 @@ vi.mock("@/lib/logger", () => ({
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: { update: mockUserUpdate, findFirst: mockUserFindFirst },
+    processedStripeEvent: { create: mockProcessedEventCreate },
+    $transaction: mockTransaction,
   },
+}));
+
+vi.mock("@/lib/credits", () => ({
+  appendCreditLedgerEventInTransaction: mockAppendCreditLedgerEventInTransaction,
+}));
+
+vi.mock("@/lib/audit", () => ({
+  logAuditEvent: mockLogAuditEvent,
 }));
 
 vi.mock("@/lib/stripe", () => ({
@@ -40,7 +54,18 @@ beforeEach(() => {
   mockRetrieve.mockReset();
   mockUserUpdate.mockReset();
   mockUserFindFirst.mockReset();
+  mockProcessedEventCreate.mockReset();
+  mockAppendCreditLedgerEventInTransaction.mockReset();
+  mockLogAuditEvent.mockReset();
+  mockTransaction.mockReset();
   mockUserUpdate.mockResolvedValue({});
+  mockProcessedEventCreate.mockResolvedValue({});
+  mockAppendCreditLedgerEventInTransaction.mockResolvedValue({ balanceAfter: 300 });
+  mockTransaction.mockImplementation(async (callback: (tx: unknown) => unknown) =>
+    callback({
+      processedStripeEvent: { create: mockProcessedEventCreate },
+    })
+  );
 });
 
 describe("POST /api/billing/webhook", () => {
@@ -71,10 +96,13 @@ describe("POST /api/billing/webhook", () => {
 
   test("returns 500 when a handler throws after valid signature", async () => {
     mockConstructEvent.mockReturnValue({
+      id: "evt_sub_fail",
       type: "checkout.session.completed",
+      livemode: false,
+      created: 1700000000,
       data: {
         object: {
-          metadata: { userId: "u1" },
+          metadata: { userId: "u1", purchaseType: "subscription" },
           subscription: "sub_fail",
         },
       },
@@ -92,6 +120,7 @@ describe("POST /api/billing/webhook", () => {
 
   test("checkout.session.completed without userId skips prisma update", async () => {
     mockConstructEvent.mockReturnValue({
+      id: "evt_missing_user",
       type: "checkout.session.completed",
       data: {
         object: {
@@ -109,6 +138,7 @@ describe("POST /api/billing/webhook", () => {
 
   test("checkout.session.completed without subscription skips prisma update", async () => {
     mockConstructEvent.mockReturnValue({
+      id: "evt_missing_sub",
       type: "checkout.session.completed",
       data: {
         object: {
@@ -126,10 +156,11 @@ describe("POST /api/billing/webhook", () => {
 
   test("checkout.session.completed updates user", async () => {
     mockConstructEvent.mockReturnValue({
+      id: "evt_sub_1",
       type: "checkout.session.completed",
       data: {
         object: {
-          metadata: { userId: "u1" },
+          metadata: { userId: "u1", purchaseType: "subscription" },
           subscription: "sub_abc",
         },
       },
@@ -140,6 +171,7 @@ describe("POST /api/billing/webhook", () => {
 
     const res = await POST(postEvent('{"type":"checkout.session.completed"}'));
     expect(res.status).toBe(200);
+    expect(mockProcessedEventCreate).toHaveBeenCalled();
     expect(mockRetrieve).toHaveBeenCalledWith("sub_abc");
     expect(mockUserUpdate).toHaveBeenCalledWith({
       where: { id: "u1" },
@@ -150,6 +182,77 @@ describe("POST /api/billing/webhook", () => {
         weeklyUsage: 0,
       }),
     });
+  });
+
+  test("checkout.session.completed for credits tops up ledger", async () => {
+    mockConstructEvent.mockReturnValue({
+      id: "evt_credit_1",
+      type: "checkout.session.completed",
+      livemode: false,
+      created: 1700000000,
+      data: {
+        object: {
+          id: "cs_123",
+          payment_status: "paid",
+          amount_total: 3900,
+          currency: "usd",
+          metadata: {
+            userId: "u1",
+            purchaseType: "credits",
+            packageId: "builder_300",
+            credits: "300",
+          },
+        },
+      },
+    });
+
+    const res = await POST(postEvent("{}"));
+    expect(res.status).toBe(200);
+    expect(mockRetrieve).not.toHaveBeenCalled();
+    expect(mockAppendCreditLedgerEventInTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        processedStripeEvent: { create: mockProcessedEventCreate },
+      }),
+      expect.objectContaining({
+        userId: "u1",
+        eventType: "top_up",
+        amount: 300,
+      })
+    );
+    expect(mockLogAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "billing.credit_purchase.completed",
+        targetId: "u1",
+      })
+    );
+  });
+
+  test("duplicate credit checkout event is ignored", async () => {
+    mockProcessedEventCreate.mockRejectedValue({ code: "P2002" });
+    mockConstructEvent.mockReturnValue({
+      id: "evt_credit_dup",
+      type: "checkout.session.completed",
+      livemode: false,
+      created: 1700000000,
+      data: {
+        object: {
+          id: "cs_dup",
+          payment_status: "paid",
+          amount_total: 1500,
+          currency: "usd",
+          metadata: {
+            userId: "u1",
+            purchaseType: "credits",
+            packageId: "starter_100",
+            credits: "100",
+          },
+        },
+      },
+    });
+
+    const res = await POST(postEvent("{}"));
+    expect(res.status).toBe(200);
+    expect(mockAppendCreditLedgerEventInTransaction).not.toHaveBeenCalled();
   });
 
   test("customer.subscription.updated does nothing when no user matches subscription", async () => {
