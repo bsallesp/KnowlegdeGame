@@ -7,7 +7,8 @@ describe("estimateBuilderRequest", () => {
       "Build me a SaaS MVP plan for an app that analyzes competitors."
     );
 
-    expect(estimate.estimatedCredits).toBeGreaterThan(0);
+    expect(estimate.estimatedInputTokens).toBeGreaterThan(0);
+    expect(estimate.estimatedOutputTokens).toBeGreaterThan(0);
     expect(estimate.actionClass).toBe("billable_generation");
   });
 

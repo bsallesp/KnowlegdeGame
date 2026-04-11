@@ -92,6 +92,7 @@ model User {
   auditEvents              AuditLog[]        @relation("AuditActor")
   resolvedApprovalGates    ApprovalGate[]    @relation("ApprovalResolvedBy")
   processedStripeEvents    ProcessedStripeEvent[]
+  onboardingConversations  OnboardingConversation[]
 }
 
 model UserProfile {
@@ -273,4 +274,46 @@ model ProcessedStripeEvent {
 
   @@index([userId, processedAt])
   @@index([eventType, processedAt])
+}
+
+model ProviderPricingSnapshot {
+  id                 String    @id @default(cuid())
+  provider           String    // "anthropic" | "azure" | "openai"
+  model              String    // "claude-sonnet-4-6" | "claude-opus-4-6" | "claude-haiku-4-5" | "openai-tts" | "azure-tts"
+  serviceType        String    @default("llm") // "llm" | "tts" | "compute" | "storage"
+  inputPricePerUnit  Float     // per token for LLM, per character for TTS
+  outputPricePerUnit Float     // per token for LLM, 0 for TTS
+  unit               String    @default("token") // "token" | "character" | "hour" | "gb_month"
+  effectiveFrom      DateTime  @default(now())
+  effectiveTo        DateTime? // null = currently active
+  notes              String?
+  createdAt          DateTime  @default(now())
+
+  @@index([provider, model, effectiveFrom])
+  @@index([effectiveTo])
+}
+
+model PlatformConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   // JSON string for complex values, plain string for simple
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model OnboardingConversation {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  conversationId String
+  title          String
+  prompt         String
+  payloadJson    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  lastActivityAt DateTime @default(now())
+
+  @@unique([userId, conversationId])
+  @@index([userId, updatedAt])
+  @@index([userId, lastActivityAt])
 }

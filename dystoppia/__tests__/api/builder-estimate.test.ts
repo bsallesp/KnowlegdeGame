@@ -2,9 +2,14 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 
 const mockRequireRole = vi.hoisted(() => vi.fn());
+const mockEstimateCredits = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/authorization", () => ({
   requireRole: mockRequireRole,
+}));
+
+vi.mock("@/lib/pricing", () => ({
+  estimateCredits: mockEstimateCredits,
 }));
 
 import { POST } from "@/app/api/builder/estimate/route";
@@ -19,6 +24,17 @@ function req(body: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockEstimateCredits.mockResolvedValue({
+    rawCostUsd: 0.05,
+    multiplier: 4,
+    chargedCostUsd: 0.2,
+    creditValueUsd: 0.01,
+    rawCredits: 20,
+    floorCredits: 5,
+    finalCredits: 20,
+    bufferFraction: 0.15,
+    bufferedCredits: 23,
+  });
 });
 
 describe("POST /api/builder/estimate", () => {

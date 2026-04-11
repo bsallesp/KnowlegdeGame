@@ -13,6 +13,12 @@ interface Persona {
   emoji: string;
   reason: string;
   initialThought: string;
+  isMandatory?: boolean;
+  candidateCatalogType?: "azure_resources" | "developer_stack" | "academic_skills";
+  candidatePool?: string[];
+  candidateTopChoices?: string[];
+  rankingBasis?: string;
+  skillDomain?: string;
 }
 
 interface DebateMessage {
@@ -41,6 +47,17 @@ interface CoreFeature {
   complexity: "low" | "medium" | "high";
 }
 
+interface MvpDecision {
+  title: string;
+  decision: string;
+  rationale: string;
+  alternativesConsidered: string[];
+  tradeoffs: string;
+  costImpact: string;
+  timelineImpact: string;
+  riskImpact: string;
+}
+
 interface MvpProposal {
   productName: string;
   oneLiner: string;
@@ -52,6 +69,7 @@ interface MvpProposal {
   };
   risks: { risk: string; mitigation: string; severity: string }[];
   phases: { name: string; duration: string; deliverables: string[] }[];
+  decisionLog: MvpDecision[];
   outOfScope: string[];
   estimatedEffort: string;
   estimatedBuildCostUSD: string;
@@ -68,12 +86,23 @@ interface ReadinessDecision {
   missingInfo: string[];
 }
 
+interface DepthProfile {
+  tier: string;
+  score: number;
+  reasons: string[];
+}
+
 interface RefinementResult {
   refinedDebate: DebateMessage[];
   readiness: ReadinessDecision;
   nextQuestions: ClarifyingQuestion[];
   mvpProposal: MvpProposal | null;
   nextActions: string[];
+  readinessGate?: {
+    passed: boolean;
+    gaps: string[];
+  };
+  depthProfile?: DepthProfile;
 }
 
 interface Conversation {
@@ -197,6 +226,122 @@ function normalizeStringList(input: unknown): string[] {
     .filter(Boolean);
 }
 
+function normalizeDecisionLog(input: unknown): MvpDecision[] {
+  if (!Array.isArray(input)) return [];
+
+  return input
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const raw = item as {
+        title?: unknown;
+        decision?: unknown;
+        rationale?: unknown;
+        alternativesConsidered?: unknown;
+        tradeoffs?: unknown;
+        costImpact?: unknown;
+        timelineImpact?: unknown;
+        riskImpact?: unknown;
+      };
+
+      const title = typeof raw.title === "string" ? raw.title.trim() : "";
+      const decision =
+        typeof raw.decision === "string" ? raw.decision.trim() : "";
+      const rationale =
+        typeof raw.rationale === "string" ? raw.rationale.trim() : "";
+
+      if (!title || !decision || !rationale) return null;
+
+      return {
+        title,
+        decision,
+        rationale,
+        alternativesConsidered: normalizeStringList(raw.alternativesConsidered),
+        tradeoffs: typeof raw.tradeoffs === "string" ? raw.tradeoffs.trim() : "",
+        costImpact:
+          typeof raw.costImpact === "string" ? raw.costImpact.trim() : "",
+        timelineImpact:
+          typeof raw.timelineImpact === "string"
+            ? raw.timelineImpact.trim()
+            : "",
+        riskImpact:
+          typeof raw.riskImpact === "string" ? raw.riskImpact.trim() : "",
+      } satisfies MvpDecision;
+    })
+    .filter((decision): decision is MvpDecision => decision !== null);
+}
+
+function normalizeMvpProposal(input: unknown): MvpProposal | null {
+  if (!input || typeof input !== "object") return null;
+  const raw = input as Record<string, unknown>;
+
+  return {
+    productName:
+      typeof raw.productName === "string" ? raw.productName.trim() : "",
+    oneLiner: typeof raw.oneLiner === "string" ? raw.oneLiner.trim() : "",
+    coreFeatures: Array.isArray(raw.coreFeatures)
+      ? (raw.coreFeatures as CoreFeature[])
+      : [],
+    architecture:
+      raw.architecture && typeof raw.architecture === "object"
+        ? {
+            summary:
+              typeof (raw.architecture as { summary?: unknown }).summary ===
+              "string"
+                ? ((raw.architecture as { summary: string }).summary ?? "")
+                : "",
+            stack: normalizeStringList(
+              (raw.architecture as { stack?: unknown }).stack
+            ),
+            services: Array.isArray(
+              (raw.architecture as { services?: unknown }).services
+            )
+              ? ((raw.architecture as { services: unknown[] }).services
+                  .map((service) => {
+                    if (!service || typeof service !== "object") return null;
+                    const rs = service as { name?: unknown; purpose?: unknown };
+                    const name =
+                      typeof rs.name === "string" ? rs.name.trim() : "";
+                    const purpose =
+                      typeof rs.purpose === "string" ? rs.purpose.trim() : "";
+                    if (!name || !purpose) return null;
+                    return { name, purpose };
+                  })
+                  .filter(
+                    (service): service is { name: string; purpose: string } =>
+                      service !== null
+                  ) ?? [])
+              : [],
+          }
+        : { summary: "", stack: [], services: [] },
+    risks: Array.isArray(raw.risks)
+      ? (raw.risks as MvpProposal["risks"])
+      : [],
+    phases: Array.isArray(raw.phases)
+      ? (raw.phases as MvpProposal["phases"])
+      : [],
+    decisionLog: normalizeDecisionLog(raw.decisionLog),
+    outOfScope: normalizeStringList(raw.outOfScope),
+    estimatedEffort:
+      typeof raw.estimatedEffort === "string" ? raw.estimatedEffort.trim() : "",
+    estimatedBuildCostUSD:
+      typeof raw.estimatedBuildCostUSD === "string"
+        ? raw.estimatedBuildCostUSD.trim()
+        : "",
+    estimatedMonthlyCostUSD:
+      typeof raw.estimatedMonthlyCostUSD === "string"
+        ? raw.estimatedMonthlyCostUSD.trim()
+        : "",
+    estimateAssumptions: normalizeStringList(raw.estimateAssumptions),
+    businessModel:
+      typeof raw.businessModel === "string" ? raw.businessModel.trim() : "",
+    legalConsiderations: normalizeStringList(raw.legalConsiderations),
+    teamRecommendation:
+      typeof raw.teamRecommendation === "string"
+        ? raw.teamRecommendation.trim()
+        : "",
+  };
+}
+
 function normalizeAnalysis(input: unknown): PersonaAnalysis | null {
   if (!input || typeof input !== "object") return null;
   const raw = input as {
@@ -237,6 +382,8 @@ function normalizeRefinementResult(input: unknown): RefinementResult | null {
     nextQuestions?: unknown;
     mvpProposal?: unknown;
     nextActions?: unknown;
+    readinessGate?: unknown;
+    depthProfile?: unknown;
   };
 
   const readinessRaw =
@@ -264,16 +411,40 @@ function normalizeRefinementResult(input: unknown): RefinementResult | null {
         : [],
     },
     nextQuestions: normalizeClarifyingQuestions(raw.nextQuestions),
-    mvpProposal:
-      raw.mvpProposal && typeof raw.mvpProposal === "object"
-        ? (raw.mvpProposal as MvpProposal)
-        : null,
+    mvpProposal: normalizeMvpProposal(raw.mvpProposal),
     nextActions: Array.isArray(raw.nextActions)
       ? raw.nextActions
           .filter((item): item is string => typeof item === "string")
           .map((item) => item.trim())
           .filter(Boolean)
       : [],
+    readinessGate:
+      raw.readinessGate && typeof raw.readinessGate === "object"
+        ? {
+            passed:
+              (raw.readinessGate as { passed?: unknown }).passed === true,
+            gaps: normalizeStringList(
+              (raw.readinessGate as { gaps?: unknown }).gaps
+            ),
+          }
+        : undefined,
+    depthProfile:
+      raw.depthProfile && typeof raw.depthProfile === "object"
+        ? {
+            tier:
+              typeof (raw.depthProfile as { tier?: unknown }).tier === "string"
+                ? (raw.depthProfile as { tier: string }).tier
+                : "routine",
+            score:
+              typeof (raw.depthProfile as { score?: unknown }).score ===
+              "number"
+                ? (raw.depthProfile as { score: number }).score
+                : 0,
+            reasons: normalizeStringList(
+              (raw.depthProfile as { reasons?: unknown }).reasons
+            ),
+          }
+        : undefined,
   };
 }
 
@@ -291,6 +462,81 @@ function toUserAnswersText(
     .join("\n\n");
 }
 
+function normalizeConversation(input: unknown): Conversation | null {
+  if (!input || typeof input !== "object") return null;
+  const rawConversation = input as {
+    id?: unknown;
+    title?: unknown;
+    prompt?: unknown;
+    analysis?: unknown;
+    refinement?: unknown;
+    questions?: unknown;
+    questionRound?: unknown;
+    answersByQuestion?: unknown;
+    remarks?: unknown;
+    userAnswers?: unknown;
+    phase?: unknown;
+    createdAt?: unknown;
+  };
+
+  const id = typeof rawConversation.id === "string" ? rawConversation.id : "";
+  const prompt =
+    typeof rawConversation.prompt === "string" ? rawConversation.prompt : "";
+  const createdAt =
+    typeof rawConversation.createdAt === "string"
+      ? rawConversation.createdAt
+      : new Date().toISOString();
+
+  if (!id || !prompt) return null;
+
+  const analysis = normalizeAnalysis(rawConversation.analysis);
+  const storedQuestions = normalizeClarifyingQuestions(rawConversation.questions);
+  const questions =
+    storedQuestions.length > 0
+      ? storedQuestions
+      : analysis?.clarifyingQuestions ?? [];
+  const questionRound =
+    typeof rawConversation.questionRound === "number" &&
+    rawConversation.questionRound > 0
+      ? Math.floor(rawConversation.questionRound)
+      : 1;
+  const answersByQuestion = normalizeAnswersByQuestion(
+    rawConversation.answersByQuestion
+  );
+  const remarks = normalizeStringList(rawConversation.remarks);
+  const userAnswers =
+    typeof rawConversation.userAnswers === "string"
+      ? rawConversation.userAnswers
+      : questions.length > 0
+        ? toUserAnswersText(questions, answersByQuestion)
+        : "";
+
+  return {
+    id,
+    title:
+      typeof rawConversation.title === "string" && rawConversation.title.trim()
+        ? rawConversation.title
+        : truncate(prompt, 60),
+    prompt,
+    analysis,
+    refinement: normalizeRefinementResult(rawConversation.refinement),
+    questions,
+    questionRound,
+    answersByQuestion,
+    remarks,
+    userAnswers,
+    phase: normalizePhase(rawConversation.phase),
+    createdAt,
+  } satisfies Conversation;
+}
+
+function normalizeConversationsArray(input: unknown): Conversation[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((item) => normalizeConversation(item))
+    .filter((conversation): conversation is Conversation => conversation !== null);
+}
+
 function loadConversations(): Conversation[] {
   if (typeof window === "undefined") return [];
   try {
@@ -298,84 +544,7 @@ function loadConversations(): Conversation[] {
     if (!raw) return [];
 
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .map((item) => {
-        if (!item || typeof item !== "object") return null;
-        const rawConversation = item as {
-          id?: unknown;
-          title?: unknown;
-          prompt?: unknown;
-          analysis?: unknown;
-          refinement?: unknown;
-          questions?: unknown;
-          questionRound?: unknown;
-          answersByQuestion?: unknown;
-          remarks?: unknown;
-          userAnswers?: unknown;
-          phase?: unknown;
-          createdAt?: unknown;
-        };
-
-        const id =
-          typeof rawConversation.id === "string" ? rawConversation.id : "";
-        const prompt =
-          typeof rawConversation.prompt === "string"
-            ? rawConversation.prompt
-            : "";
-        const createdAt =
-          typeof rawConversation.createdAt === "string"
-            ? rawConversation.createdAt
-            : new Date().toISOString();
-
-        if (!id || !prompt) return null;
-
-        const analysis = normalizeAnalysis(rawConversation.analysis);
-        const storedQuestions = normalizeClarifyingQuestions(
-          rawConversation.questions
-        );
-        const questions =
-          storedQuestions.length > 0
-            ? storedQuestions
-            : analysis?.clarifyingQuestions ?? [];
-        const questionRound =
-          typeof rawConversation.questionRound === "number" &&
-          rawConversation.questionRound > 0
-            ? Math.floor(rawConversation.questionRound)
-            : 1;
-        const answersByQuestion = normalizeAnswersByQuestion(
-          rawConversation.answersByQuestion
-        );
-        const remarks = normalizeStringList(rawConversation.remarks);
-        const userAnswers =
-          typeof rawConversation.userAnswers === "string"
-            ? rawConversation.userAnswers
-            : questions.length > 0
-              ? toUserAnswersText(questions, answersByQuestion)
-              : "";
-
-        return {
-          id,
-          title:
-            typeof rawConversation.title === "string" &&
-            rawConversation.title.trim()
-              ? rawConversation.title
-              : truncate(prompt, 60),
-          prompt,
-          analysis,
-          refinement: normalizeRefinementResult(rawConversation.refinement),
-          questions,
-          questionRound,
-          answersByQuestion,
-          remarks,
-          userAnswers,
-          phase:
-            normalizePhase(rawConversation.phase),
-          createdAt,
-        } satisfies Conversation;
-      })
-      .filter((c): c is Conversation => c !== null);
+    return normalizeConversationsArray(parsed);
   } catch {
     return [];
   }
@@ -598,48 +767,134 @@ export default function PrivateHomeDashboard() {
 
   const debateEndRef = useRef<HTMLDivElement>(null);
   const refinedDebateEndRef = useRef<HTMLDivElement>(null);
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /* Load conversations from localStorage on mount */
-  useEffect(() => {
-    const storedConversations = loadConversations();
-    const uiState = loadUiState();
-
-    setConversations(storedConversations);
-    setSidebarOpen(uiState.sidebarOpen);
-
-    if (uiState.activeId) {
-      const activeConversation = storedConversations.find(
-        (c) => c.id === uiState.activeId
-      );
-
-      if (activeConversation) {
-        setActiveId(activeConversation.id);
-        setPrompt(activeConversation.prompt);
-        setAnalysis(activeConversation.analysis);
-        setRefinement(activeConversation.refinement);
-        setQuestions(activeConversation.questions ?? []);
-        setQuestionRound(activeConversation.questionRound ?? 1);
-        setAnswersByQuestion(activeConversation.answersByQuestion ?? {});
-        setRemarks(activeConversation.remarks ?? []);
-        setUserAnswers(activeConversation.userAnswers ?? "");
-        setPhase(activeConversation.phase ?? "idle");
-        setVisiblePersonas(activeConversation.analysis?.personas.length ?? 0);
-        setVisibleDebate(
-          activeConversation.analysis?.initialDebate.length ?? 0
-        );
-        setVisibleRefinedDebate(
-          activeConversation.refinement?.refinedDebate.length ?? 0
-        );
+  const syncConversationsToServer = useCallback(
+    async (items: Conversation[]) => {
+      try {
+        await fetch("/api/onboarding/conversations", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversations: items }),
+        });
+      } catch {
+        // Silent fallback: local cache remains available even if remote sync fails.
       }
-    }
-    setHasHydrated(true);
-  }, []);
+    },
+    []
+  );
 
-  /* Persist conversations on change */
+  /* Load conversations from server (fallback to local cache) on mount */
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrate() {
+      const cachedConversations = loadConversations();
+      const uiState = loadUiState();
+      setSidebarOpen(uiState.sidebarOpen);
+
+      let sourceConversations = cachedConversations;
+
+      try {
+        const res = await fetch("/api/onboarding/conversations", {
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const body = (await res.json()) as { conversations?: unknown };
+          const serverConversations = normalizeConversationsArray(
+            body.conversations
+          );
+
+          if (serverConversations.length > 0) {
+            const mergedById = new Map(
+              serverConversations.map((conversation) => [
+                conversation.id,
+                conversation,
+              ])
+            );
+            for (const cachedConversation of cachedConversations) {
+              if (!mergedById.has(cachedConversation.id)) {
+                mergedById.set(cachedConversation.id, cachedConversation);
+              }
+            }
+            sourceConversations = Array.from(mergedById.values()).sort(
+              (a, b) =>
+                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
+            saveConversations(sourceConversations);
+            if (sourceConversations.length !== serverConversations.length) {
+              // Backfill missing local items into the server snapshot.
+              void syncConversationsToServer(sourceConversations);
+            }
+          } else if (cachedConversations.length > 0) {
+            // One-time backfill for users that had conversations only in local storage.
+            void syncConversationsToServer(cachedConversations);
+          }
+        }
+      } catch {
+        // Keep using local cache when server fetch fails.
+      }
+
+      if (cancelled) return;
+
+      setConversations(sourceConversations);
+
+      const selectedActiveId =
+        uiState.activeId &&
+        sourceConversations.some((conversation) => conversation.id === uiState.activeId)
+          ? uiState.activeId
+          : sourceConversations[0]?.id ?? null;
+
+      if (selectedActiveId) {
+        const activeConversation = sourceConversations.find(
+          (conversation) => conversation.id === selectedActiveId
+        );
+        if (activeConversation) {
+          setActiveId(activeConversation.id);
+          setPrompt(activeConversation.prompt);
+          setAnalysis(activeConversation.analysis);
+          setRefinement(activeConversation.refinement);
+          setQuestions(activeConversation.questions ?? []);
+          setQuestionRound(activeConversation.questionRound ?? 1);
+          setAnswersByQuestion(activeConversation.answersByQuestion ?? {});
+          setRemarks(activeConversation.remarks ?? []);
+          setUserAnswers(activeConversation.userAnswers ?? "");
+          setPhase(activeConversation.phase ?? "idle");
+          setVisiblePersonas(activeConversation.analysis?.personas.length ?? 0);
+          setVisibleDebate(
+            activeConversation.analysis?.initialDebate.length ?? 0
+          );
+          setVisibleRefinedDebate(
+            activeConversation.refinement?.refinedDebate.length ?? 0
+          );
+        }
+      }
+
+      setHasHydrated(true);
+    }
+
+    void hydrate();
+
+    return () => {
+      cancelled = true;
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+        syncTimeoutRef.current = null;
+      }
+    };
+  }, [syncConversationsToServer]);
+
+  /* Persist conversations locally + server sync */
   useEffect(() => {
     if (!hasHydrated) return;
     saveConversations(conversations);
-  }, [conversations, hasHydrated]);
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+    syncTimeoutRef.current = setTimeout(() => {
+      void syncConversationsToServer(conversations);
+    }, 500);
+  }, [conversations, hasHydrated, syncConversationsToServer]);
 
   /* Persist sidebar + selected conversation */
   useEffect(() => {
@@ -807,9 +1062,7 @@ export default function PrivateHomeDashboard() {
 
   function deleteConversation(id: string) {
     setConversations((prev) => {
-      const next = prev.filter((c) => c.id !== id);
-      saveConversations(next);
-      return next;
+      return prev.filter((c) => c.id !== id);
     });
     if (activeId === id) startNewConversation();
   }
@@ -995,6 +1248,13 @@ export default function PrivateHomeDashboard() {
             name: persona.name,
             emoji: persona.emoji,
             reason: persona.reason,
+            isMandatory: persona.isMandatory === true,
+            candidateCatalogType: persona.candidateCatalogType,
+            candidateTopChoices: Array.isArray(persona.candidateTopChoices)
+              ? persona.candidateTopChoices.slice(0, 24)
+              : undefined,
+            rankingBasis: persona.rankingBasis,
+            skillDomain: persona.skillDomain,
           })),
           projectSummary: analysis.projectSummary,
           qaHistory: [...qaHistory, ...noteHistory],
@@ -1651,6 +1911,46 @@ export default function PrivateHomeDashboard() {
                           >
                             {persona.reason}
                           </p>
+                          {Array.isArray(persona.candidateTopChoices) &&
+                            persona.candidateTopChoices.length > 0 && (
+                            <div
+                              className="mb-2 px-2.5 py-2 rounded-lg"
+                              style={{
+                                backgroundColor: "#0D0D15",
+                                border: "1px solid #1C1C28",
+                              }}
+                            >
+                              <p
+                                className="text-[10px] uppercase tracking-wider font-semibold mb-1"
+                                style={{ color: "#38BDF8" }}
+                              >
+                                {persona.candidateCatalogType === "azure_resources"
+                                  ? "Candidate Azure Resources"
+                                  : persona.candidateCatalogType === "developer_stack"
+                                    ? "Candidate Developer Stack"
+                                    : "Candidate Academic Skills"}
+                              </p>
+                              {persona.skillDomain && (
+                                <p
+                                  className="text-[10px] mb-1"
+                                  style={{ color: "#7DD3FC" }}
+                                >
+                                  Domain: {persona.skillDomain.replace(/_/g, " ")}
+                                </p>
+                              )}
+                              <p
+                                className="text-[11px] leading-relaxed"
+                                style={{ color: "#BFD9FF" }}
+                              >
+                                {persona.candidateTopChoices
+                                  .slice(0, 6)
+                                  .join(" · ")}
+                                {persona.candidateTopChoices.length > 6
+                                  ? ` · +${persona.candidateTopChoices.length - 6} more`
+                                  : ""}
+                              </p>
+                            </div>
+                          )}
                           <p
                             className="text-xs italic leading-relaxed"
                             style={{ color: "#6B6B8A" }}
@@ -2134,6 +2434,21 @@ export default function PrivateHomeDashboard() {
                       <p className="text-sm mb-4" style={{ color: "#BBF7D0" }}>
                         {refinement.mvpProposal.oneLiner}
                       </p>
+                      {refinement.depthProfile && (
+                        <div
+                          className="mb-4 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs"
+                          style={{
+                            backgroundColor: "rgba(56,189,248,0.12)",
+                            border: "1px solid rgba(56,189,248,0.3)",
+                            color: "#BAE6FD",
+                          }}
+                        >
+                          <span>
+                            Depth tier: <strong>{refinement.depthProfile.tier}</strong>
+                          </span>
+                          <span>score {refinement.depthProfile.score}</span>
+                        </div>
+                      )}
 
                       <div className="grid gap-3 md:grid-cols-2 mb-5">
                         <div
@@ -2216,9 +2531,93 @@ export default function PrivateHomeDashboard() {
                                   {feature.description}
                                 </p>
                               </div>
-                            ))}
+                          ))}
                         </div>
                       </div>
+
+                      {refinement.mvpProposal.decisionLog.length > 0 && (
+                        <div className="mb-5">
+                          <p
+                            className="text-xs font-semibold uppercase tracking-widest mb-2"
+                            style={{ color: "#86EFAC" }}
+                          >
+                            Detailed Decisions
+                          </p>
+                          <div className="flex flex-col gap-3">
+                            {refinement.mvpProposal.decisionLog.map(
+                              (decision, i) => (
+                                <div
+                                  key={`${decision.title}_${i}`}
+                                  className="rounded-xl p-4"
+                                  style={{
+                                    backgroundColor: "#0F172A",
+                                    border: "1px solid #1E293B",
+                                  }}
+                                >
+                                  <p
+                                    className="text-sm font-semibold mb-2"
+                                    style={{ color: "#E2E8F0" }}
+                                  >
+                                    {decision.title}
+                                  </p>
+                                  <p
+                                    className="text-xs mb-2"
+                                    style={{ color: "#CBD5E1" }}
+                                  >
+                                    <strong>Decision:</strong> {decision.decision}
+                                  </p>
+                                  <p
+                                    className="text-xs mb-2"
+                                    style={{ color: "#94A3B8" }}
+                                  >
+                                    <strong>Rationale:</strong> {decision.rationale}
+                                  </p>
+                                  {decision.alternativesConsidered.length > 0 && (
+                                    <p
+                                      className="text-xs mb-2"
+                                      style={{ color: "#94A3B8" }}
+                                    >
+                                      <strong>Alternatives:</strong>{" "}
+                                      {decision.alternativesConsidered.join(", ")}
+                                    </p>
+                                  )}
+                                  {decision.tradeoffs && (
+                                    <p
+                                      className="text-xs mb-2"
+                                      style={{ color: "#94A3B8" }}
+                                    >
+                                      <strong>Trade-offs:</strong> {decision.tradeoffs}
+                                    </p>
+                                  )}
+                                  <div className="grid gap-2 md:grid-cols-3">
+                                    <p
+                                      className="text-xs"
+                                      style={{ color: "#7DD3FC" }}
+                                    >
+                                      <strong>Cost:</strong>{" "}
+                                      {decision.costImpact || "Not specified"}
+                                    </p>
+                                    <p
+                                      className="text-xs"
+                                      style={{ color: "#7DD3FC" }}
+                                    >
+                                      <strong>Timeline:</strong>{" "}
+                                      {decision.timelineImpact || "Not specified"}
+                                    </p>
+                                    <p
+                                      className="text-xs"
+                                      style={{ color: "#7DD3FC" }}
+                                    >
+                                      <strong>Risk:</strong>{" "}
+                                      {decision.riskImpact || "Not specified"}
+                                    </p>
+                                  </div>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       {refinement.mvpProposal.estimateAssumptions.length > 0 && (
                         <div className="mb-5">

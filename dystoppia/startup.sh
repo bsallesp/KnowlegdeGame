@@ -54,5 +54,10 @@ else
   fi
 fi
 
+if [ -f prisma/seed-ged.mjs ]; then
+  echo "[startup] Running GED seed (idempotent)..."
+  node prisma/seed-ged.mjs || echo "[startup] seed-ged failed (continuing)"
+fi
+
 echo "[startup] Starting Next.js (node server.js)..."
 exec node server.js

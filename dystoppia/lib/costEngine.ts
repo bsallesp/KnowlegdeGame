@@ -17,6 +17,7 @@ export interface BuilderCostEstimate {
   actionClass: ActionClass;
   estimatedInputTokens: number;
   estimatedOutputTokens: number;
+  // Legacy fields kept for backward compat — actual pricing is in lib/pricing.ts
   providerCostUsd: number;
   overheadUsd: number;
   safetyBufferUsd: number;
@@ -39,6 +40,16 @@ const RISKY_EXECUTION_PATTERNS = [
   /\bproduction\b/i,
 ];
 
+// System prompt is ~2500 tokens
+const SYSTEM_PROMPT_TOKENS = 2500;
+const AUDIT_PROMPT_TOKENS = 900;
+const AUDIT_OUTPUT_TOKENS = 800;
+
+/**
+ * Heuristic-only estimation. Returns token estimates and viability
+ * classification. Actual cost/credit calculation is done by lib/pricing.ts
+ * using the ProviderPricingSnapshot table.
+ */
 export function estimateBuilderRequest(prompt: string): BuilderCostEstimate {
   const trimmed = prompt.trim();
   const promptLength = trimmed.length;
@@ -51,23 +62,15 @@ export function estimateBuilderRequest(prompt: string): BuilderCostEstimate {
 
   let complexity: BuilderComplexity = "small";
   let actionClass: ActionClass = "billable_generation";
-  let estimatedInputTokens = 1200;
-  let estimatedOutputTokens = 1800;
-  let providerCostUsd = 0.045;
-  let overheadUsd = 0.02;
-  let safetyBufferUsd = 0.015;
-  let estimatedCredits = 8;
+  let generationInputTokens = SYSTEM_PROMPT_TOKENS + 500;
+  let generationOutputTokens = 3000;
   let viabilityStatus: ViabilityStatus = "approved";
   let confidence: "low" | "medium" | "high" = "medium";
 
   if (promptLength >= 400 || /architecture|roadmap|backlog|competitive|business model/i.test(trimmed)) {
     complexity = "medium";
-    estimatedInputTokens = 2200;
-    estimatedOutputTokens = 3200;
-    providerCostUsd = 0.085;
-    overheadUsd = 0.035;
-    safetyBufferUsd = 0.025;
-    estimatedCredits = 18;
+    generationInputTokens = SYSTEM_PROMPT_TOKENS + 800;
+    generationOutputTokens = 6000;
     confidence = "medium";
   }
 
@@ -76,12 +79,8 @@ export function estimateBuilderRequest(prompt: string): BuilderCostEstimate {
     /multi-tenant|orchestrate|infrastructure|terraform|kubernetes|microservices/i.test(trimmed)
   ) {
     complexity = "large";
-    estimatedInputTokens = 3800;
-    estimatedOutputTokens = 5200;
-    providerCostUsd = 0.16;
-    overheadUsd = 0.06;
-    safetyBufferUsd = 0.04;
-    estimatedCredits = 35;
+    generationInputTokens = SYSTEM_PROMPT_TOKENS + 1500;
+    generationOutputTokens = 12000;
     viabilityStatus = "approved_with_warning";
     confidence = "low";
     reasons.push("Request looks broad and likely requires larger planning effort.");
@@ -90,7 +89,6 @@ export function estimateBuilderRequest(prompt: string): BuilderCostEstimate {
   if (containsRiskyExecution) {
     actionClass = "privileged_execution";
     viabilityStatus = complexity === "small" ? "reduce_scope" : "approved_with_warning";
-    estimatedCredits += 5;
     reasons.push("Request mentions external execution steps that are blocked or approval-gated in the MVP.");
   }
 
@@ -103,22 +101,29 @@ export function estimateBuilderRequest(prompt: string): BuilderCostEstimate {
   if (/unlimited|fully autonomous|no approval|bypass/i.test(trimmed)) {
     complexity = "unsafe_or_unknown";
     actionClass = "privileged_execution";
-    providerCostUsd = 0;
-    overheadUsd = 0;
-    safetyBufferUsd = 0;
-    estimatedCredits = 0;
+    generationInputTokens = 0;
+    generationOutputTokens = 0;
     viabilityStatus = "reject";
     confidence = "low";
     reasons.push("Request exceeds the MVP safety boundary.");
   }
 
-  const totalCostUsd = Number(
-    (providerCostUsd + overheadUsd + safetyBufferUsd).toFixed(4)
-  );
-
   if (reasons.length === 0) {
     reasons.push("Request fits the current Builder planning workflow.");
   }
+
+  const auditInputTokens =
+    generationOutputTokens > 0 ? AUDIT_PROMPT_TOKENS + Math.round(generationOutputTokens * 0.75) : 0;
+  const estimatedInputTokens = generationInputTokens + auditInputTokens;
+  const estimatedOutputTokens =
+    generationOutputTokens > 0 ? generationOutputTokens + AUDIT_OUTPUT_TOKENS : 0;
+
+  // These USD values are rough heuristics for the estimate endpoint only.
+  // The real pricing uses ProviderPricingSnapshot × multiplier via lib/pricing.ts.
+  const providerCostUsd = estimatedInputTokens * 3 / 1_000_000 + estimatedOutputTokens * 15 / 1_000_000;
+  const overheadUsd = 0;
+  const safetyBufferUsd = 0;
+  const totalCostUsd = Number(providerCostUsd.toFixed(6));
 
   return {
     complexity,
@@ -129,7 +134,7 @@ export function estimateBuilderRequest(prompt: string): BuilderCostEstimate {
     overheadUsd,
     safetyBufferUsd,
     totalCostUsd,
-    estimatedCredits,
+    estimatedCredits: 0, // Actual credits computed by pricing engine
     viabilityStatus,
     confidence,
     reasons,

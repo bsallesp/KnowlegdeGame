@@ -219,6 +219,25 @@ describe("BuilderWorkspace", () => {
                       viabilityStatus: "approved",
                       confidence: "medium",
                     },
+                    verification: {
+                      status: "passed_with_warnings",
+                      confidence: "medium",
+                      findings: [
+                        {
+                          code: "cost_benchmark_outlier_low",
+                          severity: "warning",
+                          source: "rule",
+                          message: "Estimated monthly cost looks too low.",
+                        },
+                      ],
+                      metrics: {
+                        totalChecks: 12,
+                        flaggedChecks: 1,
+                        criticalFindings: 0,
+                        warningFindings: 1,
+                        auditFindings: 0,
+                      },
+                    },
                     warnings: ["Do not automate privileged actions yet."],
                     nextSteps: ["Validate scope", "Run first iteration"],
                   }),
@@ -310,6 +329,25 @@ describe("BuilderWorkspace", () => {
                   viabilityStatus: "approved",
                   confidence: "high",
                 },
+                verification: {
+                  status: "passed_with_warnings",
+                  confidence: "medium",
+                  findings: [
+                    {
+                      code: "audit_missing_component_1",
+                      severity: "warning",
+                      source: "audit",
+                      message: "A durable queue may be missing for burst handling.",
+                    },
+                  ],
+                  metrics: {
+                    totalChecks: 14,
+                    flaggedChecks: 1,
+                    criticalFindings: 0,
+                    warningFindings: 1,
+                    auditFindings: 1,
+                  },
+                },
                 warnings: ["No auto-provisioning in MVP"],
                 nextSteps: ["Approve scope", "Implement report UI"],
               },
@@ -369,6 +407,8 @@ describe("BuilderWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: /Run Builder/i }));
     await waitFor(() => expect(screen.getByText(/Create a scoped competitor scanner/i)).toBeTruthy());
     expect(screen.getByText(/No auto-provisioning in MVP/i)).toBeTruthy();
+    expect(screen.getByText(/confidence: medium/i)).toBeTruthy();
+    expect(screen.getByText(/A durable queue may be missing for burst handling./i)).toBeTruthy();
     expect(screen.getByDisplayValue("")).toBeTruthy();
 
     fireEvent.click(screen.getAllByRole("button", { name: /^Approve$/i })[0]);

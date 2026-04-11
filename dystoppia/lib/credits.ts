@@ -6,8 +6,10 @@ export type CreditLedgerEventType =
   | "top_up"
   | "reserved"
   | "released"
+  | "settled"
   | "deduction"
   | "refund"
+  | "adjustment"
   | "manual_adjustment";
 
 interface LedgerMetadata {

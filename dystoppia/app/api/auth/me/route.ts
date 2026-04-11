@@ -2,19 +2,26 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { verify } from "@/lib/cookieToken";
+import { ANON_USER_ID } from "@/lib/authGuard";
 
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("dystoppia_uid")?.value;
+    let userId: string | null = null;
 
-    if (!token) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
+    if (process.env.DISABLE_AUTH === "1") {
+      userId = ANON_USER_ID;
+    } else {
+      const cookieStore = await cookies();
+      const token = cookieStore.get("dystoppia_uid")?.value;
 
-    const userId = verify(token);
-    if (!userId) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      if (!token) {
+        return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      }
+
+      userId = verify(token);
+      if (!userId) {
+        return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      }
     }
 
     const user = await prisma.user.findUnique({

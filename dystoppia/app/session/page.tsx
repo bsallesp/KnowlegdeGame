@@ -27,6 +27,7 @@ interface XPPopup {
   amount: number;
 }
 
+const GED_SLUG = "ged-mathematical-reasoning";
 const BOSS_EVERY = 10; // trigger boss round every N answers
 const BOSS_QUESTIONS = 3; // number of boss questions per round
 
@@ -53,7 +54,7 @@ export default function SessionPage() {
     weeklyRemaining,
     weeklyResetsAt,
     plan,
-    setCurrentQuestion,
+    setCurrentTopic,
     addToQueue,
     advanceQueue,
     updateSubItemStats,
@@ -96,14 +97,51 @@ export default function SessionPage() {
   const [showMobileStats, setShowMobileStats] = useState(false);
   const [showMobileTree, setShowMobileTree] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [sessionError, setSessionError] = useState("");
+  const [isRecoveringTopic, setIsRecoveringTopic] = useState(false);
   const generatingRef = useRef(false);
   const isFetchingRef = useRef(false);
 
+  // Recover from stale persisted state so /session can self-heal after refreshes/redeploys.
+  useEffect(() => {
+    if (authLoading || !_hasHydrated) return;
+    if (currentTopic && !currentTopic.id.startsWith("pending_")) return;
+
+    let cancelled = false;
+
+    async function recoverTopic() {
+      setIsRecoveringTopic(true);
+      setSessionError("");
+      try {
+        const res = await fetch(`/api/topics?slug=${encodeURIComponent(GED_SLUG)}`);
+        if (!res.ok) throw new Error("Could not load GED topic");
+        const topic = await res.json();
+        if (!cancelled) {
+          setCurrentTopic(topic);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setSessionError(error instanceof Error ? error.message : "Could not load GED topic");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsRecoveringTopic(false);
+        }
+      }
+    }
+
+    void recoverTopic();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, _hasHydrated, currentTopic, setCurrentTopic]);
+
   // Redirect if no topic — only after hydration to avoid false redirects on refresh
   useEffect(() => {
-    if (!_hasHydrated) return;
+    if (authLoading || !_hasHydrated || isRecoveringTopic) return;
     if (!currentTopic) router.push("/");
-  }, [_hasHydrated, currentTopic, router]);
+  }, [authLoading, _hasHydrated, isRecoveringTopic, currentTopic, router]);
 
   const getAllSubItems = useCallback(() => {
     if (!currentTopic) return [];
@@ -115,6 +153,7 @@ export default function SessionPage() {
       if (isFetchingRef.current) return;
       isFetchingRef.current = true;
       setIsGenerating(true);
+      setSessionError("");
       logger.info("session", `Generating questions for subItem ${subItemId}`, { count });
 
       try {
@@ -147,6 +186,7 @@ export default function SessionPage() {
         addToQueue(questionsWithSubItem);
       } catch (err) {
         logger.error("session", "Failed to generate questions", err);
+        setSessionError("Could not load questions. Try again.");
       } finally {
         isFetchingRef.current = false;
         setIsGenerating(false);
@@ -402,7 +442,38 @@ export default function SessionPage() {
     }
   };
 
-  if (!currentTopic) return null;
+  if (authLoading || !_hasHydrated || isRecoveringTopic || !currentTopic || currentTopic.id.startsWith("pending_")) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4" style={{ backgroundColor: "#09090E" }}>
+        <div className="w-full max-w-xl space-y-4">
+          <div className="rounded-xl p-6 space-y-3" style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}>
+            <SkeletonBlock width="35%" height="1.25rem" />
+            <SkeletonBlock width="100%" height="1.5rem" />
+            <SkeletonBlock width="80%" height="1.5rem" />
+          </div>
+          {[0, 1, 2, 3].map((i) => (
+            <SkeletonBlock key={i} height="3rem" className="rounded-lg" />
+          ))}
+          <div className="flex flex-col items-center gap-3 pt-4 text-sm">
+            <p className="flex items-center gap-2" style={{ color: "#9494B8" }}>
+              <motion.span animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }} className="inline-block">✦</motion.span>
+              {sessionError || "Loading your GED session..."}
+            </p>
+            {sessionError && (
+              <button
+                type="button"
+                onClick={() => router.push("/")}
+                className="px-4 py-2 rounded-lg text-sm font-semibold"
+                style={{ backgroundColor: "#818CF8", color: "white" }}
+              >
+                Back To Start
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const correctCount = Object.values(subItemStats).reduce((sum, s) => sum + s.correctCount, 0);
   const totalCount = Object.values(subItemStats).reduce((sum, s) => sum + s.totalCount, 0);
@@ -922,11 +993,23 @@ export default function SessionPage() {
                   </div>
                   {[0, 1, 2, 3].map((i) => <SkeletonBlock key={i} height="3rem" className="rounded-lg" />)}
                   <div className="flex justify-center pt-4">
-                    <motion.p className="text-sm flex items-center gap-2" style={{ color: "#9494B8" }}>
+                    <motion.p className="text-sm flex items-center gap-2" style={{ color: sessionError ? "#F97316" : "#9494B8" }}>
                       <motion.span animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }} className="inline-block">✦</motion.span>
-                      {isPending ? "Loading topic..." : isGenerating ? "Generating questions..." : "Loading..."}
+                      {sessionError || (isPending ? "Loading topic..." : isGenerating ? "Generating questions..." : "Loading...")}
                     </motion.p>
                   </div>
+                  {sessionError && (
+                    <div className="flex justify-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => void fillQueue()}
+                        className="px-4 py-2 rounded-lg text-sm font-semibold"
+                        style={{ backgroundColor: "#818CF8", color: "white" }}
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
                 </motion.div>
               ) : null}
             </AnimatePresence>

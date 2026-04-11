@@ -159,12 +159,148 @@ export interface BuilderEstimate {
   reasons: string[];
 }
 
+// ── Architecture specification types ──
+
+export type SystemClassification =
+  | "static_site"
+  | "single_page_app"
+  | "server_rendered_app"
+  | "monolith"
+  | "modular_monolith"
+  | "client_server"
+  | "microservices"
+  | "event_driven"
+  | "serverless"
+  | "data_pipeline"
+  | "ml_platform"
+  | "hybrid";
+
+export type ResourceCategory =
+  | "compute"
+  | "database"
+  | "cache"
+  | "queue"
+  | "storage"
+  | "cdn"
+  | "dns"
+  | "load_balancer"
+  | "api_gateway"
+  | "auth"
+  | "monitoring"
+  | "logging"
+  | "ci_cd"
+  | "container_registry"
+  | "secret_management"
+  | "email"
+  | "search"
+  | "analytics"
+  | "ml_inference"
+  | "scheduler"
+  | "event_bus"
+  | "service_mesh"
+  | "waf"
+  | "vpn"
+  | "other";
+
+export interface ArchResource {
+  id: string;
+  name: string;
+  category: ResourceCategory;
+  technology: string;
+  purpose: string;
+  tier: "essential" | "recommended" | "optional";
+  scalingStrategy: string;
+  estimatedMonthlyCostUsd: { min: number; max: number };
+  notes: string;
+}
+
+export interface ArchDataFlow {
+  from: string;
+  to: string;
+  protocol: string;
+  description: string;
+  dataType: string;
+  async: boolean;
+}
+
+export interface ArchEnvironment {
+  name: string;
+  purpose: string;
+  resources: string[];
+  estimatedMonthlyCostUsd: { min: number; max: number };
+}
+
+export interface ArchSecurityBoundary {
+  name: string;
+  scope: string;
+  controls: string[];
+  threats: string[];
+}
+
+export interface ArchFailureMode {
+  component: string;
+  failureScenario: string;
+  impact: string;
+  mitigationStrategy: string;
+  rto: string;
+  rpo: string;
+}
+
+export interface ArchCostBreakdown {
+  category: string;
+  items: string[];
+  estimatedMonthlyCostUsd: { min: number; max: number };
+}
+
+export interface ArchMilestone {
+  phase: number;
+  name: string;
+  deliverables: string[];
+  estimatedWeeks: number;
+  dependencies: string[];
+}
+
+export interface SystemArchitecture {
+  classification: SystemClassification;
+  summary: string;
+  principles: string[];
+  resources: ArchResource[];
+  dataFlows: ArchDataFlow[];
+  environments: ArchEnvironment[];
+  securityBoundaries: ArchSecurityBoundary[];
+  failureModes: ArchFailureMode[];
+  costBreakdown: ArchCostBreakdown[];
+  totalEstimatedMonthlyCostUsd: { min: number; max: number };
+  scalingNotes: string;
+  tradeoffs: string[];
+}
+
+export interface BuilderVerificationFinding {
+  code: string;
+  severity: "info" | "warning" | "critical";
+  source: "schema" | "rule" | "audit";
+  message: string;
+}
+
+export interface BuilderVerificationSummary {
+  status: "passed" | "passed_with_warnings" | "failed";
+  confidence: "low" | "medium" | "high";
+  findings: BuilderVerificationFinding[];
+  metrics: {
+    totalChecks: number;
+    flaggedChecks: number;
+    criticalFindings: number;
+    warningFindings: number;
+    auditFindings: number;
+  };
+}
+
 export interface BuilderStructuredResult {
   requestUnderstanding: string;
   assumptions: string[];
   recommendedScope: string;
-  architecture: string[];
-  developmentPlan: string[];
+  architecture: SystemArchitecture;
+  developmentPlan: ArchMilestone[];
   devopsPlan: string[];
   businessNotes: string[];
   competitiveAssessment: string;
@@ -173,7 +309,12 @@ export interface BuilderStructuredResult {
     estimatedCostUsd: number;
     viabilityStatus: string;
     confidence: string;
+    _realTokens?: {
+      inputTokens: number;
+      outputTokens: number;
+    };
   };
+  verification?: BuilderVerificationSummary;
   warnings: string[];
   nextSteps: string[];
 }

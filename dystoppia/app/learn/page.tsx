@@ -1,5 +1,5 @@
-import { SearchPage } from "@/app/page";
+import RootPage from "@/app/page";
 
 export default function LearnPage() {
-  return <SearchPage />;
+  return <RootPage />;
 }

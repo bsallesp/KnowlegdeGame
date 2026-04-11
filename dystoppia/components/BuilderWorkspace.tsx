@@ -7,6 +7,7 @@ import { useRequireUser } from "@/lib/useRequireUser";
 import useAppStore from "@/store/useAppStore";
 import type {
   ApprovalGateRecord,
+  ArchResource,
   AuditLogRecord,
   BuilderEstimate,
   BuilderRequestRecord,
@@ -66,6 +67,440 @@ function SectionCard({
     <div className="rounded-2xl p-5" style={{ backgroundColor: "#0D0D15", border: "1px solid #2E2E40" }}>
       <h3 className="text-sm font-semibold mb-3" style={{ color: "#EEEEFF" }}>{title}</h3>
       {children}
+    </div>
+  );
+}
+
+const TIER_COLORS: Record<string, string> = {
+  essential: "#60A5FA",
+  recommended: "#818CF8",
+  optional: "#9494B8",
+};
+
+function ResourceCard({ resource }: { resource: ArchResource }) {
+  return (
+    <div className="rounded-2xl p-4" style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}>
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="flex items-center gap-2">
+          <span
+            className="text-xs px-2 py-0.5 rounded-full font-mono"
+            style={{ backgroundColor: "rgba(129,140,248,0.12)", color: "#818CF8" }}
+          >
+            {resource.category}
+          </span>
+          <span
+            className="text-xs px-2 py-0.5 rounded-full"
+            style={{
+              backgroundColor: `${TIER_COLORS[resource.tier] ?? "#9494B8"}18`,
+              color: TIER_COLORS[resource.tier] ?? "#9494B8",
+            }}
+          >
+            {resource.tier}
+          </span>
+        </div>
+        <span className="text-xs font-mono" style={{ color: "#60A5FA" }}>
+          ${resource.estimatedMonthlyCostUsd.min}–${resource.estimatedMonthlyCostUsd.max}/mo
+        </span>
+      </div>
+      <h4 className="text-sm font-semibold mb-1" style={{ color: "#EEEEFF" }}>
+        {resource.name}
+      </h4>
+      <p className="text-xs mb-2 font-mono" style={{ color: "#818CF8" }}>
+        {resource.technology}
+      </p>
+      <p className="text-xs leading-relaxed mb-2" style={{ color: "#9494B8" }}>
+        {resource.purpose}
+      </p>
+      <div className="text-xs" style={{ color: "#6B6B8A" }}>
+        <span className="font-semibold" style={{ color: "#9494B8" }}>Scaling:</span> {resource.scalingStrategy}
+      </div>
+      {resource.notes && (
+        <div className="text-xs mt-1" style={{ color: "#6B6B8A" }}>
+          <span className="font-semibold" style={{ color: "#9494B8" }}>Notes:</span> {resource.notes}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ArchitectureReport({ result }: { result: BuilderStructuredResult }) {
+  const arch = result.architecture;
+  const isRichArch = arch && typeof arch === "object" && "classification" in arch;
+
+  return (
+    <div className="space-y-5">
+      {/* Understanding + Scope */}
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <SectionCard title="Request understanding">
+          <p className="text-sm leading-relaxed" style={{ color: "#9494B8" }}>{result.requestUnderstanding}</p>
+          {result.assumptions.length > 0 && (
+            <div className="mt-3 space-y-1">
+              <div className="text-xs font-semibold" style={{ color: "#6B6B8A" }}>Assumptions</div>
+              {result.assumptions.map((a, i) => (
+                <p key={i} className="text-xs leading-relaxed" style={{ color: "#6B6B8A" }}>• {a}</p>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+        <SectionCard title="Recommended scope">
+          <p className="text-sm leading-relaxed" style={{ color: "#9494B8" }}>{result.recommendedScope}</p>
+        </SectionCard>
+      </section>
+
+      {/* Architecture overview */}
+      {isRichArch && (
+        <>
+          <SectionCard title="Architecture overview">
+            <div className="flex items-center gap-3 mb-3">
+              <span
+                className="text-xs px-3 py-1.5 rounded-full font-semibold"
+                style={{ backgroundColor: "rgba(129,140,248,0.15)", color: "#818CF8", border: "1px solid rgba(129,140,248,0.3)" }}
+              >
+                {arch.classification.replace(/_/g, " ")}
+              </span>
+              <span className="text-xs font-mono" style={{ color: "#60A5FA" }}>
+                ${arch.totalEstimatedMonthlyCostUsd.min}–${arch.totalEstimatedMonthlyCostUsd.max}/mo total
+              </span>
+            </div>
+            <p className="text-sm leading-relaxed mb-4" style={{ color: "#9494B8" }}>
+              {arch.summary}
+            </p>
+            {arch.principles.length > 0 && (
+              <div className="space-y-1">
+                <div className="text-xs font-semibold mb-1" style={{ color: "#EEEEFF" }}>Principles</div>
+                {arch.principles.map((p, i) => (
+                  <p key={i} className="text-xs leading-relaxed" style={{ color: "#9494B8" }}>• {p}</p>
+                ))}
+              </div>
+            )}
+            {arch.tradeoffs.length > 0 && (
+              <div className="mt-4 space-y-1">
+                <div className="text-xs font-semibold mb-1" style={{ color: "#FACC15" }}>Tradeoffs</div>
+                {arch.tradeoffs.map((t, i) => (
+                  <p key={i} className="text-xs leading-relaxed" style={{ color: "#FACC15" }}>• {t}</p>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+
+          {/* Resources */}
+          {arch.resources.length > 0 && (
+            <SectionCard title={`Resources (${arch.resources.length})`}>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {arch.resources.map((r) => (
+                  <ResourceCard key={r.id} resource={r} />
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* Data flows */}
+          {arch.dataFlows.length > 0 && (
+            <SectionCard title={`Data flows (${arch.dataFlows.length})`}>
+              <div className="space-y-2">
+                {arch.dataFlows.map((f, i) => (
+                  <div key={i} className="rounded-xl p-3 flex flex-col gap-1" style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}>
+                    <div className="flex items-center gap-2 text-xs font-mono">
+                      <span style={{ color: "#60A5FA" }}>{f.from}</span>
+                      <span style={{ color: "#6B6B8A" }}>{f.async ? "~~>" : "→"}</span>
+                      <span style={{ color: "#60A5FA" }}>{f.to}</span>
+                      <span className="px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(129,140,248,0.12)", color: "#818CF8" }}>
+                        {f.protocol}
+                      </span>
+                      {f.async && (
+                        <span className="px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(250,204,21,0.12)", color: "#FACC15" }}>
+                          async
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs" style={{ color: "#9494B8" }}>{f.description}</p>
+                    <p className="text-xs" style={{ color: "#6B6B8A" }}>Data: {f.dataType}</p>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* Environments */}
+          {arch.environments.length > 0 && (
+            <SectionCard title="Environments">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {arch.environments.map((env, i) => (
+                  <div key={i} className="rounded-xl p-4" style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold" style={{ color: "#EEEEFF" }}>{env.name}</span>
+                      <span className="text-xs font-mono" style={{ color: "#60A5FA" }}>
+                        ${env.estimatedMonthlyCostUsd.min}–${env.estimatedMonthlyCostUsd.max}/mo
+                      </span>
+                    </div>
+                    <p className="text-xs mb-2" style={{ color: "#9494B8" }}>{env.purpose}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {env.resources.map((rid) => (
+                        <span key={rid} className="text-xs px-2 py-0.5 rounded-full font-mono" style={{ backgroundColor: "rgba(129,140,248,0.08)", color: "#818CF8" }}>
+                          {rid}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* Security boundaries */}
+          {arch.securityBoundaries.length > 0 && (
+            <SectionCard title="Security boundaries">
+              <div className="space-y-3">
+                {arch.securityBoundaries.map((sb, i) => (
+                  <div key={i} className="rounded-xl p-4" style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}>
+                    <div className="text-sm font-semibold mb-1" style={{ color: "#EEEEFF" }}>{sb.name}</div>
+                    <p className="text-xs mb-2" style={{ color: "#9494B8" }}>{sb.scope}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <div>
+                        <div className="text-xs font-semibold mb-1" style={{ color: "#60A5FA" }}>Controls</div>
+                        {sb.controls.map((c, ci) => (
+                          <p key={ci} className="text-xs" style={{ color: "#9494B8" }}>• {c}</p>
+                        ))}
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold mb-1" style={{ color: "#F97316" }}>Threats addressed</div>
+                        {sb.threats.map((t, ti) => (
+                          <p key={ti} className="text-xs" style={{ color: "#9494B8" }}>• {t}</p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* Failure modes */}
+          {arch.failureModes.length > 0 && (
+            <SectionCard title="Failure modes">
+              <div className="space-y-2">
+                {arch.failureModes.map((fm, i) => (
+                  <div key={i} className="rounded-xl p-4" style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-mono px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(249,115,22,0.12)", color: "#F97316" }}>
+                        {fm.component}
+                      </span>
+                      <span className="text-xs" style={{ color: "#6B6B8A" }}>
+                        RTO: {fm.rto} · RPO: {fm.rpo}
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold mb-1" style={{ color: "#EEEEFF" }}>{fm.failureScenario}</p>
+                    <p className="text-xs mb-1" style={{ color: "#F97316" }}>Impact: {fm.impact}</p>
+                    <p className="text-xs" style={{ color: "#9494B8" }}>Mitigation: {fm.mitigationStrategy}</p>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* Cost breakdown */}
+          {arch.costBreakdown.length > 0 && (
+            <SectionCard title="Cost breakdown">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {arch.costBreakdown.map((cb, i) => (
+                  <div key={i} className="rounded-xl p-4" style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold" style={{ color: "#EEEEFF" }}>{cb.category}</span>
+                      <span className="text-xs font-mono" style={{ color: "#60A5FA" }}>
+                        ${cb.estimatedMonthlyCostUsd.min}–${cb.estimatedMonthlyCostUsd.max}/mo
+                      </span>
+                    </div>
+                    {cb.items.map((item, ii) => (
+                      <p key={ii} className="text-xs" style={{ color: "#9494B8" }}>• {item}</p>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* Scaling notes */}
+          {arch.scalingNotes && (
+            <SectionCard title="Scaling strategy">
+              <p className="text-sm leading-relaxed" style={{ color: "#9494B8" }}>{arch.scalingNotes}</p>
+            </SectionCard>
+          )}
+        </>
+      )}
+
+      {/* Development plan */}
+      {result.developmentPlan.length > 0 && (
+        <SectionCard title="Development plan">
+          <div className="space-y-3">
+            {result.developmentPlan.map((milestone, i) => (
+              <div key={i} className="rounded-xl p-4" style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}>
+                <div className="flex items-center gap-3 mb-2">
+                  <span
+                    className="text-xs px-2.5 py-1 rounded-full font-semibold"
+                    style={{ backgroundColor: "rgba(129,140,248,0.15)", color: "#818CF8" }}
+                  >
+                    Phase {typeof milestone === "object" && "phase" in milestone ? milestone.phase : i + 1}
+                  </span>
+                  <span className="text-sm font-semibold" style={{ color: "#EEEEFF" }}>
+                    {typeof milestone === "object" && "name" in milestone ? milestone.name : String(milestone)}
+                  </span>
+                  {typeof milestone === "object" && "estimatedWeeks" in milestone && (
+                    <span className="text-xs" style={{ color: "#6B6B8A" }}>
+                      ~{milestone.estimatedWeeks} weeks
+                    </span>
+                  )}
+                </div>
+                {typeof milestone === "object" && "deliverables" in milestone && (
+                  <div className="space-y-1 mb-2">
+                    {milestone.deliverables.map((d: string, di: number) => (
+                      <p key={di} className="text-xs" style={{ color: "#9494B8" }}>• {d}</p>
+                    ))}
+                  </div>
+                )}
+                {typeof milestone === "object" && "dependencies" in milestone && milestone.dependencies.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    <span className="text-xs" style={{ color: "#6B6B8A" }}>Depends on:</span>
+                    {milestone.dependencies.map((dep: string, di: number) => (
+                      <span key={di} className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(250,204,21,0.12)", color: "#FACC15" }}>
+                        {dep}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      {/* DevOps + Business + Competitive */}
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {result.devopsPlan.length > 0 && (
+          <SectionCard title="DevOps plan">
+            <div className="space-y-1">
+              {result.devopsPlan.map((item, i) => (
+                <p key={i} className="text-xs leading-relaxed" style={{ color: "#9494B8" }}>• {item}</p>
+              ))}
+            </div>
+          </SectionCard>
+        )}
+        <SectionCard title="Business and economics">
+          <div className="space-y-1">
+            {result.businessNotes.map((item, i) => (
+              <p key={i} className="text-xs leading-relaxed" style={{ color: "#9494B8" }}>• {item}</p>
+            ))}
+          </div>
+          <div className="mt-3 rounded-xl p-3" style={{ backgroundColor: "#0D0D15", border: "1px solid #2E2E40" }}>
+            <div className="text-xs mb-1" style={{ color: "#9494B8" }}>Platform cost summary</div>
+            <div className="text-sm" style={{ color: "#EEEEFF" }}>
+              {result.costSummary.estimatedCredits} credits · ${result.costSummary.estimatedCostUsd.toFixed(4)} · {result.costSummary.viabilityStatus}
+            </div>
+          </div>
+        </SectionCard>
+      </section>
+
+      {result.competitiveAssessment && (
+        <SectionCard title="Competitive assessment">
+          <p className="text-sm leading-relaxed" style={{ color: "#9494B8" }}>{result.competitiveAssessment}</p>
+        </SectionCard>
+      )}
+
+      {result.verification && (
+        <SectionCard title="Verification">
+          <div className="flex flex-wrap gap-2 mb-3">
+            <span
+              className="text-xs px-2.5 py-1 rounded-full font-semibold"
+              style={{
+                backgroundColor:
+                  result.verification.status === "passed"
+                    ? "rgba(96,165,250,0.12)"
+                    : result.verification.status === "failed"
+                      ? "rgba(249,115,22,0.12)"
+                      : "rgba(250,204,21,0.12)",
+                color:
+                  result.verification.status === "passed"
+                    ? "#60A5FA"
+                    : result.verification.status === "failed"
+                      ? "#F97316"
+                      : "#FACC15",
+              }}
+            >
+              {result.verification.status.replace(/_/g, " ")}
+            </span>
+            <span
+              className="text-xs px-2.5 py-1 rounded-full font-mono"
+              style={{ backgroundColor: "rgba(129,140,248,0.12)", color: "#818CF8" }}
+            >
+              confidence: {result.verification.confidence}
+            </span>
+            <span
+              className="text-xs px-2.5 py-1 rounded-full font-mono"
+              style={{ backgroundColor: "#0D0D15", color: "#9494B8", border: "1px solid #2E2E40" }}
+            >
+              {result.verification.metrics.flaggedChecks}/{result.verification.metrics.totalChecks} findings
+            </span>
+          </div>
+          {result.verification.findings.length > 0 ? (
+            <div className="space-y-2">
+              {result.verification.findings.map((finding, i) => (
+                <div key={`${finding.code}-${i}`} className="rounded-xl p-3" style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}>
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <span
+                      className="text-[11px] px-2 py-0.5 rounded-full font-mono"
+                      style={{
+                        backgroundColor:
+                          finding.severity === "critical"
+                            ? "rgba(249,115,22,0.12)"
+                            : finding.severity === "warning"
+                              ? "rgba(250,204,21,0.12)"
+                              : "rgba(96,165,250,0.12)",
+                        color:
+                          finding.severity === "critical"
+                            ? "#F97316"
+                            : finding.severity === "warning"
+                              ? "#FACC15"
+                              : "#60A5FA",
+                      }}
+                    >
+                      {finding.severity}
+                    </span>
+                    <span className="text-[11px] font-mono" style={{ color: "#818CF8" }}>
+                      {finding.source}
+                    </span>
+                  </div>
+                  <p className="text-xs leading-relaxed" style={{ color: "#9494B8" }}>{finding.message}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs leading-relaxed" style={{ color: "#60A5FA" }}>
+              No red flags were found by the current verification checks.
+            </p>
+          )}
+        </SectionCard>
+      )}
+
+      {/* Warnings + Next steps */}
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {result.warnings.length > 0 && (
+          <SectionCard title="Warnings">
+            <div className="space-y-1">
+              {result.warnings.map((item, i) => (
+                <p key={i} className="text-xs leading-relaxed" style={{ color: "#FACC15" }}>• {item}</p>
+              ))}
+            </div>
+          </SectionCard>
+        )}
+        {result.nextSteps.length > 0 && (
+          <SectionCard title="Next steps">
+            <div className="space-y-1">
+              {result.nextSteps.map((item, i) => (
+                <p key={i} className="text-xs leading-relaxed" style={{ color: "#9494B8" }}>• {item}</p>
+              ))}
+            </div>
+          </SectionCard>
+        )}
+      </section>
     </div>
   );
 }
@@ -621,40 +1056,7 @@ export default function BuilderWorkspace() {
         </SectionCard>
 
         {result && (
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <SectionCard title="Request understanding">
-              <p className="text-sm leading-relaxed" style={{ color: "#9494B8" }}>{result.requestUnderstanding}</p>
-            </SectionCard>
-            <SectionCard title="Recommended scope">
-              <p className="text-sm leading-relaxed" style={{ color: "#9494B8" }}>{result.recommendedScope}</p>
-            </SectionCard>
-            <SectionCard title="Architecture">
-              <div className="space-y-2">{result.architecture.map((item) => <p key={item} className="text-sm" style={{ color: "#9494B8" }}>{item}</p>)}</div>
-            </SectionCard>
-            <SectionCard title="Development plan">
-              <div className="space-y-2">{result.developmentPlan.map((item) => <p key={item} className="text-sm" style={{ color: "#9494B8" }}>{item}</p>)}</div>
-            </SectionCard>
-            <SectionCard title="DevOps plan">
-              <div className="space-y-2">{result.devopsPlan.map((item) => <p key={item} className="text-sm" style={{ color: "#9494B8" }}>{item}</p>)}</div>
-            </SectionCard>
-            <SectionCard title="Business and economics">
-              <div className="space-y-2">
-                {result.businessNotes.map((item) => <p key={item} className="text-sm" style={{ color: "#9494B8" }}>{item}</p>)}
-                <div className="mt-3 rounded-xl p-3" style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}>
-                  <div className="text-xs mb-1" style={{ color: "#9494B8" }}>Cost summary</div>
-                  <div className="text-sm" style={{ color: "#EEEEFF" }}>
-                    {result.costSummary.estimatedCredits} credits · ${result.costSummary.estimatedCostUsd.toFixed(4)} · {result.costSummary.viabilityStatus}
-                  </div>
-                </div>
-              </div>
-            </SectionCard>
-            <SectionCard title="Warnings">
-              <div className="space-y-2">{result.warnings.map((item) => <p key={item} className="text-sm" style={{ color: "#FACC15" }}>{item}</p>)}</div>
-            </SectionCard>
-            <SectionCard title="Next steps">
-              <div className="space-y-2">{result.nextSteps.map((item) => <p key={item} className="text-sm" style={{ color: "#9494B8" }}>{item}</p>)}</div>
-            </SectionCard>
-          </section>
+          <ArchitectureReport result={result} />
         )}
       </div>
     </main>

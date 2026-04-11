@@ -2,9 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verify } from "@/lib/cookieToken";
 
+export const ANON_USER_ID = "anon-default-user";
+
 export async function requireUser(
   _req: NextRequest
 ): Promise<{ userId: string } | NextResponse> {
+  if (process.env.DISABLE_AUTH === "1") {
+    return { userId: ANON_USER_ID };
+  }
+
   const store = await cookies();
   const token = store.get("dystoppia_uid")?.value;
 
