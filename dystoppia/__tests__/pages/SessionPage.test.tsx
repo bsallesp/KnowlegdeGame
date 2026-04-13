@@ -27,10 +27,13 @@ vi.mock("framer-motion", () => ({
 
 // ─── Child component mocks ────────────────────────────────────────────────────
 vi.mock("@/components/TopicDashboard", () => ({
-  default: ({ items, onToggleMute, onOpenAudiobooks }: { items: unknown[]; onToggleMute: Function; onOpenAudiobooks?: Function }) => (
+  default: ({ items, onToggleMute, onSolo, onOpenAudiobooks }: { items: unknown[]; onToggleMute: Function; onSolo?: Function; onOpenAudiobooks?: Function }) => (
     <div data-testid="topic-dashboard" data-item-count={items.length}>
       <button data-testid="toggle-item-mute" onClick={() => onToggleMute("item-1", "item")}>
         Toggle item
+      </button>
+      <button data-testid="solo-item" onClick={() => onSolo?.("item-1", "item")}>
+        Solo item
       </button>
       <button
         data-testid="open-audiobook-dialog"
@@ -153,18 +156,23 @@ const mockAdvanceQueue = vi.hoisted(() => vi.fn());
 const mockAddToQueue = vi.hoisted(() => vi.fn());
 const mockSetCurrentQuestion = vi.hoisted(() => vi.fn());
 const mockUpdateSubItemStats = vi.hoisted(() => vi.fn());
+const mockSetSubItemStatsEntry = vi.hoisted(() => vi.fn());
 const mockHydrateSubItemStats = vi.hoisted(() => vi.fn());
 const mockSetIsGenerating = vi.hoisted(() => vi.fn());
 const mockSetAnswerShown = vi.hoisted(() => vi.fn());
 const mockSetLastAnswerCorrect = vi.hoisted(() => vi.fn());
 const mockToggleItemMute = vi.hoisted(() => vi.fn());
 const mockToggleSubItemMute = vi.hoisted(() => vi.fn());
+const mockSoloItem = vi.hoisted(() => vi.fn());
+const mockSoloSubItem = vi.hoisted(() => vi.fn());
 const mockAddXP = vi.hoisted(() => vi.fn());
 const mockCheckAndUpdateStreak = vi.hoisted(() => vi.fn());
 const mockLoseLife = vi.hoisted(() => vi.fn());
+const mockGainLife = vi.hoisted(() => vi.fn());
 const mockResetLives = vi.hoisted(() => vi.fn());
 const mockCheckAchievements = vi.hoisted(() => vi.fn());
 const mockIncrementDailyProgress = vi.hoisted(() => vi.fn());
+const mockDecrementDailyProgress = vi.hoisted(() => vi.fn());
 const mockSaveSessionEntry = vi.hoisted(() => vi.fn());
 const mockUseAppStore = vi.hoisted(() => vi.fn());
 
@@ -241,7 +249,7 @@ function resetStoreState() {
     questionQueue: [],
     currentQuestion: null,
     subItemStats: {},
-    settings: { queueDepth: 5, refillTrigger: 3 },
+    settings: { queueDepth: 5, refillTrigger: 3, timerEnabled: true },
     isGenerating: false,
     answerShown: false,
     lastAnswerCorrect: null,
@@ -268,18 +276,23 @@ function resetStoreState() {
     advanceQueue: mockAdvanceQueue,
     addToQueue: mockAddToQueue,
     updateSubItemStats: mockUpdateSubItemStats,
+    setSubItemStatsEntry: mockSetSubItemStatsEntry,
     hydrateSubItemStats: mockHydrateSubItemStats,
     setIsGenerating: mockSetIsGenerating,
     setAnswerShown: mockSetAnswerShown,
     setLastAnswerCorrect: mockSetLastAnswerCorrect,
     toggleItemMute: mockToggleItemMute,
     toggleSubItemMute: mockToggleSubItemMute,
+    soloItem: mockSoloItem,
+    soloSubItem: mockSoloSubItem,
     addXP: mockAddXP,
     checkAndUpdateStreak: mockCheckAndUpdateStreak,
     loseLife: mockLoseLife,
+    gainLife: mockGainLife,
     resetLives: mockResetLives,
     checkAchievements: mockCheckAchievements,
     incrementDailyProgress: mockIncrementDailyProgress,
+    decrementDailyProgress: mockDecrementDailyProgress,
     saveSessionEntry: mockSaveSessionEntry,
   }));
   (mockUseAppStore as any).getState = () => ({ ...storeState, lives: storeState.lives });
@@ -287,14 +300,35 @@ function resetStoreState() {
 
 function setFetchOk() {
   global.fetch = vi.fn().mockImplementation((url: string) => {
+    if (url.includes("/api/topics")) {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(sampleTopic) });
+    }
     if (url.includes("/api/stats")) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ stats: {} }) });
     }
     if (url.includes("/api/record-answer")) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ newDifficulty: 1.2 }) });
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          newDifficulty: 1.2,
+          stats: { correctCount: 1, totalCount: 1, difficulty: 1, lastSeen: new Date().toISOString() },
+        }),
+      });
+    }
+    if (url.includes("/api/report-question")) {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          answerInvalidated: true,
+          stats: { correctCount: 0, totalCount: 0, difficulty: 1 },
+        }),
+      });
     }
     if (url.includes("/api/toggle-mute")) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    }
+    if (url.includes("/api/solo")) {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ mode: "solo" }) });
     }
     if (url.includes("/api/generate-questions")) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ questions: [] }) });
@@ -309,6 +343,8 @@ beforeEach(() => {
   mockAdvanceQueue.mockReset();
   mockLoseLife.mockReset();
   mockResetLives.mockReset();
+  mockSoloItem.mockReset();
+  mockSoloSubItem.mockReset();
   mockAddXP.mockReset();
   mockCheckAndUpdateStreak.mockReset();
   mockHydrateSubItemStats.mockReset();
@@ -360,10 +396,10 @@ describe("SessionPage — header rendering", () => {
     expect(screen.queryByText("loading...")).toBeNull();
   });
 
-  test("shows 'loading...' badge for pending topic", async () => {
+  test("shows loading session state for pending topic", async () => {
     storeState.currentTopic = { ...sampleTopic, id: "pending_abc" };
     render(<SessionPage />);
-    expect(screen.getByText("loading...")).toBeTruthy();
+    expect(screen.getByText("Loading your GED session...")).toBeTruthy();
   });
 
   test("clicking Dystoppia brand navigates to /", async () => {
@@ -566,12 +602,12 @@ describe("SessionPage — question area", () => {
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  test("shows 'Loading topic...' text for pending topic with no question", async () => {
+  test("shows loading session text for pending topic with no question", async () => {
     storeState.currentTopic = { ...sampleTopic, id: "pending_123" };
     storeState.currentQuestion = null;
     render(<SessionPage />);
     await waitFor(() => {
-      expect(screen.getByText("Loading topic...")).toBeTruthy();
+      expect(screen.getByText("Loading your GED session...")).toBeTruthy();
     });
   });
 
@@ -837,6 +873,20 @@ describe("SessionPage — critical runtime branches", () => {
     });
   });
 
+  test("solo focus updates store and sends request to API", async () => {
+    storeState.currentTopic = sampleTopic;
+    render(<SessionPage />);
+    fireEvent.click(screen.getByTestId("solo-item"));
+
+    expect(mockSoloItem).toHaveBeenCalledWith("item-1");
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/solo",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+  });
+
   test("shows free-plan weekly usage nudge when remaining ratio is low", () => {
     storeState.currentTopic = sampleTopic;
     storeState.plan = "free";
@@ -945,10 +995,10 @@ describe("SessionPage — critical runtime branches", () => {
     });
   });
 
-  test("pending topic does not open audiobook dialog from dashboard", () => {
+  test("pending topic keeps audiobook controls hidden", () => {
     storeState.currentTopic = { ...sampleTopic, id: "pending_1" };
     render(<SessionPage />);
-    fireEvent.click(screen.getAllByTestId("open-audiobook-dialog")[0]);
+    expect(screen.queryByTestId("open-audiobook-dialog")).toBeNull();
     expect(screen.queryByTestId("audiobook-dialog")).toBeNull();
   });
 

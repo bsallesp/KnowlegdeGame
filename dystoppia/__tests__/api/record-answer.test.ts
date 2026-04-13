@@ -5,7 +5,8 @@ import { calculateSM2 } from "@/lib/adaptive";
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 const mockCreate = vi.hoisted(() => vi.fn());
 const mockFindMany = vi.hoisted(() => vi.fn());
-const mockFindUnique = vi.hoisted(() => vi.fn());
+const mockSubItemFindUnique = vi.hoisted(() => vi.fn());
+const mockQuestionFindUnique = vi.hoisted(() => vi.fn());
 const mockAnswerFindUnique = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
 
@@ -16,7 +17,8 @@ vi.mock("@/lib/prisma", () => ({
       findMany: mockFindMany,
       findUnique: mockAnswerFindUnique,
     },
-    subItem: { findUnique: mockFindUnique, updateMany: mockUpdate },
+    subItem: { findUnique: mockSubItemFindUnique, updateMany: mockUpdate },
+    question: { findUnique: mockQuestionFindUnique },
   },
 }));
 
@@ -51,10 +53,12 @@ const mockSubItem = {
 beforeEach(() => {
   mockCreate.mockReset();
   mockFindMany.mockReset();
-  mockFindUnique.mockReset();
+  mockSubItemFindUnique.mockReset();
+  mockQuestionFindUnique.mockReset();
   mockAnswerFindUnique.mockReset();
   mockUpdate.mockReset();
 
+  mockQuestionFindUnique.mockResolvedValue({ subItemId: "sub-1", flaggedAt: null });
   mockAnswerFindUnique.mockResolvedValue(null);
   mockCreate.mockResolvedValue({ id: "ans-1" });
   mockFindMany.mockResolvedValue([
@@ -62,7 +66,7 @@ beforeEach(() => {
     { correct: true, createdAt: new Date() },
     { correct: true, createdAt: new Date() },
   ]);
-  mockFindUnique.mockResolvedValue(mockSubItem);
+  mockSubItemFindUnique.mockResolvedValue(mockSubItem);
   mockUpdate.mockResolvedValue({ count: 1 });
 });
 
@@ -183,7 +187,7 @@ describe("POST /api/record-answer — happy path", () => {
     await POST(makeRequest(validBody));
     expect(mockFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { subItemId: "sub-1", sessionId: "sess-1" },
+        where: { subItemId: "sub-1", sessionId: "sess-1", invalidatedAt: null },
         orderBy: { createdAt: "desc" },
         take: 5,
       })
@@ -193,7 +197,7 @@ describe("POST /api/record-answer — happy path", () => {
   test("requests all answers for final stats without take limit", async () => {
     await POST(makeRequest(validBody));
     expect(mockFindMany).toHaveBeenLastCalledWith({
-      where: { subItemId: "sub-1", sessionId: "sess-1" },
+      where: { subItemId: "sub-1", sessionId: "sess-1", invalidatedAt: null },
     });
   });
 
@@ -246,7 +250,7 @@ describe("POST /api/record-answer — idempotency", () => {
       reviewInterval: 1,
       nextReviewAt: null as Date | null,
     };
-    mockFindUnique.mockImplementation(async () => {
+    mockSubItemFindUnique.mockImplementation(async () => {
       const sm2 = calculateSM2(stored.easeFactor, stored.reviewInterval, true, 8000, 15000);
       return {
         difficulty: stored.difficulty,
@@ -335,13 +339,13 @@ describe("POST /api/record-answer — idempotency", () => {
 
 describe("POST /api/record-answer — subItem not found", () => {
   test("returns 404 when subItem not found", async () => {
-    mockFindUnique.mockResolvedValue(null);
+    mockSubItemFindUnique.mockResolvedValue(null);
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(404);
   });
 
   test("returns error message when subItem missing", async () => {
-    mockFindUnique.mockResolvedValue(null);
+    mockSubItemFindUnique.mockResolvedValue(null);
     const res = await POST(makeRequest(validBody));
     const data = await res.json();
     expect(data.error).toBeTruthy();

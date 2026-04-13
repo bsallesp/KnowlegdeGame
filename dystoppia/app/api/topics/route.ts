@@ -58,6 +58,7 @@ export async function GET(req: NextRequest) {
             subItems: {
               include: {
                 answers: {
+                  where: { invalidatedAt: null },
                   select: { correct: true },
                 },
               },

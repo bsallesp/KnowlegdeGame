@@ -6,6 +6,9 @@ import { requireUser } from "@/lib/authGuard";
 import { checkRateLimit, RateLimitError } from "@/lib/rateLimit";
 import { logLLMUsage } from "@/lib/llmLogger";
 
+const GENERATION_MODEL = "claude-sonnet-4-6";
+const VALIDATION_MODEL = "claude-haiku-4-5";
+
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
@@ -19,6 +22,7 @@ function shuffleOptions(options: string[] | null, type: string): string[] | null
 const REFILL_THRESHOLD = 8;
 // How many questions to generate per background refill
 const REFILL_BATCH = 5;
+const MAX_GENERATION_ATTEMPTS = 3;
 
 interface GeneratedQuestion {
   type: "multiple_choice" | "single_choice" | "fill_blank" | "true_false";
@@ -27,6 +31,21 @@ interface GeneratedQuestion {
   answer: string;
   explanation: string;
   timeLimit?: number | null;
+}
+
+interface SavedQuestion extends GeneratedQuestion {
+  id: string;
+  subItemId: string;
+  difficulty: number;
+  createdAt: Date;
+}
+
+interface ValidationBatchResponse {
+  results?: Array<{
+    index: number;
+    consistent: boolean;
+    reason?: string;
+  }>;
 }
 
 type TeachingProfile = {
@@ -50,57 +69,88 @@ type SubItemWithContext = {
   };
 };
 
-async function generateAndSaveQuestions(
-  subItemId: string,
-  subItem: SubItemWithContext,
-  resolvedDifficulty: number,
-  correctRate: number,
-  count: number
-): Promise<GeneratedQuestion[]> {
-  let teachingProfile: TeachingProfile | null = null;
-  if (subItem.item.topic.teachingProfile) {
-    try {
-      teachingProfile = JSON.parse(subItem.item.topic.teachingProfile);
-    } catch {
-      logger.warn("generate-questions", "Failed to parse teachingProfile JSON");
+function extractTextContent(message: { content: Array<{ type: string; text?: string }> }): string {
+  return message.content
+    .filter((block): block is { type: "text"; text: string } => block.type === "text" && typeof block.text === "string")
+    .map((block) => block.text)
+    .join("\n")
+    .trim();
+}
+
+function parseJsonPayload<T>(rawText: string): T {
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error("Could not parse JSON from LLM response");
+  }
+  return JSON.parse(jsonMatch[0]) as T;
+}
+
+function normalizeQuestion(raw: GeneratedQuestion): GeneratedQuestion | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const normalizedType = raw.type;
+  if (!["multiple_choice", "single_choice", "fill_blank", "true_false"].includes(normalizedType)) {
+    return null;
+  }
+
+  const content = typeof raw.content === "string" ? raw.content.trim() : "";
+  const explanation = typeof raw.explanation === "string" ? raw.explanation.trim() : "";
+  let answer = typeof raw.answer === "string" ? raw.answer.trim() : "";
+  let options = Array.isArray(raw.options)
+    ? raw.options
+        .map((option) => (typeof option === "string" ? option.trim() : ""))
+        .filter(Boolean)
+    : undefined;
+
+  if (!content || !answer || !explanation) {
+    return null;
+  }
+
+  if (normalizedType === "true_false") {
+    const answerLower = answer.toLowerCase();
+    if (answerLower !== "true" && answerLower !== "false") {
+      return null;
+    }
+    answer = answerLower === "true" ? "True" : "False";
+    options = ["True", "False"];
+  }
+
+  if (normalizedType === "multiple_choice" && (!options || options.length !== 4 || !options.includes(answer))) {
+    return null;
+  }
+
+  if (normalizedType === "single_choice" && (!options || options.length < 2 || options.length > 3 || !options.includes(answer))) {
+    return null;
+  }
+
+  if (normalizedType === "fill_blank") {
+    if (!content.includes("___") || !options || options.length < 3 || options.length > 4 || !options.includes(answer)) {
+      return null;
     }
   }
 
-  const difficultyDescriptions: Record<number, string> = {
-    1: "basic recall, simple definitions",
-    2: "understanding concepts, explaining",
-    3: "application, examples",
-    4: "analysis, comparison, nuanced understanding",
-    5: "synthesis, edge cases, expert-level",
+  const timeLimit = typeof raw.timeLimit === "number" ? raw.timeLimit : null;
+
+  return {
+    type: normalizedType,
+    content,
+    options,
+    answer,
+    explanation,
+    timeLimit,
   };
+}
 
-  const difficultyDesc = difficultyDescriptions[resolvedDifficulty] || "intermediate";
-
-  const pedagogyBlock = teachingProfile
-    ? `
-PEDAGOGICAL APPROACH FOR THIS DOMAIN:
-- Teaching style: ${teachingProfile.style}
-- Register: ${teachingProfile.register}
-- Assessment focus: ${teachingProfile.assessmentFocus}
-- How to frame questions: ${teachingProfile.contextHint}
-- Example domain to draw from: ${teachingProfile.exampleDomain}
-- Question pattern templates (adapt freely):
-${teachingProfile.questionPatterns.map((p) => `  • ${p}`).join("\n")}
-
-Apply this pedagogical approach when writing all questions. The questions should feel native to this domain.`
-    : "";
-
-  if (teachingProfile) {
-    logger.debug("generate-questions", `Using teaching profile: ${teachingProfile.style} / ${teachingProfile.assessmentFocus}`);
-  }
-
-  // Timer: all questions get a timer. Harder = less time (more pressure).
-  // diff 1-2: 180s (3 min), diff 3: 150s (2.5 min), diff 4: 120s (2 min), diff 5: 120s (2 min)
-  const timeLimitByDifficulty: Record<number, number> = { 1: 180, 2: 180, 3: 150, 4: 120, 5: 120 };
-  const defaultTimeLimit = timeLimitByDifficulty[resolvedDifficulty] ?? 150;
-  const timerInstruction = `- "timeLimit": use ${defaultTimeLimit} for multiple_choice, true_false, and single_choice. Use null for fill_blank.`;
-
-  const prompt = `You are an expert educator creating quiz questions. All questions, options, answers, and explanations must be written in English.
+function buildGenerationPrompt(
+  subItem: SubItemWithContext,
+  resolvedDifficulty: number,
+  correctRate: number,
+  count: number,
+  pedagogyBlock: string,
+  difficultyDesc: string,
+  timerInstruction: string
+): string {
+  return `You are an expert educator creating quiz questions. All questions, options, answers, and explanations must be written in English.
 
 Topic: "${subItem.item.topic.name}"
 Chapter: "${subItem.item.name}"
@@ -156,49 +206,262 @@ Rules:
 - Difficulty ${resolvedDifficulty} means: ${difficultyDesc}
 - No markdown in JSON strings, no newlines in strings
 - Answer must exactly match one of the options (for choice questions)
-- Randomize the position of the correct answer within the options array — do NOT always put it first`;
+- Randomize the position of the correct answer within the options array — do NOT always put it first
+- For any arithmetic or numeric claim, compute the result before finalizing the answer
+- The explanation must support the exact final answer. Never let the explanation contradict the answer
+- If the explanation proves a true/false statement is false, the answer must be "False"`;
+}
 
+async function requestQuestionBatch(prompt: string, userId: string): Promise<GeneratedQuestion[]> {
   const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
+    model: GENERATION_MODEL,
     max_tokens: 3000,
+    thinking: { type: "adaptive", display: "omitted" },
     messages: [{ role: "user", content: prompt }],
   });
 
   logLLMUsage({
-    model: "claude-sonnet-4-6",
+    userId,
+    model: GENERATION_MODEL,
     endpoint: "generate-questions",
     inputTokens: message.usage.input_tokens,
     outputTokens: message.usage.output_tokens,
   });
 
-  const content = message.content[0];
-  if (content.type !== "text") throw new Error("Unexpected response type from LLM");
+  const parsed = parseJsonPayload<{ questions?: GeneratedQuestion[] }>(extractTextContent(message));
+  if (!Array.isArray(parsed.questions)) {
+    throw new Error("LLM response did not include a questions array");
+  }
 
-  const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Could not parse JSON from LLM response");
+  return parsed.questions;
+}
 
-  const parsed = JSON.parse(jsonMatch[0]);
-  const generatedQuestions: GeneratedQuestion[] = parsed.questions;
+async function validateGeneratedQuestions(
+  questions: GeneratedQuestion[],
+  userId: string
+): Promise<GeneratedQuestion[]> {
+  const normalizedEntries = questions
+    .map((question, index) => ({ index, question: normalizeQuestion(question) }))
+    .filter((entry): entry is { index: number; question: GeneratedQuestion } => entry.question !== null);
 
-  await Promise.all(
-    generatedQuestions.map((q: GeneratedQuestion) =>
+  if (normalizedEntries.length === 0) {
+    return [];
+  }
+
+  const validationPrompt = `You are validating whether quiz answers match their own explanations.
+
+For each question below, determine whether the explanation supports the answer.
+- Recompute arithmetic yourself when numbers are involved.
+- Reject any item where the explanation contradicts the answer, even if the rest looks plausible.
+- Be strict about true/false math statements.
+
+Return ONLY valid JSON in this shape:
+{
+  "results": [
+    { "index": 0, "consistent": true, "reason": "short reason" }
+  ]
+}
+
+Questions:
+${JSON.stringify(
+  normalizedEntries.map((entry) => ({
+    index: entry.index,
+    type: entry.question.type,
+    content: entry.question.content,
+    options: entry.question.options ?? [],
+    answer: entry.question.answer,
+    explanation: entry.question.explanation,
+  }))
+)}`;
+
+  try {
+    const message = await client.messages.create({
+      model: VALIDATION_MODEL,
+      max_tokens: Math.max(500, normalizedEntries.length * 140),
+      thinking: { type: "adaptive", display: "omitted" },
+      messages: [{ role: "user", content: validationPrompt }],
+    });
+
+    logLLMUsage({
+      userId,
+      model: VALIDATION_MODEL,
+      endpoint: "generate-questions-verify",
+      inputTokens: message.usage.input_tokens,
+      outputTokens: message.usage.output_tokens,
+    });
+
+    const parsed = parseJsonPayload<ValidationBatchResponse>(extractTextContent(message));
+    const resultMap = new Map<number, { consistent: boolean; reason?: string }>();
+
+    if (Array.isArray(parsed.results)) {
+      for (const result of parsed.results) {
+        if (typeof result.index === "number" && typeof result.consistent === "boolean") {
+          resultMap.set(result.index, {
+            consistent: result.consistent,
+            reason: result.reason,
+          });
+        }
+      }
+    }
+
+    if (resultMap.size === 0) {
+      logger.warn("generate-questions", "Validator returned no usable decisions; falling back to local validation");
+      return normalizedEntries.map((entry) => entry.question);
+    }
+
+    return normalizedEntries
+      .filter((entry) => {
+        const verdict = resultMap.get(entry.index);
+        if (!verdict || verdict.consistent) {
+          return true;
+        }
+        logger.warn("generate-questions", "Rejected inconsistent generated question", {
+          content: entry.question.content,
+          reason: verdict.reason ?? "validator marked inconsistent",
+        });
+        return false;
+      })
+      .map((entry) => entry.question);
+  } catch (error) {
+    logger.warn("generate-questions", "Validator call failed; falling back to local validation", error);
+    return normalizedEntries.map((entry) => entry.question);
+  }
+}
+
+async function persistQuestions(
+  subItemId: string,
+  resolvedDifficulty: number,
+  questions: GeneratedQuestion[]
+): Promise<SavedQuestion[]> {
+  const persisted = await Promise.all(
+    questions.map((question) =>
       prisma.question.create({
         data: {
           subItemId,
-          type: q.type,
-          content: q.content,
-          options: q.options ? JSON.stringify(q.options) : null,
-          answer: q.answer,
-          explanation: q.explanation,
+          type: question.type,
+          content: question.content,
+          options: question.options ? JSON.stringify(question.options) : null,
+          answer: question.answer,
+          explanation: question.explanation,
           difficulty: resolvedDifficulty,
-          timeLimit: q.timeLimit ?? null,
+          timeLimit: question.timeLimit ?? null,
         },
       })
     )
   );
 
-  logger.info("generate-questions", `Saved ${generatedQuestions.length} new questions to DB`, { subItemId });
-  return generatedQuestions;
+  return persisted.map((savedQuestion, index) => ({
+    id: savedQuestion.id,
+    subItemId: savedQuestion.subItemId,
+    difficulty: savedQuestion.difficulty,
+    createdAt: savedQuestion.createdAt,
+    ...questions[index],
+  }));
+}
+
+async function generateAndSaveQuestions(
+  userId: string,
+  subItemId: string,
+  subItem: SubItemWithContext,
+  resolvedDifficulty: number,
+  correctRate: number,
+  count: number
+): Promise<SavedQuestion[]> {
+  let teachingProfile: TeachingProfile | null = null;
+  if (subItem.item.topic.teachingProfile) {
+    try {
+      teachingProfile = JSON.parse(subItem.item.topic.teachingProfile);
+    } catch {
+      logger.warn("generate-questions", "Failed to parse teachingProfile JSON");
+    }
+  }
+
+  const difficultyDescriptions: Record<number, string> = {
+    1: "basic recall, simple definitions",
+    2: "understanding concepts, explaining",
+    3: "application, examples",
+    4: "analysis, comparison, nuanced understanding",
+    5: "synthesis, edge cases, expert-level",
+  };
+
+  const difficultyDesc = difficultyDescriptions[resolvedDifficulty] || "intermediate";
+
+  const pedagogyBlock = teachingProfile
+    ? `
+PEDAGOGICAL APPROACH FOR THIS DOMAIN:
+- Teaching style: ${teachingProfile.style}
+- Register: ${teachingProfile.register}
+- Assessment focus: ${teachingProfile.assessmentFocus}
+- How to frame questions: ${teachingProfile.contextHint}
+- Example domain to draw from: ${teachingProfile.exampleDomain}
+- Question pattern templates (adapt freely):
+${teachingProfile.questionPatterns.map((pattern) => `  • ${pattern}`).join("\n")}
+
+Apply this pedagogical approach when writing all questions. The questions should feel native to this domain.`
+    : "";
+
+  if (teachingProfile) {
+    logger.debug("generate-questions", `Using teaching profile: ${teachingProfile.style} / ${teachingProfile.assessmentFocus}`);
+  }
+
+  const timeLimitByDifficulty: Record<number, number> = { 1: 180, 2: 180, 3: 150, 4: 120, 5: 120 };
+  const defaultTimeLimit = timeLimitByDifficulty[resolvedDifficulty] ?? 150;
+  const timerInstruction = `- "timeLimit": use ${defaultTimeLimit} for multiple_choice, true_false, and single_choice. Use null for fill_blank.`;
+
+  const prompt = buildGenerationPrompt(
+    subItem,
+    resolvedDifficulty,
+    correctRate,
+    count,
+    pedagogyBlock,
+    difficultyDesc,
+    timerInstruction
+  );
+
+  const acceptedQuestions: GeneratedQuestion[] = [];
+  const seenQuestions = new Set<string>();
+
+  for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS && acceptedQuestions.length < count; attempt++) {
+    const requestedCount = count - acceptedQuestions.length;
+    const candidateBatch = await requestQuestionBatch(prompt, userId);
+    const validatedBatch = await validateGeneratedQuestions(candidateBatch, userId);
+
+    for (const question of validatedBatch) {
+      const dedupeKey = `${question.type}:${question.content.toLowerCase()}`;
+      if (seenQuestions.has(dedupeKey)) {
+        continue;
+      }
+
+      seenQuestions.add(dedupeKey);
+      acceptedQuestions.push(question);
+
+      if (acceptedQuestions.length >= count) {
+        break;
+      }
+    }
+
+    logger.debug("generate-questions", "Validation pass completed", {
+      requestedCount,
+      accepted: acceptedQuestions.length,
+      attempt: attempt + 1,
+    });
+  }
+
+  if (acceptedQuestions.length === 0) {
+    throw new Error("Could not generate any internally consistent questions");
+  }
+
+  const persistedQuestions = await persistQuestions(
+    subItemId,
+    resolvedDifficulty,
+    acceptedQuestions.slice(0, count)
+  );
+
+  logger.info("generate-questions", `Saved ${persistedQuestions.length} validated questions to DB`, {
+    subItemId,
+  });
+
+  return persistedQuestions;
 }
 
 export async function POST(req: NextRequest) {
@@ -224,95 +487,104 @@ export async function POST(req: NextRequest) {
     const resolvedDifficulty = difficulty || subItem.difficulty;
     const correctRate = stats?.totalCount > 0 ? (stats.correctCount / stats.totalCount) * 100 : 50;
 
-    // Rate limit check — deduct before serving
     try {
       await checkRateLimit(auth.userId, count, "question");
-    } catch (e) {
-      if (e instanceof RateLimitError) {
+    } catch (error) {
+      if (error instanceof RateLimitError) {
         return NextResponse.json(
           {
             error: "rate_limited",
-            window: e.window,
-            remaining: e.remaining,
-            resetsAt: e.resetsAt,
+            window: error.window,
+            remaining: error.remaining,
+            resetsAt: error.resetsAt,
             upgradeUrl: "/pricing",
           },
           { status: 429 }
         );
       }
-      throw e;
+      throw error;
     }
 
-    // Fetch cached questions
     const existingQuestions = await prisma.question.findMany({
-      where: { subItemId, difficulty: resolvedDifficulty },
+      where: {
+        subItemId,
+        difficulty: resolvedDifficulty,
+        flaggedAt: null,
+      },
       orderBy: { createdAt: "desc" },
       take: 50,
     });
 
     const validQuestions = existingQuestions.filter(
-      (q) => q.type !== "fill_blank" || (q.options && q.options !== "[]" && q.options !== "null")
+      (question) => question.type !== "fill_blank" || (question.options && question.options !== "[]" && question.options !== "null")
     );
 
-    logger.info("generate-questions", `SubItem "${subItem.name}" — found ${validQuestions.length} cached, need ${count}`, { subItemId, difficulty: resolvedDifficulty });
+    logger.info("generate-questions", `SubItem "${subItem.name}" — found ${validQuestions.length} cached, need ${count}`, {
+      subItemId,
+      difficulty: resolvedDifficulty,
+    });
 
-    // Cache hit: return immediately
     if (validQuestions.length >= count) {
       logger.debug("generate-questions", `Cache hit — returning ${count} from DB (${validQuestions.length} cached)`);
 
       const shuffled = validQuestions.sort(() => Math.random() - 0.5).slice(0, count);
 
-      // Background refill if cache is getting low
       if (validQuestions.length < REFILL_THRESHOLD) {
         logger.debug("generate-questions", `Cache low (${validQuestions.length}), refilling ${REFILL_BATCH} in background`);
-        generateAndSaveQuestions(subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH).catch((err) =>
-          logger.warn("generate-questions", "Background refill failed", err)
+        generateAndSaveQuestions(auth.userId, subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH).catch((error) =>
+          logger.warn("generate-questions", "Background refill failed", error)
         );
       }
 
       return NextResponse.json({
-        questions: shuffled.map((q) => {
-          const options = q.options ? JSON.parse(q.options) : null;
-          return { ...q, options: shuffleOptions(options, q.type) };
+        questions: shuffled.map((question) => {
+          const options = question.options ? JSON.parse(question.options) : null;
+          return { ...question, options: shuffleOptions(options, question.type) };
         }),
       });
     }
 
-    // Partial cache: return what we have + generate the rest in background
     if (validQuestions.length > 0) {
       logger.debug("generate-questions", `Partial cache (${validQuestions.length}) — returning now, generating ${REFILL_BATCH} in background`);
 
-      generateAndSaveQuestions(subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH).catch((err) =>
-        logger.warn("generate-questions", "Background refill failed", err)
+      generateAndSaveQuestions(auth.userId, subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH).catch((error) =>
+        logger.warn("generate-questions", "Background refill failed", error)
       );
 
       return NextResponse.json({
-        questions: validQuestions.map((q) => {
-          const options = q.options ? JSON.parse(q.options) : null;
-          return { ...q, options: shuffleOptions(options, q.type) };
+        questions: validQuestions.map((question) => {
+          const options = question.options ? JSON.parse(question.options) : null;
+          return { ...question, options: shuffleOptions(options, question.type) };
         }),
       });
     }
 
-    // Cache empty: generate synchronously (unavoidable first time)
     logger.info("generate-questions", `Cache empty — generating ${count} questions synchronously`);
-    const generated = await generateAndSaveQuestions(subItemId, subItem, resolvedDifficulty, correctRate, count);
+    const generated = await generateAndSaveQuestions(
+      auth.userId,
+      subItemId,
+      subItem,
+      resolvedDifficulty,
+      correctRate,
+      count
+    );
 
-    // Also kick off a larger batch in background to warm the cache for next time
-    generateAndSaveQuestions(subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH).catch((err) =>
-      logger.warn("generate-questions", "Post-generation background warmup failed", err)
+    generateAndSaveQuestions(auth.userId, subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH).catch((error) =>
+      logger.warn("generate-questions", "Post-generation background warmup failed", error)
     );
 
     return NextResponse.json({
-      questions: generated.map((q) => ({
-        type: q.type,
-        content: q.content,
-        options: shuffleOptions(q.options ?? null, q.type),
-        answer: q.answer,
-        explanation: q.explanation,
-        timeLimit: q.timeLimit ?? null,
+      questions: generated.map((question) => ({
+        id: question.id,
+        type: question.type,
+        content: question.content,
+        options: shuffleOptions(question.options ?? null, question.type),
+        answer: question.answer,
+        explanation: question.explanation,
+        timeLimit: question.timeLimit ?? null,
         subItemId,
         difficulty: resolvedDifficulty,
+        createdAt: question.createdAt,
       })),
     });
   } catch (error) {

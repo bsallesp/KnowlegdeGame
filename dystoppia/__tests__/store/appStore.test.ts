@@ -271,6 +271,45 @@ describe("toggleItemMute", () => {
   });
 });
 
+describe("soloItem", () => {
+  test("keeps only the selected item active", () => {
+    const otherSubItem = { ...mockSubItem, id: "sub-2", itemId: "item-2", name: "Storage" };
+    const topicWithTwoItems = {
+      ...mockTopic,
+      items: [
+        { ...mockItem, id: "item-1", subItems: [{ ...mockSubItem, id: "sub-1", itemId: "item-1" }] },
+        { ...mockItem, id: "item-2", name: "Security", subItems: [otherSubItem] },
+      ],
+    };
+
+    useAppStore.getState().setCurrentTopic(topicWithTwoItems);
+    useAppStore.getState().soloItem("item-2");
+
+    const [firstItem, secondItem] = useAppStore.getState().currentTopic!.items;
+    expect(firstItem.muted).toBe(true);
+    expect(firstItem.subItems[0].muted).toBe(true);
+    expect(secondItem.muted).toBe(false);
+    expect(secondItem.subItems[0].muted).toBe(false);
+  });
+
+  test("clicking solo again restores all items and subitems", () => {
+    const topicWithSolo = {
+      ...mockTopic,
+      items: [
+        { ...mockItem, id: "item-1", muted: true, subItems: [{ ...mockSubItem, id: "sub-1", itemId: "item-1", muted: true }] },
+        { ...mockItem, id: "item-2", name: "Security", muted: false, subItems: [{ ...mockSubItem, id: "sub-2", itemId: "item-2", muted: false }] },
+      ],
+    };
+
+    useAppStore.getState().setCurrentTopic(topicWithSolo);
+    useAppStore.getState().soloItem("item-2");
+
+    const items = useAppStore.getState().currentTopic!.items;
+    expect(items.every((item) => !item.muted)).toBe(true);
+    expect(items.every((item) => item.subItems.every((subItem) => !subItem.muted))).toBe(true);
+  });
+});
+
 // ─── checkAchievements ────────────────────────────────────────────────────────
 
 describe("checkAchievements", () => {
@@ -540,5 +579,69 @@ describe("toggleSubItemMute", () => {
     const subs = useAppStore.getState().currentTopic!.items[0].subItems;
     expect(subs[0].muted).toBe(true);
     expect(subs[1].muted).toBe(false);
+  });
+});
+
+describe("soloSubItem", () => {
+  test("keeps only the selected subitem active", () => {
+    const topicWithTwoItems = {
+      ...mockTopic,
+      items: [
+        {
+          ...mockItem,
+          id: "item-1",
+          subItems: [
+            { ...mockSubItem, id: "sub-1", itemId: "item-1", muted: false },
+            { ...mockSubItem, id: "sub-2", itemId: "item-1", name: "PaaS", muted: false },
+          ],
+        },
+        {
+          ...mockItem,
+          id: "item-2",
+          name: "Security",
+          subItems: [{ ...mockSubItem, id: "sub-3", itemId: "item-2", name: "IAM", muted: false }],
+        },
+      ],
+    };
+
+    useAppStore.getState().setCurrentTopic(topicWithTwoItems);
+    useAppStore.getState().soloSubItem("sub-2");
+
+    const [firstItem, secondItem] = useAppStore.getState().currentTopic!.items;
+    expect(firstItem.muted).toBe(false);
+    expect(firstItem.subItems[0].muted).toBe(true);
+    expect(firstItem.subItems[1].muted).toBe(false);
+    expect(secondItem.muted).toBe(true);
+    expect(secondItem.subItems[0].muted).toBe(true);
+  });
+
+  test("clicking subitem solo again restores all items and subitems", () => {
+    const topicWithSoloSubitem = {
+      ...mockTopic,
+      items: [
+        {
+          ...mockItem,
+          id: "item-1",
+          muted: false,
+          subItems: [
+            { ...mockSubItem, id: "sub-1", itemId: "item-1", muted: true },
+            { ...mockSubItem, id: "sub-2", itemId: "item-1", muted: false },
+          ],
+        },
+        {
+          ...mockItem,
+          id: "item-2",
+          muted: true,
+          subItems: [{ ...mockSubItem, id: "sub-3", itemId: "item-2", muted: true }],
+        },
+      ],
+    };
+
+    useAppStore.getState().setCurrentTopic(topicWithSoloSubitem);
+    useAppStore.getState().soloSubItem("sub-2");
+
+    const items = useAppStore.getState().currentTopic!.items;
+    expect(items.every((item) => !item.muted)).toBe(true);
+    expect(items.every((item) => item.subItems.every((subItem) => !subItem.muted))).toBe(true);
   });
 });

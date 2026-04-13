@@ -27,6 +27,18 @@ interface XPPopup {
   amount: number;
 }
 
+interface AnswerMeta {
+  questionId: string;
+  subItemId: string;
+  correct: boolean;
+  xpAwarded: number;
+  lifeLost: boolean;
+  wasBossRound: boolean;
+  bossQuestionsLeftBefore: number;
+}
+
+type QuestionReportState = "idle" | "submitting" | "submitted" | "error";
+
 const GED_SLUG = "ged-mathematical-reasoning";
 const BOSS_EVERY = 10; // trigger boss round every N answers
 const BOSS_QUESTIONS = 3; // number of boss questions per round
@@ -52,24 +64,28 @@ export default function SessionPage() {
     maxLives,
     weeklyUsage,
     weeklyRemaining,
-    weeklyResetsAt,
     plan,
     setCurrentTopic,
     addToQueue,
     advanceQueue,
     updateSubItemStats,
+    setSubItemStatsEntry,
     hydrateSubItemStats,
     setIsGenerating,
     setAnswerShown,
     setLastAnswerCorrect,
     toggleItemMute,
     toggleSubItemMute,
+    soloItem,
+    soloSubItem,
     addXP,
     checkAndUpdateStreak,
     loseLife,
+    gainLife,
     resetLives,
     checkAchievements,
     incrementDailyProgress,
+    decrementDailyProgress,
     saveSessionEntry,
   } = useAppStore();
 
@@ -99,8 +115,20 @@ export default function SessionPage() {
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [sessionError, setSessionError] = useState("");
   const [isRecoveringTopic, setIsRecoveringTopic] = useState(false);
+  const [isRecordingAnswer, setIsRecordingAnswer] = useState(false);
+  const [reportState, setReportState] = useState<QuestionReportState>("idle");
+  const [reportMessage, setReportMessage] = useState("");
+  const [lastAnswerMeta, setLastAnswerMeta] = useState<AnswerMeta | null>(null);
   const generatingRef = useRef(false);
   const isFetchingRef = useRef(false);
+  const reportedQuestionIdsRef = useRef<Set<string>>(new Set());
+
+  const syncTopicFromServer = useCallback(async () => {
+    const res = await fetch(`/api/topics?slug=${encodeURIComponent(GED_SLUG)}`);
+    if (!res.ok) throw new Error("Could not load GED topic");
+    const topic = await res.json();
+    setCurrentTopic(topic);
+  }, [setCurrentTopic]);
 
   // Recover from stale persisted state so /session can self-heal after refreshes/redeploys.
   useEffect(() => {
@@ -113,12 +141,7 @@ export default function SessionPage() {
       setIsRecoveringTopic(true);
       setSessionError("");
       try {
-        const res = await fetch(`/api/topics?slug=${encodeURIComponent(GED_SLUG)}`);
-        if (!res.ok) throw new Error("Could not load GED topic");
-        const topic = await res.json();
-        if (!cancelled) {
-          setCurrentTopic(topic);
-        }
+        await syncTopicFromServer();
       } catch (error) {
         if (!cancelled) {
           setSessionError(error instanceof Error ? error.message : "Could not load GED topic");
@@ -135,7 +158,7 @@ export default function SessionPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, _hasHydrated, currentTopic, setCurrentTopic]);
+  }, [authLoading, _hasHydrated, currentTopic, syncTopicFromServer]);
 
   // Redirect if no topic — only after hydration to avoid false redirects on refresh
   useEffect(() => {
@@ -261,19 +284,58 @@ export default function SessionPage() {
       setPendingQuestion(currentQuestion);
       setShowFlashCard(true);
     }
+  }, [answerShown, currentQuestion, lastSubItemId]);
+
+  useEffect(() => {
+    setReportState("idle");
+    setReportMessage("");
+    setIsRecordingAnswer(false);
+    setLastAnswerMeta(null);
   }, [currentQuestion?.id]);
+
+  const rollbackAnsweredQuestion = useCallback(
+    (meta: AnswerMeta | null) => {
+      if (!meta) return;
+
+      setAnswerCount((count) => Math.max(0, count - 1));
+
+      if (meta.correct) {
+        setSessionCorrect((count) => Math.max(0, count - 1));
+        if (meta.xpAwarded > 0) {
+          addXP(-meta.xpAwarded);
+        }
+      }
+
+      if (meta.lifeLost) {
+        gainLife();
+        setShowGameOver(false);
+      }
+
+      decrementDailyProgress();
+
+      if (meta.wasBossRound) {
+        setIsBossRound(true);
+        setBossQuestionsLeft(meta.bossQuestionsLeftBefore);
+      }
+
+      setLastAnswerMeta(null);
+    },
+    [addXP, decrementDailyProgress, gainLife]
+  );
 
   const handleAnswer = async (answer: string, timeSpent: number) => {
     if (!currentQuestion || answerShown) return;
 
+    const questionAtAnswer = currentQuestion;
+
     const isTimeout = answer === "__timeout__";
     const isCorrect = isTimeout
       ? false
-      : currentQuestion.type === "fill_blank"
-      ? answer.toLowerCase().trim() === currentQuestion.answer.toLowerCase().trim()
-      : answer === currentQuestion.answer;
+      : questionAtAnswer.type === "fill_blank"
+      ? answer.toLowerCase().trim() === questionAtAnswer.answer.toLowerCase().trim()
+      : answer === questionAtAnswer.answer;
 
-    logger.info("session", `Answer submitted`, { questionId: currentQuestion.id, correct: isCorrect, timeSpent });
+    logger.info("session", `Answer submitted`, { questionId: questionAtAnswer.id, correct: isCorrect, timeSpent });
     setUserAnswer(isTimeout ? "" : answer);
     setLastAnswerCorrect(isCorrect);
     setAnswerShown(true);
@@ -282,8 +344,23 @@ export default function SessionPage() {
 
     // XP: boss round = double
     const xpMultiplier = isBossRound ? 2 : 1;
+    const xpGain = isCorrect
+      ? Math.round(10 * (questionAtAnswer.difficulty || 1) * Math.min(2, 1 + streak * 0.05) * xpMultiplier)
+      : 0;
+
+    const answerMeta: AnswerMeta = {
+      questionId: questionAtAnswer.id,
+      subItemId: questionAtAnswer.subItemId,
+      correct: isCorrect,
+      xpAwarded: xpGain,
+      lifeLost: !isCorrect,
+      wasBossRound: isBossRound,
+      bossQuestionsLeftBefore: bossQuestionsLeft,
+    };
+
+    setLastAnswerMeta(answerMeta);
+
     if (isCorrect) {
-      const xpGain = Math.round(10 * (currentQuestion.difficulty || 1) * Math.min(2, 1 + streak * 0.05) * xpMultiplier);
       addXP(xpGain);
       const popupId = Date.now();
       setXpPopups((prev) => [...prev, { id: popupId, amount: xpGain }]);
@@ -310,23 +387,42 @@ export default function SessionPage() {
     }
 
     // Record answer to server
+    setIsRecordingAnswer(true);
     try {
       const res = await fetch("/api/record-answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          questionId: currentQuestion.id,
-          subItemId: currentQuestion.subItemId,
+          questionId: questionAtAnswer.id,
+          subItemId: questionAtAnswer.subItemId,
           sessionId,
           correct: isCorrect,
           timeSpent,
         }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        const prevDifficulty = subItemStats[currentQuestion.subItemId]?.difficulty || 1;
-        updateSubItemStats(currentQuestion.subItemId, isCorrect, data.newDifficulty);
+      if (!res.ok) {
+        throw new Error("Failed to record answer");
+      }
+
+      const data = await res.json();
+
+      if (reportedQuestionIdsRef.current.has(questionAtAnswer.id)) {
+        return;
+      }
+
+      if (data.stats) {
+        const prevDifficulty = subItemStats[questionAtAnswer.subItemId]?.difficulty || questionAtAnswer.difficulty || 1;
+        setSubItemStatsEntry(questionAtAnswer.subItemId, data.stats);
+
+        if (data.ignoredFlaggedQuestion) {
+          reportedQuestionIdsRef.current.add(questionAtAnswer.id);
+          rollbackAnsweredQuestion(answerMeta);
+          setReportState("submitted");
+          setReportMessage("This question had already been flagged and was removed from scoring.");
+          return;
+        }
+
         if (isCorrect && data.newDifficulty > prevDifficulty) {
           import("canvas-confetti").then(({ default: confetti }) => {
             confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 }, colors: ["#818CF8", "#38BDF8", "#60A5FA", "#FACC15"] });
@@ -334,9 +430,68 @@ export default function SessionPage() {
         }
       }
     } catch (err) {
-      console.error("Error recording answer:", err);
-      const subItem = getAllSubItems().find((s) => s.id === currentQuestion.subItemId);
-      updateSubItemStats(currentQuestion.subItemId, isCorrect, subItem?.difficulty || 1);
+      logger.error("session", "Error recording answer", err);
+      if (!reportedQuestionIdsRef.current.has(questionAtAnswer.id)) {
+        const subItem = getAllSubItems().find((s) => s.id === questionAtAnswer.subItemId);
+        updateSubItemStats(questionAtAnswer.subItemId, isCorrect, subItem?.difficulty || 1);
+      }
+    } finally {
+      setIsRecordingAnswer(false);
+    }
+  };
+
+  const handleReportQuestion = async () => {
+    if (!currentQuestion || !answerShown || reportState === "submitting" || reportState === "submitted") {
+      return;
+    }
+
+    const reportTarget = currentQuestion;
+    const metaToRollback =
+      lastAnswerMeta?.questionId === reportTarget.id ? lastAnswerMeta : null;
+
+    setReportState("submitting");
+    setReportMessage("");
+
+    try {
+      const res = await fetch("/api/report-question", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionId: reportTarget.id,
+          subItemId: reportTarget.subItemId,
+          sessionId,
+          reason: lastAnswerCorrect === false
+            ? "User reported a question after being marked incorrect."
+            : "User reported a question from the session UI.",
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Failed to report question");
+      }
+
+      const data = await res.json();
+      reportedQuestionIdsRef.current.add(reportTarget.id);
+
+      if (data.stats) {
+        setSubItemStatsEntry(reportTarget.subItemId, data.stats);
+      }
+
+      if (data.answerInvalidated) {
+        rollbackAnsweredQuestion(metaToRollback);
+      }
+
+      setReportState("submitted");
+      setReportMessage(
+        data.answerInvalidated
+          ? "Question flagged. This answer no longer counts against you."
+          : "Question flagged for review."
+      );
+    } catch (error) {
+      logger.error("session", "Failed to report question", error);
+      setReportState("error");
+      setReportMessage("Couldn't report this question. Please try again.");
     }
   };
 
@@ -377,13 +532,40 @@ export default function SessionPage() {
     if (type === "item") toggleItemMute(id);
     else toggleSubItemMute(id);
     try {
-      await fetch("/api/toggle-mute", {
+      const res = await fetch("/api/toggle-mute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, type }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch (err) {
       console.error("Error toggling mute:", err);
+      try {
+        await syncTopicFromServer();
+      } catch (syncError) {
+        logger.error("session", "Failed to re-sync topic after mute error", syncError);
+      }
+    }
+  };
+
+  const handleSolo = async (id: string, type: "item" | "subitem") => {
+    if (type === "item") soloItem(id);
+    else soloSubItem(id);
+
+    try {
+      const res = await fetch("/api/solo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, type }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      console.error("Error updating solo focus:", err);
+      try {
+        await syncTopicFromServer();
+      } catch (syncError) {
+        logger.error("session", "Failed to re-sync topic after solo error", syncError);
+      }
     }
   };
 
@@ -854,7 +1036,7 @@ export default function SessionPage() {
                     <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#9494B8" }}>Learning Tree</h2>
                     <InfoButton
                       title="Learning Tree"
-                      content="Your curriculum organized by chapters and concepts. ⚠ = weak spot (< 50% correct, 3+ attempts). ✓ = mastered (≥ 80%, 10+ attempts). Mute any item to skip it."
+                      content="Your curriculum organized by chapters and concepts. ⚠ = weak spot (< 50% correct, 3+ attempts). ✓ = mastered (≥ 80%, 10+ attempts). Mute skips a branch, and Solo keeps just one branch active."
                       side="below"
                     />
                   </div>
@@ -870,6 +1052,7 @@ export default function SessionPage() {
                 items={currentTopic.items}
                 subItemStats={subItemStats}
                 onToggleMute={handleToggleMute}
+                onSolo={handleSolo}
                 onOpenAudiobooks={isPending ? undefined : (id, type, label) => { setAudiobookDialog({ id, type, label }); setShowMobileTree(false); }}
               />
             </motion.div>
@@ -898,7 +1081,7 @@ export default function SessionPage() {
               <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#9494B8" }}>Learning Tree</h2>
               <InfoButton
                 title="Learning Tree"
-                content="Your curriculum organized by chapters and concepts. ⚠ = weak spot (< 50% correct, 3+ attempts). ✓ = mastered (≥ 80%, 10+ attempts). Mute any item to skip it."
+                content="Your curriculum organized by chapters and concepts. ⚠ = weak spot (< 50% correct, 3+ attempts). ✓ = mastered (≥ 80%, 10+ attempts). Mute skips a branch, and Solo keeps just one branch active."
               />
             </div>
             <p className="text-xs" style={{ color: "#9494B8" }}>⚠ = weak spot &nbsp; ✓ = mastered</p>
@@ -907,6 +1090,7 @@ export default function SessionPage() {
             items={currentTopic.items}
             subItemStats={subItemStats}
             onToggleMute={handleToggleMute}
+            onSolo={handleSolo}
             onOpenAudiobooks={isPending ? undefined : (id, type, label) => setAudiobookDialog({ id, type, label })}
           />
         </aside>
@@ -954,6 +1138,10 @@ export default function SessionPage() {
                     answerShown={answerShown}
                     lastAnswerCorrect={lastAnswerCorrect}
                     userAnswer={userAnswer}
+                    onReportQuestion={handleReportQuestion}
+                    reportState={reportState}
+                    reportMessage={reportMessage}
+                    reportDisabled={isRecordingAnswer}
                     xp={xp}
                     topicName={currentTopic.name}
                     onHintUsed={() => {

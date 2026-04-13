@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { Topic, Item, Question, SubItemStats, Settings, Achievement, DailyGoal, SessionHistoryEntry } from "@/types";
+import { applyItemSolo, applySubItemSolo } from "@/lib/topicFocus";
 
 function generateSessionId(): string {
   return "sess_" + Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -69,6 +70,7 @@ interface AppState {
   setCurrentQuestion: (question: Question | null) => void;
   advanceQueue: () => void;
   updateSubItemStats: (subItemId: string, correct: boolean, difficulty: number) => void;
+  setSubItemStatsEntry: (subItemId: string, stats: SubItemStats) => void;
   hydrateSubItemStats: (stats: Record<string, SubItemStats>) => void;
   setSettings: (settings: Partial<Settings>) => void;
   setIsGenerating: (val: boolean) => void;
@@ -77,6 +79,8 @@ interface AppState {
   resetSession: () => void;
   toggleItemMute: (itemId: string) => void;
   toggleSubItemMute: (subItemId: string) => void;
+  soloItem: (itemId: string) => void;
+  soloSubItem: (subItemId: string) => void;
 
   // XP & streak actions
   addXP: (amount: number) => void;
@@ -85,6 +89,7 @@ interface AppState {
 
   // Lives actions
   loseLife: () => void;
+  gainLife: () => void;
   resetLives: () => void;
 
   // User identity
@@ -120,6 +125,7 @@ interface AppState {
 
   // Daily goal actions
   incrementDailyProgress: () => void;
+  decrementDailyProgress: () => void;
   setDailyGoalTarget: (target: number) => void;
 
   // Session history
@@ -128,7 +134,7 @@ interface AppState {
 
 const useAppStore = create<AppState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       _hasHydrated: false,
       sessionId: generateSessionId(),
       currentTopic: null,
@@ -138,6 +144,7 @@ const useAppStore = create<AppState>()(
       settings: {
         queueDepth: 5,
         refillTrigger: 3,
+        timerEnabled: true,
       },
       isGenerating: false,
       answerShown: false,
@@ -252,6 +259,25 @@ const useAppStore = create<AppState>()(
           };
         }),
 
+      setSubItemStatsEntry: (subItemId, stats) =>
+        set((state) => ({
+          subItemStats: {
+            ...state.subItemStats,
+            [subItemId]: stats,
+          },
+          currentTopic: state.currentTopic
+            ? {
+                ...state.currentTopic,
+                items: state.currentTopic.items.map((item) => ({
+                  ...item,
+                  subItems: item.subItems.map((sub) =>
+                    sub.id === subItemId ? { ...sub, difficulty: stats.difficulty } : sub
+                  ),
+                })),
+              }
+            : null,
+        })),
+
       hydrateSubItemStats: (stats) => set({ subItemStats: stats }),
 
       setSettings: (settings) =>
@@ -305,6 +331,28 @@ const useAppStore = create<AppState>()(
           };
         }),
 
+      soloItem: (itemId) =>
+        set((state) => {
+          if (!state.currentTopic) return {};
+          return {
+            currentTopic: {
+              ...state.currentTopic,
+              items: applyItemSolo(state.currentTopic.items, itemId),
+            },
+          };
+        }),
+
+      soloSubItem: (subItemId) =>
+        set((state) => {
+          if (!state.currentTopic) return {};
+          return {
+            currentTopic: {
+              ...state.currentTopic,
+              items: applySubItemSolo(state.currentTopic.items, subItemId),
+            },
+          };
+        }),
+
       addXP: (amount) =>
         set((state) => ({
           xp: state.xp + amount,
@@ -322,6 +370,7 @@ const useAppStore = create<AppState>()(
 
       setReviewMode: (val) => set({ reviewMode: val }),
       loseLife: () => set((state) => ({ lives: Math.max(0, state.lives - 1) })),
+      gainLife: () => set((state) => ({ lives: Math.min(state.maxLives, state.lives + 1) })),
       resetLives: () => set((state) => ({ lives: state.maxLives })),
       setUser: (id, email, role = "customer", status = "active", isInternal = false) =>
         set({
@@ -354,7 +403,6 @@ const useAppStore = create<AppState>()(
         set((state) => {
           const newUnlocked: string[] = [];
           const totalAnswered = Object.values(state.subItemStats).reduce((s, v) => s + v.totalCount, 0);
-          const totalCorrect = Object.values(state.subItemStats).reduce((s, v) => s + v.correctCount, 0);
 
           let newConsecutiveCorrect = state.consecutiveCorrect;
           let newConsecutiveNoHint = state.consecutiveNoHint;
@@ -418,6 +466,15 @@ const useAppStore = create<AppState>()(
             ? state.dailyGoal
             : { target: state.dailyGoal.target, progress: 0, date: today };
           return { dailyGoal: { ...goal, progress: goal.progress + 1 } };
+        }),
+
+      decrementDailyProgress: () =>
+        set((state) => {
+          const today = new Date().toISOString().split("T")[0];
+          const goal = state.dailyGoal.date === today
+            ? state.dailyGoal
+            : { target: state.dailyGoal.target, progress: 0, date: today };
+          return { dailyGoal: { ...goal, progress: Math.max(0, goal.progress - 1) } };
         }),
 
       setDailyGoalTarget: (target) =>

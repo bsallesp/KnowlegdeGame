@@ -2,12 +2,14 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
+import { isItemSoloActive, isSubItemSoloActive } from "@/lib/topicFocus";
 import type { Item } from "@/types";
 
 interface TopicDashboardProps {
   items: Item[];
   subItemStats: Record<string, { correctCount: number; totalCount: number; difficulty: number }>;
   onToggleMute: (id: string, type: "item" | "subitem") => void;
+  onSolo?: (id: string, type: "item" | "subitem") => void;
   onOpenAudiobooks?: (id: string, type: "item" | "subitem", label: string) => void;
 }
 
@@ -74,7 +76,18 @@ function DifficultyDots({ level }: { level: number }) {
   );
 }
 
-export default function TopicDashboard({ items, subItemStats, onToggleMute, onOpenAudiobooks }: TopicDashboardProps) {
+function SoloBadge({ active }: { active: boolean }) {
+  return (
+    <span
+      className="text-[0.55rem] font-semibold tracking-[0.2em]"
+      style={{ color: active ? "#FACC15" : "#9494B8" }}
+    >
+      SOLO
+    </span>
+  );
+}
+
+export default function TopicDashboard({ items, subItemStats, onToggleMute, onSolo, onOpenAudiobooks }: TopicDashboardProps) {
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(
     items.reduce((acc, item) => ({ ...acc, [item.id]: true }), {})
   );
@@ -96,6 +109,7 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute, onOp
         {items.map((item, itemIndex) => {
           ensureExpanded(item.id);
           const isExpanded = expandedItems[item.id] !== false;
+          const itemSoloActive = isItemSoloActive(items, item.id);
 
           return (
             <motion.div
@@ -147,6 +161,20 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute, onOp
                     </svg>
                   </button>
                 )}
+                {onSolo && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onSolo(item.id, "item"); }}
+                    className="flex-shrink-0 px-1.5 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{
+                      backgroundColor: itemSoloActive ? "rgba(250,204,21,0.14)" : "transparent",
+                      border: `1px solid ${itemSoloActive ? "rgba(250,204,21,0.35)" : "#2E2E40"}`,
+                    }}
+                    title={itemSoloActive ? "Show all chapters again" : "Solo this chapter"}
+                    aria-label={itemSoloActive ? "Exit item solo" : "Solo item"}
+                  >
+                    <SoloBadge active={itemSoloActive} />
+                  </button>
+                )}
                 <button
                   onClick={() => onToggleMute(item.id, "item")}
                   className="flex-shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
@@ -174,6 +202,7 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute, onOp
                       const correctCount = stats?.correctCount || 0;
                       const difficulty = stats?.difficulty || sub.difficulty || 1;
                       const proficiencyLabel = PROFICIENCY_LABELS[difficulty] || "Beginner";
+                      const subItemSoloActive = isSubItemSoloActive(items, sub.id);
 
                       return (
                         <motion.div
@@ -223,6 +252,20 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute, onOp
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 18v-6a9 9 0 0118 0v6" />
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
                                     </svg>
+                                  </button>
+                                )}
+                                {onSolo && (
+                                  <button
+                                    onClick={() => onSolo(sub.id, "subitem")}
+                                    className="flex-shrink-0 px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                    style={{
+                                      backgroundColor: subItemSoloActive ? "rgba(250,204,21,0.14)" : "transparent",
+                                      border: `1px solid ${subItemSoloActive ? "rgba(250,204,21,0.35)" : "#2E2E40"}`,
+                                    }}
+                                    title={subItemSoloActive ? "Show all concepts again" : "Solo this concept"}
+                                    aria-label={subItemSoloActive ? "Exit subitem solo" : "Solo subitem"}
+                                  >
+                                    <SoloBadge active={subItemSoloActive} />
                                   </button>
                                 )}
                                 <button

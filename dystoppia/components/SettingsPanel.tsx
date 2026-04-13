@@ -100,6 +100,39 @@ export default function SettingsPanel({ embedded = false }: SettingsPanelProps) 
       </div>
 
       <div
+        className="rounded-xl p-6 space-y-4"
+        style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold" style={{ color: "#EEEEFF" }}>
+              Question Timer
+            </h3>
+            <p className="text-xs mt-1" style={{ color: "#9494B8" }}>
+              Enable or disable the countdown timer for each question.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={settings.timerEnabled}
+            onClick={() => setSettings({ timerEnabled: !settings.timerEnabled })}
+            className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none"
+            style={{
+              backgroundColor: settings.timerEnabled ? "#818CF8" : "#2E2E40",
+            }}
+          >
+            <span
+              className="inline-block h-4 w-4 rounded-full bg-white transition-transform duration-200"
+              style={{
+                transform: settings.timerEnabled ? "translateX(1.375rem)" : "translateX(0.25rem)",
+              }}
+            />
+          </button>
+        </div>
+      </div>
+
+      <div
         className="rounded-xl p-4 flex gap-3"
         style={{
           backgroundColor: "rgba(129, 140, 248, 0.05)",

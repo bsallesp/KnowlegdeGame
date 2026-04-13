@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Question } from "@/types";
 import InfoButton from "@/components/InfoButton";
+import useAppStore from "@/store/useAppStore";
 
 interface QuestionCardProps {
   question: Question;
@@ -12,6 +13,10 @@ interface QuestionCardProps {
   lastAnswerCorrect: boolean | null;
   userAnswer?: string;
   onHintUsed?: () => void;
+  onReportQuestion?: () => void | Promise<void>;
+  reportState?: "idle" | "submitting" | "submitted" | "error";
+  reportMessage?: string;
+  reportDisabled?: boolean;
   xp?: number;
   topicName?: string;
 }
@@ -54,6 +59,10 @@ export default function QuestionCard({
   lastAnswerCorrect,
   userAnswer,
   onHintUsed,
+  onReportQuestion,
+  reportState = "idle",
+  reportMessage = "",
+  reportDisabled = false,
   xp = 0,
   topicName = "",
 }: QuestionCardProps) {
@@ -67,6 +76,7 @@ export default function QuestionCard({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const HINT_COST = 5;
+  const { settings } = useAppStore();
 
   useEffect(() => {
     setSelectedAnswer("");
@@ -75,7 +85,7 @@ export default function QuestionCard({
     setHintError(false);
     startTimeRef.current = Date.now();
 
-    if (question.timeLimit && question.timeLimit > 0) {
+    if (settings.timerEnabled && question.timeLimit && question.timeLimit > 0) {
       setTimeLeft(question.timeLimit);
     } else {
       setTimeLeft(null);
@@ -84,7 +94,7 @@ export default function QuestionCard({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [question.id, question.timeLimit]);
+  }, [question.id, question.timeLimit, settings.timerEnabled]);
 
   // Countdown timer
   useEffect(() => {
@@ -400,6 +410,36 @@ export default function QuestionCard({
               <span className="font-semibold" style={{ color: "#EEEEFF" }}>Explanation: </span>
               {question.explanation}
             </div>
+            {onReportQuestion && (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => void onReportQuestion()}
+                  disabled={reportDisabled || reportState === "submitting" || reportState === "submitted"}
+                  className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all"
+                  style={{
+                    backgroundColor: reportState === "submitted" ? "rgba(96,165,250,0.12)" : "rgba(249,115,22,0.1)",
+                    border: `1px solid ${reportState === "submitted" ? "#60A5FA" : "#F97316"}`,
+                    color: reportState === "submitted" ? "#60A5FA" : "#F97316",
+                    cursor: reportDisabled || reportState === "submitting" || reportState === "submitted" ? "not-allowed" : "pointer",
+                    opacity: reportDisabled ? 0.7 : 1,
+                  }}
+                >
+                  {reportState === "submitting"
+                    ? "Reporting..."
+                    : reportState === "submitted"
+                    ? "Question Reported"
+                    : reportState === "error"
+                    ? "Try Reporting Again"
+                    : "Report Question"}
+                </button>
+                {reportMessage && (
+                  <p className="text-xs leading-relaxed" style={{ color: reportState === "error" ? "#F97316" : "#9494B8" }}>
+                    {reportMessage}
+                  </p>
+                )}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

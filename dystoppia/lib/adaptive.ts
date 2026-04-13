@@ -36,6 +36,20 @@ export interface SM2Result {
   nextReviewAt: Date;
 }
 
+export interface ReplayableAnswer {
+  sessionId: string;
+  correct: boolean;
+  timeSpent: number;
+  createdAt: Date | string;
+}
+
+export interface ReplayedSubItemState {
+  difficulty: number;
+  easeFactor: number;
+  reviewInterval: number;
+  nextReviewAt: Date | null;
+}
+
 export function calculateSM2(
   easeFactor: number,
   reviewInterval: number,
@@ -105,4 +119,43 @@ export function selectNextSubItem(
     if (rand <= 0) return item.id;
   }
   return top[0].id;
+}
+
+export function replaySubItemProgress(
+  answers: ReplayableAnswer[],
+  initialState: Partial<ReplayedSubItemState> = {}
+): ReplayedSubItemState {
+  const sortedAnswers = [...answers].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+
+  let difficulty = initialState.difficulty ?? 1;
+  let easeFactor = initialState.easeFactor ?? 2.5;
+  let reviewInterval = initialState.reviewInterval ?? 1;
+  let nextReviewAt: Date | null = initialState.nextReviewAt ?? null;
+
+  const recentBySession = new Map<string, boolean[]>();
+
+  for (const answer of sortedAnswers) {
+    const recent = recentBySession.get(answer.sessionId) ?? [];
+    const nextRecent = [...recent.slice(-4), answer.correct];
+    const recentCorrect = nextRecent.filter(Boolean).length;
+    const recentTotal = nextRecent.length;
+
+    difficulty = calculateNewDifficulty(difficulty, recentCorrect, recentTotal);
+
+    const sm2 = calculateSM2(easeFactor, reviewInterval, answer.correct, answer.timeSpent, 15000);
+    easeFactor = sm2.easeFactor;
+    reviewInterval = sm2.reviewInterval;
+    nextReviewAt = sm2.nextReviewAt;
+
+    recentBySession.set(answer.sessionId, nextRecent);
+  }
+
+  return {
+    difficulty,
+    easeFactor,
+    reviewInterval,
+    nextReviewAt,
+  };
 }

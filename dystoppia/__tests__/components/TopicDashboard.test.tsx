@@ -138,6 +138,20 @@ describe("TopicDashboard — interactions", () => {
     render(<TopicDashboard items={[item]} subItemStats={emptyStats} onToggleMute={vi.fn()} />);
     expect(screen.getByLabelText("Unmute subitem")).toBeInTheDocument();
   });
+
+  test("calls onSolo with item id and 'item' type", async () => {
+    const onSolo = vi.fn();
+    render(<TopicDashboard items={[makeItem()]} subItemStats={emptyStats} onToggleMute={vi.fn()} onSolo={onSolo} />);
+    await userEvent.click(screen.getByLabelText("Solo item"));
+    expect(onSolo).toHaveBeenCalledWith("item-1", "item");
+  });
+
+  test("calls onSolo with subitem id and 'subitem' type", async () => {
+    const onSolo = vi.fn();
+    render(<TopicDashboard items={[makeItem()]} subItemStats={emptyStats} onToggleMute={vi.fn()} onSolo={onSolo} />);
+    await userEvent.click(screen.getAllByLabelText("Solo subitem")[0]);
+    expect(onSolo).toHaveBeenCalledWith("sub-1", "subitem");
+  });
 });
 
 describe("TopicDashboard — onOpenAudiobooks", () => {

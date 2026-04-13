@@ -15,7 +15,7 @@ async function buildSuccessResponse(subItemId: string, sessionId: string) {
   }
 
   const allAnswers = await prisma.userAnswer.findMany({
-    where: { subItemId, sessionId },
+    where: { subItemId, sessionId, invalidatedAt: null },
   });
   const totalCount = allAnswers.length;
   const correctCount = allAnswers.filter((a) => a.correct).length;
@@ -45,6 +45,19 @@ export async function POST(req: NextRequest) {
     }
     logger.debug("record-answer", `Answer received`, { questionId, subItemId, correct, timeSpent });
 
+    const question = await prisma.question.findUnique({
+      where: { id: questionId },
+      select: { subItemId: true, flaggedAt: true },
+    });
+
+    if (!question) {
+      return NextResponse.json({ error: "Question not found" }, { status: 404 });
+    }
+
+    if (question.subItemId !== subItemId) {
+      return NextResponse.json({ error: "Question does not belong to the provided subItem" }, { status: 409 });
+    }
+
     if (idempotencyKey) {
       const existing = await prisma.userAnswer.findUnique({
         where: {
@@ -70,6 +83,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (question.flaggedAt) {
+      const payload = await buildSuccessResponse(subItemId, sessionId);
+      if (!payload) {
+        return NextResponse.json({ error: "SubItem not found" }, { status: 404 });
+      }
+      return NextResponse.json({
+        ...payload,
+        ignoredFlaggedQuestion: true,
+      });
+    }
+
     // Save the answer
     await prisma.userAnswer.create({
       data: {
@@ -84,7 +108,7 @@ export async function POST(req: NextRequest) {
 
     // Get recent answers for this subItem to update difficulty
     const recentAnswers = await prisma.userAnswer.findMany({
-      where: { subItemId, sessionId },
+      where: { subItemId, sessionId, invalidatedAt: null },
       orderBy: { createdAt: "desc" },
       take: 5,
     });

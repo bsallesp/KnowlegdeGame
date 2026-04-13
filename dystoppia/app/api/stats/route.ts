@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
       where: { item: { topicId } },
       include: {
         answers: {
+          where: { invalidatedAt: null },
           select: { correct: true, createdAt: true },
           orderBy: { createdAt: "desc" },
         },

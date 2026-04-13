@@ -44,6 +44,8 @@ export interface Question {
   explanation: string;
   difficulty: number;
   timeLimit?: number | null;
+  flaggedAt?: string | null;
+  flaggedReason?: string | null;
   createdAt: string;
   subItem?: SubItem;
 }
@@ -68,6 +70,7 @@ export interface SubItemStats {
 export interface Settings {
   queueDepth: number;
   refillTrigger: number;
+  timerEnabled: boolean;
 }
 
 export type QuestionType = "multiple_choice" | "single_choice" | "fill_blank" | "true_false";

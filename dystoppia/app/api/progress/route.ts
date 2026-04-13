@@ -13,9 +13,10 @@ export async function GET(req: NextRequest) {
     const where = topicId
       ? {
           createdAt: { gte: since },
+          invalidatedAt: null,
           subItem: { item: { topicId } },
         }
-      : { createdAt: { gte: since } };
+      : { createdAt: { gte: since }, invalidatedAt: null };
 
     const answers = await prisma.userAnswer.findMany({
       where,

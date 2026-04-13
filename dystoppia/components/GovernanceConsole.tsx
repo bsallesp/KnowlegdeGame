@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRequireUser } from "@/lib/useRequireUser";
@@ -74,12 +74,7 @@ export default function GovernanceConsole() {
   const [executionResult, setExecutionResult] = useState<{ mode: string; manifest: unknown } | null>(null);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (loading || userRole !== "master") return;
-    void refreshGovernance();
-  }, [loading, userRole]);
-
-  async function refreshGovernance() {
+  const refreshGovernance = useCallback(async () => {
     const [overviewRes, requestsRes, approvalsRes, auditRes, ledgerRes] = await Promise.all([
       fetch("/api/admin/reporting/overview"),
       fetch("/api/builder/requests"),
@@ -107,7 +102,15 @@ export default function GovernanceConsole() {
       const data = (await ledgerRes.json()) as LedgerResponse;
       setLedgerEntries(data.entries ?? []);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (loading || userRole !== "master") return;
+    const timeoutId = window.setTimeout(() => {
+      void refreshGovernance();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [loading, refreshGovernance, userRole]);
 
   async function loadRequestDetail(id: string) {
     setError("");
