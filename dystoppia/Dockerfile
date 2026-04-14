@@ -26,17 +26,11 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Prisma: schema + config + migrations + full @prisma scope + pg adapter
+# Prisma: schema + config (migrations live under prisma/)
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/pg ./node_modules/pg
-
-# Azure SDK dependencies (control panel uses DefaultAzureCredential + ARM clients)
-COPY --from=builder /app/node_modules/@azure ./node_modules/@azure
-COPY --from=builder /app/node_modules/uuid ./node_modules/uuid
+# Copy full node_modules so runtime deps are always present (Next standalone tracing can miss Azure SDK deps)
+COPY --from=builder /app/node_modules ./node_modules
 
 # Recreate the .bin/prisma symlink so startup.sh can call prisma migrate deploy
 RUN mkdir -p node_modules/.bin && \
