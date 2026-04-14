@@ -34,6 +34,9 @@ COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/pg ./node_modules/pg
 
+# Azure SDK dependencies (control panel uses DefaultAzureCredential + ARM clients)
+COPY --from=builder /app/node_modules/@azure ./node_modules/@azure
+
 # Recreate the .bin/prisma symlink so startup.sh can call prisma migrate deploy
 RUN mkdir -p node_modules/.bin && \
     ln -sf /app/node_modules/prisma/build/index.js node_modules/.bin/prisma && \
