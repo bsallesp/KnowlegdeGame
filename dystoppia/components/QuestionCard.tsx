@@ -291,7 +291,7 @@ export default function QuestionCard({
       </AnimatePresence>
 
       {/* Question content */}
-      <div className="rounded-xl p-6 mb-4" style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}>
+      <div className="relative rounded-xl p-6 mb-4" style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}>
         <p className="text-lg font-medium leading-relaxed" style={{ color: "#EEEEFF" }}>
           {question.type === "fill_blank"
             ? question.content.split("___").map((part, i, arr) => (
@@ -315,6 +315,31 @@ export default function QuestionCard({
               ))
             : question.content}
         </p>
+
+        {onReportQuestion && answerShown && lastAnswerCorrect !== null && (
+          <button
+            type="button"
+            onClick={() => void onReportQuestion()}
+            disabled={reportDisabled || reportState === "submitting" || reportState === "submitted"}
+            className="absolute bottom-3 right-3 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all"
+            style={{
+              backgroundColor: reportState === "submitted" ? "rgba(96,165,250,0.08)" : "rgba(249,115,22,0.06)",
+              border: `1px solid ${reportState === "submitted" ? "rgba(96,165,250,0.7)" : "rgba(249,115,22,0.7)"}`,
+              color: reportState === "submitted" ? "rgba(96,165,250,0.95)" : "rgba(249,115,22,0.95)",
+              cursor: reportDisabled || reportState === "submitting" || reportState === "submitted" ? "not-allowed" : "pointer",
+              opacity: reportDisabled ? 0.55 : 0.9,
+            }}
+            aria-label="Report Question"
+          >
+            {reportState === "submitting"
+              ? "Reporting..."
+              : reportState === "submitted"
+              ? "Reported"
+              : reportState === "error"
+              ? "Try Again"
+              : "Report"}
+          </button>
+        )}
       </div>
 
       {/* Answer options */}
@@ -410,35 +435,10 @@ export default function QuestionCard({
               <span className="font-semibold" style={{ color: "#EEEEFF" }}>Explanation: </span>
               {question.explanation}
             </div>
-            {onReportQuestion && (
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => void onReportQuestion()}
-                  disabled={reportDisabled || reportState === "submitting" || reportState === "submitted"}
-                  className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all"
-                  style={{
-                    backgroundColor: reportState === "submitted" ? "rgba(96,165,250,0.12)" : "rgba(249,115,22,0.1)",
-                    border: `1px solid ${reportState === "submitted" ? "#60A5FA" : "#F97316"}`,
-                    color: reportState === "submitted" ? "#60A5FA" : "#F97316",
-                    cursor: reportDisabled || reportState === "submitting" || reportState === "submitted" ? "not-allowed" : "pointer",
-                    opacity: reportDisabled ? 0.7 : 1,
-                  }}
-                >
-                  {reportState === "submitting"
-                    ? "Reporting..."
-                    : reportState === "submitted"
-                    ? "Question Reported"
-                    : reportState === "error"
-                    ? "Try Reporting Again"
-                    : "Report Question"}
-                </button>
-                {reportMessage && (
-                  <p className="text-xs leading-relaxed" style={{ color: reportState === "error" ? "#F97316" : "#9494B8" }}>
-                    {reportMessage}
-                  </p>
-                )}
-              </div>
+            {onReportQuestion && reportMessage && (
+              <p className="text-xs leading-relaxed" style={{ color: reportState === "error" ? "#F97316" : "#9494B8" }}>
+                {reportMessage}
+              </p>
             )}
           </motion.div>
         )}

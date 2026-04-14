@@ -759,21 +759,37 @@ export default function SessionPage() {
 
       {/* Top bar */}
       <header
-        className="flex items-center justify-between px-4 py-3 flex-shrink-0"
+        className="flex items-center justify-between px-4 py-3 flex-shrink-0 min-w-0"
         style={{ backgroundColor: "#09090E", borderBottom: "1px solid #2E2E40" }}
       >
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.push("/")} className="flex items-center gap-2 text-sm font-bold transition-colors" style={{ color: "#818CF8" }}>
+        <div className="flex flex-1 min-w-0 items-center gap-2 overflow-hidden sm:gap-3">
+          <button
+            onClick={() => router.push("/")}
+            className="flex shrink-0 items-center gap-2 text-sm font-bold transition-colors"
+            style={{ color: "#818CF8" }}
+          >
             Dystoppia
           </button>
-          <span style={{ color: "#2E2E40" }}>/</span>
-          <span className="text-sm truncate max-w-[160px]" style={{ color: "#EEEEFF" }}>{currentTopic.name}</span>
+          <span className="shrink-0" style={{ color: "#2E2E40" }}>/</span>
+          <span
+            className="min-w-0 max-w-[42vw] truncate text-sm sm:max-w-[160px]"
+            style={{ color: "#EEEEFF" }}
+            title={currentTopic.name}
+          >
+            {currentTopic.name}
+          </span>
           {isPending && (
-            <span className="text-xs px-2 py-0.5 rounded-full animate-pulse" style={{ backgroundColor: "rgba(129,140,248,0.15)", color: "#818CF8" }}>loading...</span>
+            <span
+              className="hidden text-xs px-2 py-0.5 rounded-full animate-pulse sm:inline-flex"
+              style={{ backgroundColor: "rgba(129,140,248,0.15)", color: "#818CF8" }}
+            >
+              loading...
+            </span>
           )}
           {isBossRound && (
             <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-bold animate-pulse" style={{ backgroundColor: "rgba(239,68,68,0.15)", color: "#EF4444" }}>
-              ⚔️ BOSS ({bossQuestionsLeft})
+              <span className="sm:hidden">⚔️ {bossQuestionsLeft}</span>
+              <span className="hidden sm:inline">⚔️ BOSS ({bossQuestionsLeft})</span>
               <InfoButton
                 title="Boss Round"
                 content="Every 10 answers, 3 maximum-difficulty questions appear with 2× XP. Answer all 3 to earn the Boss Slayer achievement."
@@ -784,7 +800,7 @@ export default function SessionPage() {
         </div>
 
         {/* Desktop stats bar */}
-        <div className="hidden sm:flex items-center gap-4">
+        <div className="hidden shrink-0 sm:flex items-center gap-4">
           {/* Weekly usage */}
           <div
             className="flex items-center gap-1 text-xs font-semibold"
@@ -880,7 +896,7 @@ export default function SessionPage() {
         </div>
 
         {/* Mobile compact bar */}
-        <div className="flex sm:hidden items-center gap-2">
+        <div className="flex shrink-0 sm:hidden items-center gap-2">
           {streak > 1 && (
             <span className="text-xs font-semibold" style={{ color: "#F97316" }}>🔥{streak}</span>
           )}
