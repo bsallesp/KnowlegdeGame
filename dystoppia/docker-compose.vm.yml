@@ -1,21 +1,7 @@
 services:
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    env_file:
-      - .env.vm
-    environment:
-      POSTGRES_DB: dystoppia
-      POSTGRES_USER: dystoppia
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
   app:
     build: .
     restart: unless-stopped
-    depends_on:
-      - db
     env_file:
       - .env.vm
 
@@ -37,4 +23,3 @@ services:
 volumes:
   caddy_data:
   caddy_config:
-  postgres_data:
