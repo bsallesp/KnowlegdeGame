@@ -36,6 +36,7 @@ COPY --from=builder /app/node_modules/pg ./node_modules/pg
 
 # Azure SDK dependencies (control panel uses DefaultAzureCredential + ARM clients)
 COPY --from=builder /app/node_modules/@azure ./node_modules/@azure
+COPY --from=builder /app/node_modules/uuid ./node_modules/uuid
 
 # Recreate the .bin/prisma symlink so startup.sh can call prisma migrate deploy
 RUN mkdir -p node_modules/.bin && \
