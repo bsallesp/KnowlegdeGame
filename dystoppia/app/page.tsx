@@ -20,6 +20,7 @@ interface TopicHistory {
 
 export default function RootPage() {
   const { loading: authLoading } = useRequireUser();
+  const userRole = useAppStore((s) => s.userRole);
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -387,9 +388,43 @@ export default function RootPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.7 }}
-            className="flex gap-4 text-xs"
+            className="flex flex-wrap justify-center gap-4 text-xs"
             style={{ color: "#9494B8" }}
           >
+            {userRole === "master" && (
+              <>
+                <a
+                  href="/dashboard"
+                  className="hover:text-primary transition-colors flex items-center gap-1"
+                  style={{ color: "#818CF8" }}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                  Dashboard
+                </a>
+                <a
+                  href="/builder"
+                  className="hover:text-primary transition-colors flex items-center gap-1"
+                  style={{ color: "#818CF8" }}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                  Builder
+                </a>
+                <a
+                  href="/governance"
+                  className="hover:text-primary transition-colors flex items-center gap-1"
+                  style={{ color: "#818CF8" }}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  Governance
+                </a>
+              </>
+            )}
             <a
               href="/profile"
               className="hover:text-primary transition-colors flex items-center gap-1"
