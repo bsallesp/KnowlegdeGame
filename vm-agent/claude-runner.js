@@ -1,8 +1,13 @@
 const { spawn } = require("child_process");
 
-const DEFAULT_TIMEOUT_MS = 600000;
-const SLACK_CHUNK_SIZE = 3000;
+const DEFAULT_TIMEOUT_MS = 600_000; // 10 min
 
+/**
+ * Runs `claude --print <prompt>` and returns the output as a string.
+ * @param {string} message
+ * @param {Array<{role:string,content:string}>} conversationHistory
+ * @returns {Promise<string>}
+ */
 async function runClaude(message, conversationHistory = []) {
   const prompt = buildPrompt(message, conversationHistory);
 
@@ -32,26 +37,19 @@ async function runClaude(message, conversationHistory = []) {
     child.stdout.on("data", (chunk) => {
       stdout += chunk.toString();
     });
-
     child.stderr.on("data", (chunk) => {
       stderr += chunk.toString();
     });
 
     child.on("error", (error) => {
-      if (settled) {
-        return;
-      }
-
+      if (settled) return;
       settled = true;
       clearTimeout(timeout);
       resolve(`Erro ao executar Claude: ${error.message}`);
     });
 
     child.on("close", (code, signal) => {
-      if (settled) {
-        return;
-      }
-
+      if (settled) return;
       settled = true;
       clearTimeout(timeout);
 
@@ -60,7 +58,9 @@ async function runClaude(message, conversationHistory = []) {
         return;
       }
 
-      const reason = stderr.trim() || `Processo finalizado com código ${code ?? "desconhecido"} e sinal ${signal ?? "nenhum"}.`;
+      const reason =
+        stderr.trim() ||
+        `Processo finalizado com código ${code ?? "desconhecido"} e sinal ${signal ?? "nenhum"}.`;
       resolve(`Erro ao executar Claude: ${reason}`);
     });
   });
@@ -72,31 +72,11 @@ function buildPrompt(message, conversationHistory) {
   }
 
   const historyLines = conversationHistory.map((entry) => {
-    if (!entry || typeof entry !== "object") {
-      return String(entry);
-    }
-
-    const role = entry.role || "unknown";
-    const content = entry.content || "";
-    return `${role}: ${content}`;
+    if (!entry || typeof entry !== "object") return String(entry);
+    return `${entry.role || "unknown"}: ${entry.content || ""}`;
   });
 
   return `Contexto da conversa anterior:\n${historyLines.join("\n")}\n\nNova tarefa: ${message}`;
 }
 
-function formatForSlack(output) {
-  const text = String(output || "");
-  const chunks = [];
-
-  for (let index = 0; index < text.length; index += SLACK_CHUNK_SIZE) {
-    chunks.push(text.slice(index, index + SLACK_CHUNK_SIZE));
-  }
-
-  return chunks.length > 0 ? chunks : [""];
-}
-
-module.exports = {
-  runClaude,
-  buildPrompt,
-  formatForSlack,
-};
+module.exports = { runClaude, buildPrompt };

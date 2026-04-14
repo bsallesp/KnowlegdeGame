@@ -4,6 +4,9 @@ services:
     restart: unless-stopped
     env_file:
       - .env.vm
+    extra_hosts:
+      # Allows the Next.js container to reach the vm-agent on the host at port 3333
+      - "host.docker.internal:host-gateway"
 
   caddy:
     image: caddy:2-alpine
