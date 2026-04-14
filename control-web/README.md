@@ -5,7 +5,7 @@ Static frontend (fora da VM) para ligar/desligar a VM e, no futuro, interagir co
 ## Como funciona
 
 - Autenticação via Azure Entra ID (MSAL).
-- O browser pega um token de ARM (`https://management.azure.com/.default`).
+- O browser pega um token de ARM (`https://management.azure.com/user_impersonation`).
 - As chamadas de start/stop/status vão direto pro Azure Management REST API.
 
 Isso mantém o painel disponível mesmo se a VM estiver desligada.
@@ -39,4 +39,3 @@ npm run build
 ```
 
 Saída em `control-web/dist/` (publique em qualquer hosting estático).
-

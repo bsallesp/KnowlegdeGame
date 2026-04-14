@@ -5,7 +5,9 @@ import {
 } from "@azure/msal-browser";
 import { config } from "./config";
 
-const ARM_SCOPE = "https://management.azure.com/.default";
+// Standard delegated scope for Azure Resource Manager (Azure Service Management).
+// The user must have RBAC on the target subscription/resource group.
+const ARM_SCOPE = "https://management.azure.com/user_impersonation";
 
 export const msal = new PublicClientApplication({
   auth: {
@@ -53,4 +55,3 @@ export async function getArmAccessToken(): Promise<string> {
   });
   return result.accessToken;
 }
-
