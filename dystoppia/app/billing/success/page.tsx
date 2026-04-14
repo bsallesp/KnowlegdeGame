@@ -61,11 +61,11 @@ export default function BillingSuccessPage() {
           </div>
         )}
         <Link
-          href="/builder"
+          href="/"
           className="inline-block px-8 py-3 rounded-xl font-semibold text-sm"
           style={{ backgroundColor: "#818CF8", color: "#09090E" }}
         >
-          Back to Builder
+          Start Learning
         </Link>
       </motion.div>
     </div>

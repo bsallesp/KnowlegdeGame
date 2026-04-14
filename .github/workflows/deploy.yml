@@ -111,6 +111,12 @@ jobs:
           docker push $ACR_NAME.azurecr.io/dystoppia:${{ steps.tag.outputs.value }}
           docker push $ACR_NAME.azurecr.io/dystoppia:latest
 
+      - name: Purge old ACR images
+        run: |
+          az acr run --registry $ACR_NAME \
+            --cmd "acr purge --filter 'dystoppia:[0-9a-f]{7}' --ago 7d --keep 5 --untagged" \
+            /dev/null
+
       - name: Deploy to App Service
         run: |
           az webapp config container set \

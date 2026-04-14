@@ -1,3 +1,19 @@
 deploy.zip
 temp/*
 !temp/.gitkeep
+
+# dependencies
+node_modules/
+
+# build artifacts (common)
+.next/
+out/
+build/
+dist/
+coverage/
+
+# logs
+*.log
+
+# local build packages
+function-package.zip

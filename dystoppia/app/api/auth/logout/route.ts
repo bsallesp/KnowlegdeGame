@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-export async function DELETE() {
+async function clearSession() {
   const store = await cookies();
   store.set("dystoppia_uid", "", {
     httpOnly: true,
@@ -10,4 +10,12 @@ export async function DELETE() {
     maxAge: 0,
   });
   return NextResponse.json({ ok: true });
+}
+
+export async function DELETE() {
+  return clearSession();
+}
+
+export async function POST() {
+  return clearSession();
 }

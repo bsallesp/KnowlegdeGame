@@ -469,6 +469,17 @@ export async function POST(req: NextRequest) {
     const auth = await requireUser(req);
     if (auth instanceof NextResponse) return auth;
 
+    // Verify user still exists in DB (stale cookie guard)
+    const userExists = await prisma.user.findUnique({
+      where: { id: auth.userId },
+      select: { id: true },
+    });
+    if (!userExists) {
+      const res = NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      res.cookies.delete("dystoppia_uid");
+      return res;
+    }
+
     const { subItemId, difficulty, count = 3, stats } = await req.json();
 
     if (!subItemId) {
