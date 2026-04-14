@@ -7,6 +7,8 @@ Static frontend (fora da VM) para ligar/desligar a VM e, no futuro, interagir co
 - Autenticação via Azure Entra ID (MSAL).
 - O browser pega um token de ARM (`https://management.azure.com/user_impersonation`).
 - As chamadas de start/stop/status vão direto pro Azure Management REST API.
+- Para delegar tarefas ao agente na VM, usa **Azure VM Run Command** e chama o `vm-agent` via `localhost:3333`
+  (o token do agente é lido localmente da VM, sem expor segredo no frontend).
 
 Isso mantém o painel disponível mesmo se a VM estiver desligada.
 
@@ -18,6 +20,8 @@ Isso mantém o painel disponível mesmo se a VM estiver desligada.
    - Prod: o domínio onde você publicar (ex.: `https://control.seudominio.com`)
 3. Dar RBAC pro(s) usuário(s) que vão operar:
    - no mínimo `Contributor` no scope do resource group/VM (ex.: `rg-dystoppia-prod`).
+   - para o agente via Run Command, precisa do action `Microsoft.Compute/virtualMachines/runCommand/action`
+     (já incluso em `Contributor`).
 
 ## Config
 
