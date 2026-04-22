@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, vi, beforeEach, afterAll } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
@@ -6,9 +6,11 @@ import { NextRequest, NextResponse } from "next/server";
 const mockCreate = vi.hoisted(() => vi.fn());
 const mockFindMany = vi.hoisted(() => vi.fn());
 const mockFindUnique = vi.hoisted(() => vi.fn());
+const mockUserFindUnique = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
+    user: { findUnique: mockUserFindUnique },
     subItem: { findUnique: mockFindUnique },
     question: { findMany: mockFindMany, create: mockCreate },
   },
@@ -124,10 +126,14 @@ function makeRequest(body: Record<string, unknown>) {
 
 const { POST } = await import("@/app/api/generate-questions/route");
 
+const originalAnthropicApiKey = process.env.ANTHROPIC_API_KEY;
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
+  mockUserFindUnique.mockResolvedValue({ id: "user-1" });
   mockFindUnique.mockResolvedValue(mockSubItem);
   mockCreate.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
     Promise.resolve({ ...data, id: "new-q", createdAt: new Date() })
@@ -142,6 +148,14 @@ beforeEach(() => {
     weeklyRemaining: 0,
     weeklyResetsAt: new Date(),
   });
+});
+
+afterAll(() => {
+  if (originalAnthropicApiKey === undefined) {
+    delete process.env.ANTHROPIC_API_KEY;
+  } else {
+    process.env.ANTHROPIC_API_KEY = originalAnthropicApiKey;
+  }
 });
 
 // ─── Input validation ─────────────────────────────────────────────────────────
@@ -182,6 +196,25 @@ describe("cache hit", () => {
     expect(mockCreate_llm).not.toHaveBeenCalled();
     const { questions } = await res.json();
     expect(questions).toHaveLength(3);
+  });
+
+  test("returns cached questions without ANTHROPIC_API_KEY when cache is sufficient", async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    mockFindMany.mockResolvedValue([
+      makeDbQuestion({ id: "q-1" }),
+      makeDbQuestion({ id: "q-2" }),
+      makeDbQuestion({ id: "q-3" }),
+      makeDbQuestion({ id: "q-4" }),
+      makeDbQuestion({ id: "q-5" }),
+      makeDbQuestion({ id: "q-6" }),
+      makeDbQuestion({ id: "q-7" }),
+      makeDbQuestion({ id: "q-8" }),
+    ]);
+
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
+
+    expect(res.status).toBe(200);
+    expect(mockCreate_llm).not.toHaveBeenCalled();
   });
 
   test("parses options JSON string into array on cache hit", async () => {
@@ -261,6 +294,17 @@ describe("cache hit", () => {
 describe("generation path", () => {
   beforeEach(() => {
     mockFindMany.mockResolvedValue([]); // no cache
+  });
+
+  test("returns 503 before calling the LLM when ANTHROPIC_API_KEY is missing", async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
+
+    expect(res.status).toBe(503);
+    expect(mockCreate_llm).not.toHaveBeenCalled();
+    const body = await res.json();
+    expect(body.error).toBe("question_generation_not_configured");
   });
 
   test("calls the LLM when cache is insufficient", async () => {

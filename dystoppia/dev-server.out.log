@@ -6,133 +6,106 @@
 - Local:         http://localhost:3000
 - Network:       http://10.0.0.106:3000
 - Environments: .env.local
-✓ Ready in 589ms
+✓ Ready in 445ms
 Creating turbopack project {
-  dir: 'C:\\Users\\bsall\\OneDrive\\Área de Trabalho\\Dystoppia 1.0\\KnowlegdeGame\\dystoppia',
+  dir: 'C:\\Users\\bsall\\OneDrive\\Área de Trabalho\\Dystoppia\\KnowlegdeGame\\dystoppia',
   testMode: true
 }
 
- GET / 200 in 487ms (next.js: 221ms, application-code: 266ms)
- GET /api/auth/me 200 in 364ms (next.js: 193ms, application-code: 171ms)
- GET /api/auth/me 200 in 55ms (next.js: 6ms, application-code: 49ms)
- GET /api/onboarding/conversations 200 in 82ms (next.js: 45ms, application-code: 36ms)
- GET /api/auth/me 200 in 20ms (next.js: 5ms, application-code: 15ms)
- GET /api/onboarding/conversations 200 in 133ms (next.js: 45ms, application-code: 88ms)
- PUT /api/onboarding/conversations 200 in 46ms (next.js: 4ms, application-code: 42ms)
- PUT /api/onboarding/conversations 200 in 69ms (next.js: 5ms, application-code: 64ms)
- PUT /api/onboarding/conversations 200 in 72ms (next.js: 5ms, application-code: 67ms)
- POST /api/auth/login 200 in 382ms (next.js: 36ms, application-code: 345ms)
- GET /api/onboarding/conversations 200 in 13ms (next.js: 3ms, application-code: 10ms)
- PUT /api/onboarding/conversations 200 in 23ms (next.js: 2ms, application-code: 21ms)
- GET /api/onboarding/conversations 200 in 20ms (next.js: 3ms, application-code: 18ms)
-✓ Compiled in 442ms
- GET /api/onboarding/conversations 200 in 43ms (next.js: 3ms, application-code: 40ms)
- PUT /api/onboarding/conversations 200 in 68ms (next.js: 3ms, application-code: 65ms)
- PUT /api/onboarding/conversations 200 in 65ms (next.js: 2ms, application-code: 63ms)
- POST /api/auth/login 200 in 293ms (next.js: 8ms, application-code: 284ms)
- GET /api/onboarding/conversations 200 in 11ms (next.js: 3ms, application-code: 8ms)
- POST /api/auth/login 200 in 300ms (next.js: 2ms, application-code: 298ms)
- GET /api/onboarding/conversations 200 in 12ms (next.js: 2ms, application-code: 10ms)
- PUT /api/onboarding/conversations 200 in 75ms (next.js: 3ms, application-code: 72ms)
- PUT /api/onboarding/conversations 200 in 62ms (next.js: 3ms, application-code: 59ms)
- PUT /api/onboarding/conversations 200 in 58ms (next.js: 2ms, application-code: 56ms)
- PUT /api/onboarding/conversations 200 in 58ms (next.js: 2ms, application-code: 56ms)
- PUT /api/onboarding/conversations 200 in 58ms (next.js: 1966µs, application-code: 56ms)
- PUT /api/onboarding/conversations 200 in 65ms (next.js: 2ms, application-code: 63ms)
- PUT /api/onboarding/conversations 200 in 63ms (next.js: 2ms, application-code: 61ms)
- PUT /api/onboarding/conversations 200 in 80ms (next.js: 3ms, application-code: 77ms)
- PUT /api/onboarding/conversations 200 in 56ms (next.js: 2ms, application-code: 54ms)
- PUT /api/onboarding/conversations 200 in 61ms (next.js: 2ms, application-code: 59ms)
- PUT /api/onboarding/conversations 200 in 65ms (next.js: 3ms, application-code: 61ms)
- PUT /api/onboarding/conversations 200 in 68ms (next.js: 2ms, application-code: 66ms)
- PUT /api/onboarding/conversations 200 in 77ms (next.js: 2ms, application-code: 75ms)
- PUT /api/onboarding/conversations 200 in 64ms (next.js: 3ms, application-code: 60ms)
- POST /api/onboarding/refine 200 in 17.0s (next.js: 254ms, application-code: 16.7s)
- PUT /api/onboarding/conversations 200 in 106ms (next.js: 3ms, application-code: 103ms)
- PUT /api/onboarding/conversations 200 in 59ms (next.js: 2ms, application-code: 57ms)
- PUT /api/onboarding/conversations 200 in 103ms (next.js: 3ms, application-code: 100ms)
- PUT /api/onboarding/conversations 200 in 84ms (next.js: 4ms, application-code: 80ms)
- PUT /api/onboarding/conversations 200 in 65ms (next.js: 2ms, application-code: 63ms)
- PUT /api/onboarding/conversations 200 in 63ms (next.js: 3ms, application-code: 60ms)
- POST /api/onboarding/refine 200 in 75s (next.js: 1972µs, application-code: 75s)
- PUT /api/onboarding/conversations 200 in 93ms (next.js: 5ms, application-code: 89ms)
- PUT /api/onboarding/conversations 200 in 59ms (next.js: 2ms, application-code: 57ms)
- GET / 200 in 175ms (next.js: 113ms, application-code: 62ms)
- GET / 200 in 23ms (next.js: 3ms, application-code: 20ms)
-✓ Compiled in 54ms
- GET /api/onboarding/conversations 200 in 119ms (next.js: 61ms, application-code: 57ms)
- PUT /api/onboarding/conversations 200 in 80ms (next.js: 2ms, application-code: 78ms)
-✓ Compiled in 62ms
- GET /api/onboarding/conversations 200 in 22ms (next.js: 3ms, application-code: 19ms)
- PUT /api/onboarding/conversations 200 in 64ms (next.js: 2ms, application-code: 62ms)
-✓ Compiled in 105ms
- GET /api/onboarding/conversations 200 in 33ms (next.js: 3ms, application-code: 30ms)
- PUT /api/onboarding/conversations 200 in 70ms (next.js: 3ms, application-code: 67ms)
- POST /api/auth/login 200 in 362ms (next.js: 32ms, application-code: 330ms)
- POST /api/onboarding/personas 200 in 37.7s (next.js: 48ms, application-code: 37.7s)
-✓ Compiled in 44ms
- GET /api/onboarding/conversations 200 in 47ms (next.js: 5ms, application-code: 42ms)
- PUT /api/onboarding/conversations 200 in 86ms (next.js: 3ms, application-code: 83ms)
-✓ Compiled in 70ms
- GET /api/onboarding/conversations 200 in 22ms (next.js: 10ms, application-code: 12ms)
- PUT /api/onboarding/conversations 200 in 73ms (next.js: 4ms, application-code: 69ms)
-✓ Compiled in 58ms
- GET /api/onboarding/conversations 200 in 12ms (next.js: 3ms, application-code: 9ms)
- PUT /api/onboarding/conversations 200 in 65ms (next.js: 2ms, application-code: 63ms)
- POST /api/auth/login 200 in 309ms (next.js: 3ms, application-code: 306ms)
- POST /api/onboarding/personas 200 in 47s (next.js: 68ms, application-code: 47s)
- POST /api/auth/login 200 in 307ms (next.js: 3ms, application-code: 305ms)
- POST /api/onboarding/personas 200 in 49s (next.js: 51ms, application-code: 49s)
- GET / 200 in 187ms (next.js: 98ms, application-code: 88ms)
- GET / 200 in 45ms (next.js: 5ms, application-code: 39ms)
- POST /api/auth/login 200 in 388ms (next.js: 57ms, application-code: 331ms)
- POST /api/onboarding/personas 200 in 50s (next.js: 33ms, application-code: 50s)
- POST /api/onboarding/refine 200 in 52s (next.js: 68ms, application-code: 52s)
-✓ Compiled in 48ms
- GET /api/onboarding/conversations 200 in 75ms (next.js: 35ms, application-code: 40ms)
- PUT /api/onboarding/conversations 200 in 70ms (next.js: 1999µs, application-code: 68ms)
-✓ Compiled in 151ms
- GET /api/onboarding/conversations 200 in 40ms (next.js: 3ms, application-code: 37ms)
- PUT /api/onboarding/conversations 200 in 66ms (next.js: 3ms, application-code: 63ms)
-✓ Compiled in 44ms
- GET /api/onboarding/conversations 200 in 32ms (next.js: 2ms, application-code: 30ms)
- PUT /api/onboarding/conversations 200 in 62ms (next.js: 2ms, application-code: 60ms)
-✓ Compiled in 64ms
- GET /api/onboarding/conversations 200 in 31ms (next.js: 2ms, application-code: 28ms)
- PUT /api/onboarding/conversations 200 in 69ms (next.js: 2ms, application-code: 67ms)
- PUT /api/onboarding/conversations 200 in 114ms (next.js: 2ms, application-code: 112ms)
- POST /api/onboarding/personas 200 in 41s (next.js: 10ms, application-code: 41s)
- PUT /api/onboarding/conversations 200 in 84ms (next.js: 3ms, application-code: 81ms)
- PUT /api/onboarding/conversations 200 in 111ms (next.js: 2ms, application-code: 109ms)
- PUT /api/onboarding/conversations 200 in 125ms (next.js: 1997µs, application-code: 123ms)
- PUT /api/onboarding/conversations 200 in 82ms (next.js: 2ms, application-code: 80ms)
- PUT /api/onboarding/conversations 200 in 115ms (next.js: 1857µs, application-code: 113ms)
- PUT /api/onboarding/conversations 200 in 79ms (next.js: 1892µs, application-code: 77ms)
- PUT /api/onboarding/conversations 200 in 140ms (next.js: 2ms, application-code: 138ms)
- PUT /api/onboarding/conversations 200 in 80ms (next.js: 1987µs, application-code: 78ms)
- PUT /api/onboarding/conversations 200 in 105ms (next.js: 2ms, application-code: 103ms)
- PUT /api/onboarding/conversations 200 in 123ms (next.js: 3ms, application-code: 120ms)
- POST /api/onboarding/refine 200 in 31.5s (next.js: 117ms, application-code: 31.4s)
- PUT /api/onboarding/conversations 200 in 82ms (next.js: 3ms, application-code: 79ms)
- PUT /api/onboarding/conversations 200 in 80ms (next.js: 2ms, application-code: 78ms)
- PUT /api/onboarding/conversations 200 in 134ms (next.js: 2ms, application-code: 131ms)
- PUT /api/onboarding/conversations 200 in 112ms (next.js: 1699µs, application-code: 110ms)
- PUT /api/onboarding/conversations 200 in 111ms (next.js: 2ms, application-code: 109ms)
- PUT /api/onboarding/conversations 200 in 113ms (next.js: 1926µs, application-code: 111ms)
- PUT /api/onboarding/conversations 200 in 110ms (next.js: 1907µs, application-code: 108ms)
- PUT /api/onboarding/conversations 200 in 114ms (next.js: 2ms, application-code: 112ms)
- PUT /api/onboarding/conversations 200 in 106ms (next.js: 2ms, application-code: 104ms)
- PUT /api/onboarding/conversations 200 in 105ms (next.js: 1997µs, application-code: 103ms)
- PUT /api/onboarding/conversations 200 in 104ms (next.js: 1892µs, application-code: 102ms)
- PUT /api/onboarding/conversations 200 in 77ms (next.js: 1903µs, application-code: 75ms)
- PUT /api/onboarding/conversations 200 in 106ms (next.js: 3ms, application-code: 103ms)
- PUT /api/onboarding/conversations 200 in 120ms (next.js: 3ms, application-code: 117ms)
- POST /api/onboarding/refine 200 in 64s (next.js: 2ms, application-code: 64s)
- PUT /api/onboarding/conversations 200 in 137ms (next.js: 3ms, application-code: 134ms)
- PUT /api/onboarding/conversations 200 in 126ms (next.js: 2ms, application-code: 124ms)
-✓ Compiled in 55ms
- GET /api/onboarding/conversations 200 in 52ms (next.js: 5ms, application-code: 48ms)
- PUT /api/onboarding/conversations 200 in 120ms (next.js: 3ms, application-code: 117ms)
-✓ Compiled in 59ms
- GET /api/onboarding/conversations 200 in 27ms (next.js: 2ms, application-code: 24ms)
- PUT /api/onboarding/conversations 200 in 111ms (next.js: 4ms, application-code: 107ms)
+ GET /login 200 in 540ms (next.js: 308ms, application-code: 231ms)
+ GET /api/auth/me 401 in 147ms (next.js: 128ms, application-code: 19ms)
+ POST /api/auth/login 401 in 206ms (next.js: 35ms, application-code: 171ms)
+[dev-email] Azure Email is not configured. Use OTP 751093
+ POST /api/auth/register 200 in 804ms (next.js: 449ms, application-code: 354ms)
+ POST /api/auth/verify-email 200 in 155ms (next.js: 126ms, application-code: 29ms)
+ POST /api/auth/login 200 in 281ms (next.js: 3ms, application-code: 279ms)
+ POST /api/auth/login 401 in 51ms (next.js: 5ms, application-code: 46ms)
+ GET /login 200 in 101ms (next.js: 4ms, application-code: 97ms)
+ GET /api/auth/me 401 in 10ms (next.js: 3ms, application-code: 8ms)
+ POST /api/auth/login 401 in 45ms (next.js: 4ms, application-code: 41ms)
+ POST /api/auth/login 200 in 317ms (next.js: 3ms, application-code: 315ms)
+ GET /api/auth/me 200 in 12ms (next.js: 3ms, application-code: 9ms)
+ GET /api/credits/balance 200 in 148ms (next.js: 134ms, application-code: 14ms)
+ POST /api/auth/login 401 in 340ms (next.js: 3ms, application-code: 337ms)
+ POST /api/auth/login 401 in 296ms (next.js: 1835µs, application-code: 294ms)
+ POST /api/auth/login 200 in 332ms (next.js: 1974µs, application-code: 330ms)
+ GET /api/auth/me 200 in 25ms (next.js: 3ms, application-code: 21ms)
+ POST /api/auth/login 200 in 354ms (next.js: 3ms, application-code: 352ms)
+ GET / 200 in 62ms (next.js: 35ms, application-code: 26ms)
+ GET /api/auth/me 200 in 17ms (next.js: 4ms, application-code: 13ms)
+ GET /api/auth/me 200 in 54ms (next.js: 8ms, application-code: 46ms)
+ GET /api/topics 200 in 153ms (next.js: 131ms, application-code: 21ms)
+ GET /api/topics?slug=ged-mathematical-reasoning 200 in 58ms (next.js: 4ms, application-code: 54ms)
+ GET /session 200 in 1409ms (next.js: 1372ms, application-code: 37ms)
+ GET /api/auth/me 200 in 14ms (next.js: 4ms, application-code: 10ms)
+ GET /api/auth/me 200 in 23ms (next.js: 3ms, application-code: 19ms)
+ GET /api/stats?topicId=cmoa6mf3m000b6st6xmfeoxkc 200 in 179ms (next.js: 158ms, application-code: 21ms)
+ GET /api/stats?topicId=cmoa6mf3m000b6st6xmfeoxkc 200 in 14ms (next.js: 4ms, application-code: 10ms)
+[36m[1mINFO [0m [2m2026-04-22T15:08:31.536Z[0m [1m[generate-questions][0m SubItem "Order of operations (PEMDAS)" — found 0 cached, need 5
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000d6st6hwyv5427",
+          "difficulty": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:08:31.540Z[0m [1m[generate-questions][0m Cache empty — generating 5 questions synchronously
+[35m[1mDEBUG[0m [2m2026-04-22T15:08:31.542Z[0m [1m[generate-questions][0m Using teaching profile: scenario_based / application
+ POST /api/generate-questions 500 in 366ms (next.js: 316ms, application-code: 51ms)
+✓ Compiled in 248ms
+ GET /session 200 in 238ms (next.js: 105ms, application-code: 133ms)
+ GET /session 200 in 49ms (next.js: 5ms, application-code: 44ms)
+ POST /api/generate-questions 503 in 139ms (next.js: 51ms, application-code: 87ms)
+ GET /session 200 in 41ms (next.js: 12ms, application-code: 29ms)
+ GET /session 200 in 34ms (next.js: 5ms, application-code: 30ms)
+[36m[1mINFO [0m [2m2026-04-22T15:14:20.104Z[0m [1m[generate-questions][0m SubItem "Order of operations (PEMDAS)" — found 0 cached, need 1
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000d6st6hwyv5427",
+          "difficulty": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:14:20.107Z[0m [1m[generate-questions][0m Cache empty — generating 1 questions synchronously
+ POST /api/generate-questions 503 in 134ms (next.js: 50ms, application-code: 84ms)
+ GET /session 200 in 187ms (next.js: 5ms, application-code: 182ms)
+ GET /api/auth/me 200 in 97ms (next.js: 41ms, application-code: 56ms)
+[36m[1mINFO [0m [2m2026-04-22T15:16:33.444Z[0m [1m[generate-questions][0m SubItem "Fractions and mixed numbers" — found 0 cached, need 5
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000e6st6ofl6vwra",
+          "difficulty": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:16:33.446Z[0m [1m[generate-questions][0m Cache empty — generating 5 questions synchronously
+ POST /api/generate-questions 503 in 75ms (next.js: 4ms, application-code: 72ms)
+ GET /api/stats?topicId=cmoa6mf3m000b6st6xmfeoxkc 200 in 45ms (next.js: 26ms, application-code: 18ms)
+[36m[1mINFO [0m [2m2026-04-22T15:16:33.619Z[0m [1m[generate-questions][0m SubItem "Order of operations (PEMDAS)" — found 0 cached, need 5
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000d6st6hwyv5427",
+          "difficulty": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:16:33.623Z[0m [1m[generate-questions][0m Cache empty — generating 5 questions synchronously
+ POST /api/generate-questions 503 in 36ms (next.js: 2ms, application-code: 34ms)
+ GET /session 200 in 55ms (next.js: 4ms, application-code: 51ms)
+ GET /session 200 in 50ms (next.js: 3ms, application-code: 47ms)
+ GET /api/auth/me 200 in 54ms (next.js: 3ms, application-code: 50ms)
+[36m[1mINFO [0m [2m2026-04-22T15:17:05.615Z[0m [1m[generate-questions][0m SubItem "Order of operations (PEMDAS)" — found 0 cached, need 5
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000d6st6hwyv5427",
+          "difficulty": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:17:05.618Z[0m [1m[generate-questions][0m Cache empty — generating 5 questions synchronously
+ POST /api/generate-questions 503 in 81ms (next.js: 2ms, application-code: 79ms)
+ GET /api/stats?topicId=cmoa6mf3m000b6st6xmfeoxkc 200 in 12ms (next.js: 2ms, application-code: 9ms)
+[36m[1mINFO [0m [2m2026-04-22T15:17:05.812Z[0m [1m[generate-questions][0m SubItem "Fractions and mixed numbers" — found 0 cached, need 5
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000e6st6ofl6vwra",
+          "difficulty": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:17:05.815Z[0m [1m[generate-questions][0m Cache empty — generating 5 questions synchronously
+ POST /api/generate-questions 503 in 50ms (next.js: 4ms, application-code: 46ms)
+  Reload env: .env.local
+ GET /session 200 in 138ms (next.js: 82ms, application-code: 56ms)
+ GET /session 200 in 105ms (next.js: 3ms, application-code: 102ms)
+ GET /api/auth/me 200 in 141ms (next.js: 44ms, application-code: 97ms)
+[36m[1mINFO [0m [2m2026-04-22T15:23:28.711Z[0m [1m[generate-questions][0m SubItem "Decimals and rounding" — found 0 cached, need 5
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000f6st6e1uwludr",
+          "difficulty": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:23:28.713Z[0m [1m[generate-questions][0m Cache empty — generating 5 questions synchronously
+[35m[1mDEBUG[0m [2m2026-04-22T15:23:28.715Z[0m [1m[generate-questions][0m Using teaching profile: scenario_based / application
+ GET /api/stats?topicId=cmoa6mf3m000b6st6xmfeoxkc 200 in 90ms (next.js: 17ms, application-code: 73ms)

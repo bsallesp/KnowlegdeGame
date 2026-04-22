@@ -25,6 +25,18 @@ interface LogEntry {
   data?:     unknown;
 }
 
+function serializeLogData(data: unknown): unknown {
+  if (data instanceof Error) {
+    return {
+      name: data.name,
+      message: data.message,
+      stack: process.env.NODE_ENV === "development" ? data.stack : undefined,
+    };
+  }
+
+  return data;
+}
+
 // ─── File output ──────────────────────────────────────────────────────────────
 
 function writeToFile(entry: LogEntry) {
@@ -97,6 +109,7 @@ function printClient(entry: LogEntry) {
 
 function log(level: Level, context: string, message: string, data?: unknown, requestId?: string) {
   if (level === "debug" && process.env.NODE_ENV !== "development") return;
+  const serializedData = data !== undefined ? serializeLogData(data) : undefined;
 
   const entry: LogEntry = {
     ts: new Date().toISOString(),
@@ -104,7 +117,7 @@ function log(level: Level, context: string, message: string, data?: unknown, req
     context,
     message,
     ...(requestId ? { requestId } : {}),
-    ...(data !== undefined ? { data } : {}),
+    ...(serializedData !== undefined ? { data: serializedData } : {}),
   };
 
   if (typeof window === "undefined") {

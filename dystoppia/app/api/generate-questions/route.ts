@@ -13,6 +13,17 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+function hasAnthropicApiKey(): boolean {
+  return Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+}
+
+class QuestionGenerationConfigError extends Error {
+  constructor() {
+    super("Question generation is not configured");
+    this.name = "QuestionGenerationConfigError";
+  }
+}
+
 function shuffleOptions(options: string[] | null, type: string): string[] | null {
   if (!options || type === "true_false") return options;
   return [...options].sort(() => Math.random() - 0.5);
@@ -367,6 +378,10 @@ async function generateAndSaveQuestions(
   correctRate: number,
   count: number
 ): Promise<SavedQuestion[]> {
+  if (!hasAnthropicApiKey()) {
+    throw new QuestionGenerationConfigError();
+  }
+
   let teachingProfile: TeachingProfile | null = null;
   if (subItem.item.topic.teachingProfile) {
     try {
@@ -599,9 +614,25 @@ export async function POST(req: NextRequest) {
       })),
     });
   } catch (error) {
+    if (error instanceof QuestionGenerationConfigError) {
+      logger.error("generate-questions", "ANTHROPIC_API_KEY is not configured");
+      return NextResponse.json(
+        {
+          error: "question_generation_not_configured",
+          message: process.env.NODE_ENV === "production"
+            ? "Question generation is temporarily unavailable."
+            : "Question generation is not configured. Add ANTHROPIC_API_KEY to .env.local and restart the dev server.",
+        },
+        { status: 503 }
+      );
+    }
+
     logger.error("generate-questions", "Failed to generate questions", error);
     return NextResponse.json(
-      { error: "Failed to generate questions", details: String(error) },
+      {
+        error: "Failed to generate questions",
+        ...(process.env.NODE_ENV === "development" ? { details: String(error) } : {}),
+      },
       { status: 500 }
     );
   }

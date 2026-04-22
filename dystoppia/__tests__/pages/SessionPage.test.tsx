@@ -135,7 +135,7 @@ vi.mock("@/lib/adaptive", () => ({
   selectNextSubItem: vi.fn(() => "sub-1"),
 }));
 
-vi.mock("@/lib/logger", () => ({
+vi.mock("@/lib/clientLogger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 

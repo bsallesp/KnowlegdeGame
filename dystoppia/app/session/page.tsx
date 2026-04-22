@@ -19,7 +19,7 @@ import AudiobookPlayer from "@/components/AudiobookPlayer";
 import AudiobookDialog, { type AudiobookEntry } from "@/components/AudiobookDialog";
 import SettingsDialog from "@/components/SettingsDialog";
 import { selectNextSubItem } from "@/lib/adaptive";
-import { logger } from "@/lib/logger";
+import { logger } from "@/lib/clientLogger";
 import type { Question } from "@/types";
 
 interface XPPopup {
@@ -202,14 +202,20 @@ export default function SessionPage() {
           setShowPaywall(true);
           return;
         }
-        if (!res.ok) throw new Error("Failed to generate questions");
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({})) as { message?: unknown };
+          const message = res.status === 503 && typeof body.message === "string"
+            ? body.message
+            : "Failed to generate questions";
+          throw new Error(message);
+        }
         const data = await res.json();
         const questionsWithSubItem: Question[] = data.questions.map((q: Question) => ({ ...q, subItem }));
         logger.debug("session", `Added ${questionsWithSubItem.length} questions to queue`);
         addToQueue(questionsWithSubItem);
       } catch (err) {
         logger.error("session", "Failed to generate questions", err);
-        setSessionError("Could not load questions. Try again.");
+        setSessionError(err instanceof Error ? err.message : "Could not load questions. Try again.");
       } finally {
         isFetchingRef.current = false;
         setIsGenerating(false);

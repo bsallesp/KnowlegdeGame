@@ -1,1 +1,164 @@
-^C^C
+⚠ ./lib/logger.ts:33:18
+Module not found: Can't resolve 'fs'
+  [90m31 |[0m   [36mtry[0m {
+  [90m32 |[0m     [90m// eslint-disable-next-line @typescript-eslint/no-require-imports[0m
+[31m[1m>[0m [90m33 |[0m     [36mconst[0m fs   = require([32m"fs"[0m)   [36mas[0m [36mtypeof[0m [36mimport[0m([32m"fs"[0m);
+  [90m   |[0m                  [31m[1m^^^^^^^^^^^^^[0m
+  [90m34 |[0m     [90m// eslint-disable-next-line @typescript-eslint/no-require-imports[0m
+  [90m35 |[0m     [36mconst[0m path = require([32m"path"[0m) [36mas[0m [36mtypeof[0m [36mimport[0m([32m"path"[0m);
+  [90m36 |[0m     [36mconst[0m logDir  = path.resolve(process.cwd(), [32m"logs"[0m);
+
+
+
+Import traces:
+  Client Component Browser:
+    ./lib/logger.ts [Client Component Browser]
+    ./app/session/page.tsx [Client Component Browser]
+    ./app/session/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./lib/logger.ts [Client Component SSR]
+    ./app/session/page.tsx [Client Component SSR]
+    ./app/session/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⚠ ./lib/logger.ts:33:18
+Module not found: Can't resolve 'fs'
+  [90m31 |[0m   [36mtry[0m {
+  [90m32 |[0m     [90m// eslint-disable-next-line @typescript-eslint/no-require-imports[0m
+[31m[1m>[0m [90m33 |[0m     [36mconst[0m fs   = require([32m"fs"[0m)   [36mas[0m [36mtypeof[0m [36mimport[0m([32m"fs"[0m);
+  [90m   |[0m                  [31m[1m^^^^^^^^^^^^^[0m
+  [90m34 |[0m     [90m// eslint-disable-next-line @typescript-eslint/no-require-imports[0m
+  [90m35 |[0m     [36mconst[0m path = require([32m"path"[0m) [36mas[0m [36mtypeof[0m [36mimport[0m([32m"path"[0m);
+  [90m36 |[0m     [36mconst[0m logDir  = path.resolve(process.cwd(), [32m"logs"[0m);
+
+
+
+Import traces:
+  Client Component Browser:
+    ./lib/logger.ts [Client Component Browser]
+    ./app/session/page.tsx [Client Component Browser]
+    ./app/session/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./lib/logger.ts [Client Component SSR]
+    ./app/session/page.tsx [Client Component SSR]
+    ./app/session/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⚠ ./lib/logger.ts:33:18
+Module not found: Can't resolve 'fs'
+  [90m31 |[0m   [36mtry[0m {
+  [90m32 |[0m     [90m// eslint-disable-next-line @typescript-eslint/no-require-imports[0m
+[31m[1m>[0m [90m33 |[0m     [36mconst[0m fs   = require([32m"fs"[0m)   [36mas[0m [36mtypeof[0m [36mimport[0m([32m"fs"[0m);
+  [90m   |[0m                  [31m[1m^^^^^^^^^^^^^[0m
+  [90m34 |[0m     [90m// eslint-disable-next-line @typescript-eslint/no-require-imports[0m
+  [90m35 |[0m     [36mconst[0m path = require([32m"path"[0m) [36mas[0m [36mtypeof[0m [36mimport[0m([32m"path"[0m);
+  [90m36 |[0m     [36mconst[0m logDir  = path.resolve(process.cwd(), [32m"logs"[0m);
+
+
+
+Import traces:
+  Client Component Browser:
+    ./lib/logger.ts [Client Component Browser]
+    ./app/session/page.tsx [Client Component Browser]
+    ./app/session/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./lib/logger.ts [Client Component SSR]
+    ./app/session/page.tsx [Client Component SSR]
+    ./app/session/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⚠ ./lib/logger.ts:33:18
+Module not found: Can't resolve 'fs'
+  [90m31 |[0m   [36mtry[0m {
+  [90m32 |[0m     [90m// eslint-disable-next-line @typescript-eslint/no-require-imports[0m
+[31m[1m>[0m [90m33 |[0m     [36mconst[0m fs   = require([32m"fs"[0m)   [36mas[0m [36mtypeof[0m [36mimport[0m([32m"fs"[0m);
+  [90m   |[0m                  [31m[1m^^^^^^^^^^^^^[0m
+  [90m34 |[0m     [90m// eslint-disable-next-line @typescript-eslint/no-require-imports[0m
+  [90m35 |[0m     [36mconst[0m path = require([32m"path"[0m) [36mas[0m [36mtypeof[0m [36mimport[0m([32m"path"[0m);
+  [90m36 |[0m     [36mconst[0m logDir  = path.resolve(process.cwd(), [32m"logs"[0m);
+
+
+
+Import traces:
+  Client Component Browser:
+    ./lib/logger.ts [Client Component Browser]
+    ./app/session/page.tsx [Client Component Browser]
+    ./app/session/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./lib/logger.ts [Client Component SSR]
+    ./app/session/page.tsx [Client Component SSR]
+    ./app/session/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⚠ ./lib/logger.ts:33:18
+Module not found: Can't resolve 'fs'
+  [90m31 |[0m   [36mtry[0m {
+  [90m32 |[0m     [90m// eslint-disable-next-line @typescript-eslint/no-require-imports[0m
+[31m[1m>[0m [90m33 |[0m     [36mconst[0m fs   = require([32m"fs"[0m)   [36mas[0m [36mtypeof[0m [36mimport[0m([32m"fs"[0m);
+  [90m   |[0m                  [31m[1m^^^^^^^^^^^^^[0m
+  [90m34 |[0m     [90m// eslint-disable-next-line @typescript-eslint/no-require-imports[0m
+  [90m35 |[0m     [36mconst[0m path = require([32m"path"[0m) [36mas[0m [36mtypeof[0m [36mimport[0m([32m"path"[0m);
+  [90m36 |[0m     [36mconst[0m logDir  = path.resolve(process.cwd(), [32m"logs"[0m);
+
+
+
+Import traces:
+  Client Component Browser:
+    ./lib/logger.ts [Client Component Browser]
+    ./app/session/page.tsx [Client Component Browser]
+    ./app/session/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./lib/logger.ts [Client Component SSR]
+    ./app/session/page.tsx [Client Component SSR]
+    ./app/session/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⚠ ./lib/logger.ts:33:18
+Module not found: Can't resolve 'fs'
+  [90m31 |[0m   [36mtry[0m {
+  [90m32 |[0m     [90m// eslint-disable-next-line @typescript-eslint/no-require-imports[0m
+[31m[1m>[0m [90m33 |[0m     [36mconst[0m fs   = require([32m"fs"[0m)   [36mas[0m [36mtypeof[0m [36mimport[0m([32m"fs"[0m);
+  [90m   |[0m                  [31m[1m^^^^^^^^^^^^^[0m
+  [90m34 |[0m     [90m// eslint-disable-next-line @typescript-eslint/no-require-imports[0m
+  [90m35 |[0m     [36mconst[0m path = require([32m"path"[0m) [36mas[0m [36mtypeof[0m [36mimport[0m([32m"path"[0m);
+  [90m36 |[0m     [36mconst[0m logDir  = path.resolve(process.cwd(), [32m"logs"[0m);
+
+
+
+Import traces:
+  Client Component Browser:
+    ./lib/logger.ts [Client Component Browser]
+    ./app/session/page.tsx [Client Component Browser]
+    ./app/session/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./lib/logger.ts [Client Component SSR]
+    ./app/session/page.tsx [Client Component SSR]
+    ./app/session/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[31m[1mERROR[0m [2m2026-04-22T15:08:31.548Z[0m [1m[generate-questions][0m Failed to generate questions
+[2m      ↳[0m {}
+[31m[1mERROR[0m [2m2026-04-22T15:12:24.595Z[0m [1m[generate-questions][0m ANTHROPIC_API_KEY is not configured
+[31m[1mERROR[0m [2m2026-04-22T15:14:20.109Z[0m [1m[generate-questions][0m ANTHROPIC_API_KEY is not configured
+[31m[1mERROR[0m [2m2026-04-22T15:16:33.448Z[0m [1m[generate-questions][0m ANTHROPIC_API_KEY is not configured
+[31m[1mERROR[0m [2m2026-04-22T15:16:33.624Z[0m [1m[generate-questions][0m ANTHROPIC_API_KEY is not configured
+[31m[1mERROR[0m [2m2026-04-22T15:17:05.619Z[0m [1m[generate-questions][0m ANTHROPIC_API_KEY is not configured
+[31m[1mERROR[0m [2m2026-04-22T15:17:05.817Z[0m [1m[generate-questions][0m ANTHROPIC_API_KEY is not configured
