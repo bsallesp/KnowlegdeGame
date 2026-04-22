@@ -126,6 +126,7 @@ function makeLLMStream(chunks: string[]) {
 }
 
 beforeEach(() => {
+  process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
   mockTopicFindUnique.mockReset();
   mockTopicCreate.mockReset();
   mockItemCreate.mockReset();

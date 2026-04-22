@@ -6,6 +6,7 @@ import { logger } from "@/lib/logger";
 import { requireUser } from "@/lib/authGuard";
 import { checkRateLimit, RateLimitError } from "@/lib/rateLimit";
 import { logLLMUsage } from "@/lib/llmLogger";
+import { requireAnthropicKey } from "@/lib/anthropicGuard";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -20,6 +21,9 @@ function sseEvent(data: object): Uint8Array {
 export async function POST(req: NextRequest) {
   const auth = await requireUser(req);
   if (auth instanceof NextResponse) return auth;
+
+  const keyGuard = requireAnthropicKey("generate-structure");
+  if (keyGuard) return keyGuard;
 
   const { topic, onboardingContext } = await req.json() as { topic: string; onboardingContext?: string };
 

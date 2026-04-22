@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "@/lib/logger";
 import { logLLMUsage } from "@/lib/llmLogger";
+import { requireAnthropicKey } from "@/lib/anthropicGuard";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -12,6 +13,9 @@ export async function POST(req: NextRequest) {
     if (!questionContent) {
       return NextResponse.json({ error: "questionContent is required" }, { status: 400 });
     }
+
+    const keyGuard = requireAnthropicKey("hint");
+    if (keyGuard) return keyGuard;
 
     const prompt = `You are a helpful tutor. A student is stuck on this quiz question and needs a hint — but NOT the answer.
 

@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { requireUser } from "@/lib/authGuard";
 import { getTTSProvider } from "@/lib/tts";
 import { logLLMUsage } from "@/lib/llmLogger";
+import { requireAnthropicKey } from "@/lib/anthropicGuard";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -104,6 +105,9 @@ export async function POST(req: NextRequest) {
   try {
     const auth = await requireUser(req);
     if (auth instanceof NextResponse) return auth;
+
+    const keyGuard = requireAnthropicKey("audiobook-generate");
+    if (keyGuard) return keyGuard;
 
     const body: AudiobookRequest = await req.json();
     const { topicId, itemId, subItemId, subItemStats } = body;

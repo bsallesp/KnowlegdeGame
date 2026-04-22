@@ -34,6 +34,9 @@ const REFILL_THRESHOLD = 8;
 // How many questions to generate per background refill
 const REFILL_BATCH = 5;
 const MAX_GENERATION_ATTEMPTS = 3;
+// Budget for generation output. Adaptive thinking consumes from this budget,
+// so it must be comfortably above the JSON payload size for REFILL_BATCH questions.
+const GENERATION_MAX_TOKENS = 8000;
 
 interface GeneratedQuestion {
   type: "multiple_choice" | "single_choice" | "fill_blank" | "true_false";
@@ -89,11 +92,22 @@ function extractTextContent(message: { content: Array<{ type: string; text?: str
 }
 
 function parseJsonPayload<T>(rawText: string): T {
-  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  const fenceStripped = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+  const jsonMatch = fenceStripped.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
+    logger.error("generate-questions", "No JSON object found in LLM response", { preview: rawText.slice(0, 500) });
     throw new Error("Could not parse JSON from LLM response");
   }
-  return JSON.parse(jsonMatch[0]) as T;
+  try {
+    return JSON.parse(jsonMatch[0]) as T;
+  } catch (err) {
+    logger.error("generate-questions", "JSON.parse failed on LLM response", {
+      error: String(err),
+      length: rawText.length,
+      tail: rawText.slice(-300),
+    });
+    throw err;
+  }
 }
 
 function normalizeQuestion(raw: GeneratedQuestion): GeneratedQuestion | null {
@@ -226,10 +240,14 @@ Rules:
 async function requestQuestionBatch(prompt: string, userId: string): Promise<GeneratedQuestion[]> {
   const message = await client.messages.create({
     model: GENERATION_MODEL,
-    max_tokens: 3000,
+    max_tokens: GENERATION_MAX_TOKENS,
     thinking: { type: "adaptive", display: "omitted" },
     messages: [{ role: "user", content: prompt }],
   });
+
+  if (message.stop_reason === "max_tokens") {
+    logger.warn("generate-questions", "Generation hit max_tokens — response likely truncated");
+  }
 
   logLLMUsage({
     userId,
@@ -289,7 +307,6 @@ ${JSON.stringify(
     const message = await client.messages.create({
       model: VALIDATION_MODEL,
       max_tokens: Math.max(500, normalizedEntries.length * 140),
-      thinking: { type: "adaptive", display: "omitted" },
       messages: [{ role: "user", content: validationPrompt }],
     });
 

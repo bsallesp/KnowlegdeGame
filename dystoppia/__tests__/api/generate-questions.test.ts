@@ -391,6 +391,38 @@ describe("generation path", () => {
     expect(res.status).toBe(500);
   });
 
+  // ── Bug regression: response truncated at max_tokens produces invalid JSON ───
+  // The wild failure: max_tokens=3000 with adaptive thinking + REFILL_BATCH=5
+  // questions cut the payload mid-array and JSON.parse threw. Root cause fixed
+  // by raising GENERATION_MAX_TOKENS to 8000. This test pins current behavior:
+  // a truncated batch surfaces as 500 (the retry loop around requestQuestionBatch
+  // does not catch parseJsonPayload exceptions — a batch-level try/catch with
+  // retry on parse failure would add resilience but is out of scope here).
+  test("returns 500 when an LLM batch returns JSON truncated at max_tokens", async () => {
+    const truncated =
+      '{"questions":[{"type":"multiple_choice","content":"Q1","options":["A","B","C","D"],"answer":"A","explanation":"e",';
+    mockCreate_llm.mockResolvedValue({
+      content: [{ type: "text", text: truncated }],
+      usage: { input_tokens: 10, output_tokens: 20 },
+      stop_reason: "max_tokens",
+    });
+
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
+    expect(res.status).toBe(500);
+  });
+
+  // ── Bug regression: LLM wraps JSON in ```json ... ``` markdown fence ────────
+  test("parses LLM response wrapped in markdown code fence", async () => {
+    const fenced = "```json\n" + JSON.stringify({ questions: [makeLLMQuestion()] }) + "\n```";
+    mockCreate_llm.mockResolvedValue({
+      content: [{ type: "text", text: fenced }],
+      usage: { input_tokens: 10, output_tokens: 20 },
+    });
+
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
+    expect(res.status).toBe(200);
+  });
+
   test("handles invalid teachingProfile JSON (still generates questions)", async () => {
     mockFindUnique.mockResolvedValue({
       ...mockSubItem,

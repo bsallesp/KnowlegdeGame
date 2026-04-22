@@ -87,6 +87,7 @@ function mockLLM(text = "This is the audio script.") {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
   mockUserFindUnique.mockResolvedValue({ plan: "learner" });
   mockTopicFindUnique.mockResolvedValue(TOPIC);
   mockSynthesize.mockResolvedValue(AUDIO_BUFFER);

@@ -109,3 +109,181 @@ Creating turbopack project {
 [36m[1mINFO [0m [2m2026-04-22T15:23:28.713Z[0m [1m[generate-questions][0m Cache empty — generating 5 questions synchronously
 [35m[1mDEBUG[0m [2m2026-04-22T15:23:28.715Z[0m [1m[generate-questions][0m Using teaching profile: scenario_based / application
  GET /api/stats?topicId=cmoa6mf3m000b6st6xmfeoxkc 200 in 90ms (next.js: 17ms, application-code: 73ms)
+ POST /api/generate-questions 500 in 37.2s (next.js: 38ms, application-code: 37.2s)
+ POST /api/generate-questions 401 in 20ms (next.js: 5ms, application-code: 15ms)
+ GET /session 200 in 55ms (next.js: 3ms, application-code: 51ms)
+ GET /api/auth/me 200 in 129ms (next.js: 2ms, application-code: 126ms)
+[36m[1mINFO [0m [2m2026-04-22T15:30:59.716Z[0m [1m[generate-questions][0m SubItem "Order of operations (PEMDAS)" — found 0 cached, need 5
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000d6st6hwyv5427",
+          "difficulty": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:30:59.719Z[0m [1m[generate-questions][0m Cache empty — generating 5 questions synchronously
+[35m[1mDEBUG[0m [2m2026-04-22T15:30:59.721Z[0m [1m[generate-questions][0m Using teaching profile: scenario_based / application
+ GET /api/stats?topicId=cmoa6mf3m000b6st6xmfeoxkc 200 in 59ms (next.js: 4ms, application-code: 56ms)
+ POST /api/generate-questions 500 in 39.8s (next.js: 53ms, application-code: 39.8s)
+ GET /session 200 in 58ms (next.js: 4ms, application-code: 54ms)
+ GET /session 200 in 37ms (next.js: 3ms, application-code: 34ms)
+ GET /api/auth/me 200 in 26ms (next.js: 5ms, application-code: 21ms)
+[36m[1mINFO [0m [2m2026-04-22T15:31:44.792Z[0m [1m[generate-questions][0m SubItem "Fractions and mixed numbers" — found 0 cached, need 5
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000e6st6ofl6vwra",
+          "difficulty": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:31:44.795Z[0m [1m[generate-questions][0m Cache empty — generating 5 questions synchronously
+[35m[1mDEBUG[0m [2m2026-04-22T15:31:44.797Z[0m [1m[generate-questions][0m Using teaching profile: scenario_based / application
+ GET /api/stats?topicId=cmoa6mf3m000b6st6xmfeoxkc 200 in 13ms (next.js: 3ms, application-code: 10ms)
+ POST /api/generate-questions 500 in 38.7s (next.js: 13ms, application-code: 38.7s)
+ GET /session 200 in 51ms (next.js: 4ms, application-code: 47ms)
+ GET /api/auth/me 200 in 63ms (next.js: 3ms, application-code: 60ms)
+[36m[1mINFO [0m [2m2026-04-22T15:34:47.094Z[0m [1m[generate-questions][0m SubItem "Order of operations (PEMDAS)" — found 0 cached, need 5
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000d6st6hwyv5427",
+          "difficulty": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:34:47.097Z[0m [1m[generate-questions][0m Cache empty — generating 5 questions synchronously
+[35m[1mDEBUG[0m [2m2026-04-22T15:34:47.099Z[0m [1m[generate-questions][0m Using teaching profile: scenario_based / application
+ GET /api/stats?topicId=cmoa6mf3m000b6st6xmfeoxkc 200 in 13ms (next.js: 4ms, application-code: 9ms)
+ POST /api/generate-questions 500 in 43s (next.js: 4ms, application-code: 43s)
+ GET /session 200 in 114ms (next.js: 72ms, application-code: 43ms)
+ GET /session 200 in 137ms (next.js: 4ms, application-code: 133ms)
+ GET /api/auth/me 200 in 211ms (next.js: 51ms, application-code: 160ms)
+[36m[1mINFO [0m [2m2026-04-22T15:37:04.782Z[0m [1m[generate-questions][0m SubItem "Decimals and rounding" — found 0 cached, need 5
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000f6st6e1uwludr",
+          "difficulty": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:37:04.786Z[0m [1m[generate-questions][0m Cache empty — generating 5 questions synchronously
+[35m[1mDEBUG[0m [2m2026-04-22T15:37:04.788Z[0m [1m[generate-questions][0m Using teaching profile: scenario_based / application
+ GET /api/stats?topicId=cmoa6mf3m000b6st6xmfeoxkc 200 in 95ms (next.js: 33ms, application-code: 61ms)
+ POST /api/generate-questions 500 in 34.8s (next.js: 136ms, application-code: 34.7s)
+ GET /session 200 in 61ms (next.js: 3ms, application-code: 58ms)
+ GET /api/auth/me 401 in 18ms (next.js: 4ms, application-code: 14ms)
+ GET /login 200 in 57ms (next.js: 20ms, application-code: 37ms)
+ GET /api/auth/me 401 in 17ms (next.js: 4ms, application-code: 12ms)
+ GET /api/auth/me 401 in 9ms (next.js: 3ms, application-code: 6ms)
+ POST /api/auth/login 401 in 425ms (next.js: 67ms, application-code: 358ms)
+ POST /api/auth/login 401 in 311ms (next.js: 3ms, application-code: 308ms)
+ POST /api/auth/login 401 in 318ms (next.js: 4ms, application-code: 314ms)
+ POST /api/auth/login 401 in 319ms (next.js: 4ms, application-code: 315ms)
+ POST /api/auth/login 200 in 346ms (next.js: 4ms, application-code: 342ms)
+ GET / 200 in 44ms (next.js: 17ms, application-code: 27ms)
+ GET /api/auth/me 200 in 22ms (next.js: 2ms, application-code: 20ms)
+ GET /api/auth/me 200 in 16ms (next.js: 3ms, application-code: 13ms)
+ GET /api/topics 200 in 56ms (next.js: 36ms, application-code: 20ms)
+ GET /api/topics?slug=ged-mathematical-reasoning 200 in 14ms (next.js: 3ms, application-code: 10ms)
+ GET /session 200 in 28ms (next.js: 4ms, application-code: 24ms)
+ GET /api/auth/me 200 in 15ms (next.js: 4ms, application-code: 11ms)
+[36m[1mINFO [0m [2m2026-04-22T15:40:00.783Z[0m [1m[generate-questions][0m SubItem "Fractions and mixed numbers" — found 0 cached, need 5
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000e6st6ofl6vwra",
+          "difficulty": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:40:00.786Z[0m [1m[generate-questions][0m Cache empty — generating 5 questions synchronously
+[35m[1mDEBUG[0m [2m2026-04-22T15:40:00.788Z[0m [1m[generate-questions][0m Using teaching profile: scenario_based / application
+ GET /api/auth/me 200 in 53ms (next.js: 5ms, application-code: 48ms)
+ GET /api/stats?topicId=cmoa6mf3m000b6st6xmfeoxkc 200 in 20ms (next.js: 4ms, application-code: 16ms)
+ GET /api/stats?topicId=cmoa6mf3m000b6st6xmfeoxkc 200 in 16ms (next.js: 4ms, application-code: 13ms)
+ POST /api/generate-questions 500 in 41s (next.js: 4ms, application-code: 41s)
+ GET /session 200 in 60ms (next.js: 5ms, application-code: 55ms)
+ GET /api/auth/me 200 in 180ms (next.js: 5ms, application-code: 176ms)
+ GET /api/stats?topicId=cmoa6mf3m000b6st6xmfeoxkc 200 in 84ms (next.js: 5ms, application-code: 80ms)
+[36m[1mINFO [0m [2m2026-04-22T15:43:15.508Z[0m [1m[generate-questions][0m SubItem "Fractions and mixed numbers" — found 0 cached, need 5
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000e6st6ofl6vwra",
+          "difficulty": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:43:15.512Z[0m [1m[generate-questions][0m Cache empty — generating 5 questions synchronously
+[35m[1mDEBUG[0m [2m2026-04-22T15:43:15.514Z[0m [1m[generate-questions][0m Using teaching profile: scenario_based / application
+[35m[1mDEBUG[0m [2m2026-04-22T15:43:58.500Z[0m [1m[generate-questions][0m Validation pass completed
+[2m      ↳[0m {
+          "requestedCount": 5,
+          "accepted": 5,
+          "attempt": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:43:58.565Z[0m [1m[generate-questions][0m Saved 5 validated questions to DB
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000e6st6ofl6vwra"
+        }
+[35m[1mDEBUG[0m [2m2026-04-22T15:43:58.568Z[0m [1m[generate-questions][0m Using teaching profile: scenario_based / application
+ POST /api/generate-questions 200 in 43s (next.js: 95ms, application-code: 43s)
+ GET / 200 in 29ms (next.js: 5ms, application-code: 24ms)
+ GET /api/auth/me 200 in 79ms (next.js: 3ms, application-code: 77ms)
+ GET /api/auth/me 200 in 21ms (next.js: 3ms, application-code: 18ms)
+ GET /api/topics 200 in 19ms (next.js: 3ms, application-code: 16ms)
+[35m[1mDEBUG[0m [2m2026-04-22T15:44:57.578Z[0m [1m[generate-questions][0m Validation pass completed
+[2m      ↳[0m {
+          "requestedCount": 5,
+          "accepted": 5,
+          "attempt": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:44:57.643Z[0m [1m[generate-questions][0m Saved 5 validated questions to DB
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000e6st6ofl6vwra"
+        }
+ GET / 200 in 215ms (next.js: 83ms, application-code: 132ms)
+ GET /session 200 in 217ms (next.js: 135ms, application-code: 82ms)
+ GET / 200 in 52ms (next.js: 6ms, application-code: 47ms)
+ GET /session 200 in 31ms (next.js: 5ms, application-code: 26ms)
+ GET /session 200 in 163ms (next.js: 6ms, application-code: 157ms)
+ GET /api/auth/me 200 in 246ms (next.js: 57ms, application-code: 189ms)
+[36m[1mINFO [0m [2m2026-04-22T15:54:35.456Z[0m [1m[generate-questions][0m SubItem "Decimals and rounding" — found 0 cached, need 5
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000f6st6e1uwludr",
+          "difficulty": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:54:35.458Z[0m [1m[generate-questions][0m Cache empty — generating 5 questions synchronously
+[35m[1mDEBUG[0m [2m2026-04-22T15:54:35.460Z[0m [1m[generate-questions][0m Using teaching profile: scenario_based / application
+ GET /api/stats?topicId=cmoa6mf3m000b6st6xmfeoxkc 200 in 115ms (next.js: 49ms, application-code: 66ms)
+[35m[1mDEBUG[0m [2m2026-04-22T15:55:17.603Z[0m [1m[generate-questions][0m Validation pass completed
+[2m      ↳[0m {
+          "requestedCount": 5,
+          "accepted": 5,
+          "attempt": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:55:17.823Z[0m [1m[generate-questions][0m Saved 5 validated questions to DB
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000f6st6e1uwludr"
+        }
+[35m[1mDEBUG[0m [2m2026-04-22T15:55:17.827Z[0m [1m[generate-questions][0m Using teaching profile: scenario_based / application
+ POST /api/generate-questions 200 in 43s (next.js: 79ms, application-code: 43s)
+[35m[1mDEBUG[0m [2m2026-04-22T15:56:10.563Z[0m [1m[generate-questions][0m Validation pass completed
+[2m      ↳[0m {
+          "requestedCount": 5,
+          "accepted": 5,
+          "attempt": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:56:10.720Z[0m [1m[generate-questions][0m Saved 5 validated questions to DB
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000f6st6e1uwludr"
+        }
+ GET / 200 in 65ms (next.js: 7ms, application-code: 57ms)
+ GET /api/auth/me 200 in 62ms (next.js: 3ms, application-code: 59ms)
+ GET /api/topics 200 in 47ms (next.js: 30ms, application-code: 18ms)
+ GET /api/topics?slug=ged-mathematical-reasoning 200 in 12ms (next.js: 2ms, application-code: 10ms)
+ GET /session 200 in 27ms (next.js: 3ms, application-code: 24ms)
+ GET /api/auth/me 200 in 12ms (next.js: 3ms, application-code: 8ms)
+ GET /api/auth/me 200 in 11ms (next.js: 2ms, application-code: 9ms)
+[36m[1mINFO [0m [2m2026-04-22T15:58:18.464Z[0m [1m[generate-questions][0m SubItem "Order of operations (PEMDAS)" — found 0 cached, need 5
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000d6st6hwyv5427",
+          "difficulty": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:58:18.466Z[0m [1m[generate-questions][0m Cache empty — generating 5 questions synchronously
+[35m[1mDEBUG[0m [2m2026-04-22T15:58:18.469Z[0m [1m[generate-questions][0m Using teaching profile: scenario_based / application
+ GET /api/stats?topicId=cmoa6mf3m000b6st6xmfeoxkc 200 in 12ms (next.js: 3ms, application-code: 10ms)
+ GET /api/stats?topicId=cmoa6mf3m000b6st6xmfeoxkc 200 in 12ms (next.js: 3ms, application-code: 8ms)
+ GET /api/admin/reporting/overview 401 in 283ms (next.js: 268ms, application-code: 15ms)
+[35m[1mDEBUG[0m [2m2026-04-22T15:59:14.396Z[0m [1m[generate-questions][0m Validation pass completed
+[2m      ↳[0m {
+          "requestedCount": 5,
+          "accepted": 5,
+          "attempt": 1
+        }
+[36m[1mINFO [0m [2m2026-04-22T15:59:14.467Z[0m [1m[generate-questions][0m Saved 5 validated questions to DB
+[2m      ↳[0m {
+          "subItemId": "cmoa6mf3q000d6st6hwyv5427"
+        }
+[35m[1mDEBUG[0m [2m2026-04-22T15:59:14.469Z[0m [1m[generate-questions][0m Using teaching profile: scenario_based / application
+ POST /api/generate-questions 200 in 56s (next.js: 3ms, application-code: 56s)
+ GET /api/admin/reporting/overview 200 in 238ms (next.js: 3ms, application-code: 235ms)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireUser } from "@/lib/authGuard";
+import { requireAnthropicKey } from "@/lib/anthropicGuard";
 import {
   assessDepthForMvp,
   buildDepthGuidance,
@@ -205,6 +206,9 @@ function buildGateQuestionsFromGaps(gaps: string[]): ClarifyingQuestion[] {
 export async function POST(req: NextRequest) {
   const auth = await requireUser(req);
   if (auth instanceof NextResponse) return auth;
+
+  const keyGuard = requireAnthropicKey("onboarding-refine");
+  if (keyGuard) return keyGuard;
 
   const body = (await req.json()) as {
     originalPrompt: string;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireUser } from "@/lib/authGuard";
+import { requireAnthropicKey } from "@/lib/anthropicGuard";
 import {
   attachAcademicSkillCatalog,
   AZURE_RESOURCE_CANDIDATE_POOL,
@@ -279,6 +280,9 @@ function normalizeClarifyingQuestions(input: unknown): ClarifyingQuestion[] {
 export async function POST(req: NextRequest) {
   const auth = await requireUser(req);
   if (auth instanceof NextResponse) return auth;
+
+  const keyGuard = requireAnthropicKey("onboarding-personas");
+  if (keyGuard) return keyGuard;
 
   const { prompt } = (await req.json()) as { prompt: string };
 

@@ -4,12 +4,16 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/authGuard";
 import type { OnboardingMessage, OnboardingEntry } from "@/types";
 import { logLLMUsage } from "@/lib/llmLogger";
+import { requireAnthropicKey } from "@/lib/anthropicGuard";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: NextRequest) {
   const auth = await requireUser(req);
   if (auth instanceof NextResponse) return auth;
+
+  const keyGuard = requireAnthropicKey("onboarding-chat");
+  if (keyGuard) return keyGuard;
 
   const { topic, messages, pillar } = await req.json() as {
     topic: string;

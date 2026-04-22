@@ -37,6 +37,7 @@ function mockLLMResponse(text: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
 });
 
 describe("POST /api/hint", () => {

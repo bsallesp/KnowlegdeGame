@@ -73,6 +73,7 @@ const readyResponse = {
 };
 
 beforeEach(() => {
+  process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
   mockRequireUser.mockReset();
   mockProfileFindUnique.mockReset();
   mockProfileUpsert.mockReset();
