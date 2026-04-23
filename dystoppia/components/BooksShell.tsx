@@ -66,6 +66,26 @@ export default function BooksShell() {
     [refresh],
   );
 
+  // Função para apagar livro
+  const onDelete = useCallback(
+    async (id: string) => {
+      if (!window.confirm("Are you sure you want to delete this book? This action cannot be undone.")) return;
+      setError(null);
+      try {
+        const res = await fetch(`/api/books/${id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const body = await safeJson(res);
+          setError(body?.error ? String(body.error) : `delete_failed:${res.status}`);
+          return;
+        }
+        await refresh();
+      } catch (err) {
+        setError("delete_failed");
+      }
+    },
+    [refresh],
+  );
+
   return (
     <main className="mx-auto max-w-4xl px-6 py-12">
       <div className="mb-8">
@@ -115,20 +135,26 @@ export default function BooksShell() {
           {books.map((book) => (
             <li
               key={book.id}
-              className="border-b border-white/10 bg-white/[0.04] px-4 py-4 transition last:border-b-0 hover:bg-white/[0.07]"
+              className="border-b border-white/10 bg-white/[0.04] px-4 py-4 transition last:border-b-0 hover:bg-white/[0.07] flex items-center justify-between gap-4"
             >
-              <Link href={`/books/${book.id}`} className="block">
+              <Link href={`/books/${book.id}`} className="block flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0">
                     <p className="truncate text-base font-medium text-white">{formatDisplayTitle(book.title)}</p>
                     <p className="mt-1 text-xs text-white/50">
-                      {book.pageCount} pages - {formatExtractionModeLabel(book.extractionMode)} -{" "}
-                      {formatStatusLabel(book.status)}
+                      {book.pageCount} pages - {formatExtractionModeLabel(book.extractionMode)} - {formatStatusLabel(book.status)}
                     </p>
                   </div>
                   <span className="text-xs text-white/40">{new Date(book.createdAt).toLocaleDateString()}</span>
                 </div>
               </Link>
+              <button
+                onClick={() => onDelete(book.id)}
+                className="ml-4 shrink-0 rounded-xl border border-rose-400/30 bg-rose-500/20 px-3 py-1.5 text-xs font-semibold text-rose-100 hover:bg-rose-500/30"
+                title="Delete book"
+              >
+                Delete
+              </button>
             </li>
           ))}
         </ul>

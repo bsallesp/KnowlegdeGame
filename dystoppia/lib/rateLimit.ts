@@ -69,6 +69,7 @@ export async function checkRateLimit(
       where: { id: userId },
       select: {
         plan: true,
+        isInternal: true,
         hourlyUsage: true,
         hourlyWindowStart: true,
         hourlyCurriculumUsage: true,
@@ -82,6 +83,19 @@ export async function checkRateLimit(
 
     const now = new Date();
     const limits = planLimits(user.plan);
+
+    // Internal accounts (Anthropic staff / developers) bypass quota limits entirely.
+    // Counters are left untouched so production telemetry stays clean.
+    if (user.isInternal) {
+      return {
+        hourlyUsage: user.hourlyUsage,
+        hourlyRemaining: Number.POSITIVE_INFINITY,
+        hourlyResetsAt: new Date(user.hourlyWindowStart.getTime() + HOUR_MS),
+        weeklyUsage: user.weeklyUsage,
+        weeklyRemaining: Number.POSITIVE_INFINITY,
+        weeklyResetsAt: new Date(user.weeklyWindowStart.getTime() + WEEK_MS),
+      };
+    }
 
     // Determine effective hourly usage (reset if window expired)
     const hourlyExpired =

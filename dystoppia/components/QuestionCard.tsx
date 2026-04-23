@@ -290,6 +290,33 @@ export default function QuestionCard({
         )}
       </AnimatePresence>
 
+      {/* Concept primer — didactic text shown before the question (Pearson-VUE style) */}
+      {question.primer && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-3 rounded-lg px-4 py-3"
+          style={{
+            backgroundColor: "rgba(129,140,248,0.06)",
+            border: "1px solid rgba(129,140,248,0.25)",
+          }}
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#818CF8" }}>
+              Concept primer
+            </span>
+            <InfoButton
+              title="Concept Primer"
+              content="A short didactic text that teaches the principle behind the question using a different example. Read it carefully — it never contains the answer, only the reasoning you need to find it."
+              side="below"
+            />
+          </div>
+          <p className="text-sm leading-relaxed" style={{ color: "#C7C7E0" }}>
+            {question.primer}
+          </p>
+        </motion.div>
+      )}
+
       {/* Question content */}
       <div className="relative rounded-xl p-6 mb-4" style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}>
         <p className="text-lg font-medium leading-relaxed" style={{ color: "#EEEEFF" }}>

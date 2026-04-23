@@ -18,7 +18,7 @@ import InfoButton from "@/components/InfoButton";
 import AudiobookPlayer from "@/components/AudiobookPlayer";
 import AudiobookDialog, { type AudiobookEntry } from "@/components/AudiobookDialog";
 import SettingsDialog from "@/components/SettingsDialog";
-import { selectNextSubItem } from "@/lib/adaptive";
+import { selectNextSubItem, selectTopNSubItems } from "@/lib/adaptive";
 import { logger } from "@/lib/clientLogger";
 import type { Question } from "@/types";
 
@@ -241,6 +241,27 @@ export default function SessionPage() {
     }
   }, [getAllSubItems, questionQueue.length, settings.queueDepth, subItemStats, generateQuestionsForSubItem]);
 
+  // Fire-and-forget warmup: asks server to populate the shared question cache for
+  // upcoming subItems. Does not touch `isGenerating` (no spinner) or `questionQueue`
+  // (no UI effect). Server-side uses `prefetch: true` to skip quota charging.
+  const prefetchSubItems = useCallback(
+    (subItemIds: string[]) => {
+      for (const subItemId of subItemIds) {
+        if (!subItemId) continue;
+        const stats = subItemStats[subItemId];
+        fetch("/api/generate-questions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subItemId, count: 5, stats, prefetch: true }),
+          keepalive: true,
+        }).catch(() => {
+          // Prefetch is best-effort; swallow network errors silently.
+        });
+      }
+    },
+    [subItemStats]
+  );
+
   // Initialize session
   useEffect(() => {
     if (!currentTopic || isInitialized) return;
@@ -289,8 +310,13 @@ export default function SessionPage() {
       setLastSubItemId(subItemId);
       setPendingQuestion(currentQuestion);
       setShowFlashCard(true);
+      // Warmup: while the learner reads the flashcard, pre-generate questions for the
+      // most likely next subItems so their first question loads instantly on transition.
+      const activeSubItems = getAllSubItems().filter((s) => !s.muted);
+      const nextIds = selectTopNSubItems(activeSubItems, subItemStats, 3, [subItemId]);
+      if (nextIds.length > 0) prefetchSubItems(nextIds);
     }
-  }, [answerShown, currentQuestion, lastSubItemId]);
+  }, [answerShown, currentQuestion, lastSubItemId, getAllSubItems, subItemStats, prefetchSubItems]);
 
   useEffect(() => {
     setReportState("idle");

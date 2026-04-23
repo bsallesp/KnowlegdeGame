@@ -60,6 +60,7 @@ model Question {
   options          String?
   answer           String
   explanation      String
+  primer           String?
   difficulty       Int
   timeLimit        Int?
   flaggedAt        DateTime?

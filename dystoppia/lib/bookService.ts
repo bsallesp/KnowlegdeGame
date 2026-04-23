@@ -1,3 +1,22 @@
+// Remove a book and all its data for a user
+export async function deleteBook(userId: string, id: string): Promise<boolean> {
+  // Busca o livro para garantir que pertence ao usuário
+  const book = await prisma.book.findFirst({ where: { id, userId }, select: { id: true, sha256: true, sourceUri: true } });
+  if (!book) return false;
+
+  const storage = getStorage();
+  // Remove do banco (páginas, capítulos, livro)
+  await prisma.$transaction([
+    prisma.bookPage.deleteMany({ where: { bookId: id } }),
+    prisma.bookChapter.deleteMany({ where: { bookId: id } }),
+    prisma.book.delete({ where: { id } }),
+  ]);
+  // Remove arquivo do storage
+  if (book.sourceUri) {
+    await storage.delete(book.sourceUri).catch(() => {});
+  }
+  return true;
+}
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";

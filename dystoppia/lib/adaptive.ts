@@ -82,33 +82,44 @@ export function calculateSM2(
   return { easeFactor: newEaseFactor, reviewInterval: newInterval, nextReviewAt };
 }
 
-export function selectNextSubItem(
-  subItems: Array<{ id: string; muted: boolean; difficulty: number; nextReviewAt?: string | null }>,
-  stats: Record<string, { correctCount: number; totalCount: number; difficulty: number; lastSeen?: string }>
-): string | null {
+interface ScorableSubItem {
+  id: string;
+  muted: boolean;
+  difficulty: number;
+  nextReviewAt?: string | null;
+}
+
+type SubItemStatsMap = Record<
+  string,
+  { correctCount: number; totalCount: number; difficulty: number; lastSeen?: string }
+>;
+
+function scoreSubItems(subItems: ScorableSubItem[], stats: SubItemStatsMap) {
   const eligible = subItems.filter((s) => !s.muted);
-  if (eligible.length === 0) return null;
+  if (eligible.length === 0) return [];
 
   const now = Date.now();
 
-  // Weighted selection: prefer subitems with lower correct rate and those not seen recently
-  const scored = eligible.map((sub) => {
-    const stat = stats[sub.id];
-    const correctRate = stat && stat.totalCount > 0 ? stat.correctCount / stat.totalCount : 0.5;
-    const lastSeenMs = stat?.lastSeen ? now - new Date(stat.lastSeen).getTime() : Infinity;
-    // Higher score = more likely to be selected
-    const recencyScore = Math.min(lastSeenMs / 60000, 10); // up to 10 points for not being seen in 10 min
-    const weaknessScore = (1 - correctRate) * 5;
+  return eligible
+    .map((sub) => {
+      const stat = stats[sub.id];
+      const correctRate = stat && stat.totalCount > 0 ? stat.correctCount / stat.totalCount : 0.5;
+      const lastSeenMs = stat?.lastSeen ? now - new Date(stat.lastSeen).getTime() : Infinity;
+      const recencyScore = Math.min(lastSeenMs / 60000, 10);
+      const weaknessScore = (1 - correctRate) * 5;
+      const overdueBoost =
+        sub.nextReviewAt && new Date(sub.nextReviewAt).getTime() < now ? 15 : 0;
+      return { id: sub.id, score: recencyScore + weaknessScore + overdueBoost };
+    })
+    .sort((a, b) => b.score - a.score);
+}
 
-    // SM-2: boost score for overdue reviews (+15)
-    const overdueBoost =
-      sub.nextReviewAt && new Date(sub.nextReviewAt).getTime() < now ? 15 : 0;
-
-    return { id: sub.id, score: recencyScore + weaknessScore + overdueBoost };
-  });
-
-  // Sort by score descending, pick top with some randomness
-  scored.sort((a, b) => b.score - a.score);
+export function selectNextSubItem(
+  subItems: ScorableSubItem[],
+  stats: SubItemStatsMap
+): string | null {
+  const scored = scoreSubItems(subItems, stats);
+  if (scored.length === 0) return null;
 
   // Pick from top 3 randomly with weighting
   const top = scored.slice(0, Math.min(3, scored.length));
@@ -119,6 +130,22 @@ export function selectNextSubItem(
     if (rand <= 0) return item.id;
   }
   return top[0].id;
+}
+
+// Returns up to `n` distinct subItem ids ranked by selection score (deterministic, no randomness).
+// Used to prefetch/warm the shared question cache for the most likely next subItems.
+export function selectTopNSubItems(
+  subItems: ScorableSubItem[],
+  stats: SubItemStatsMap,
+  n: number,
+  excludeIds: string[] = []
+): string[] {
+  if (n <= 0) return [];
+  const exclude = new Set(excludeIds);
+  return scoreSubItems(subItems, stats)
+    .filter((s) => !exclude.has(s.id))
+    .slice(0, n)
+    .map((s) => s.id);
 }
 
 export function replaySubItemProgress(

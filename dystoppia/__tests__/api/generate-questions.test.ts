@@ -181,18 +181,13 @@ describe("input validation", () => {
 // ─── Cache hit path ───────────────────────────────────────────────────────────
 
 describe("cache hit", () => {
+  function fullCachePool(overrides: Partial<ReturnType<typeof makeDbQuestion>> = {}) {
+    // REFILL_THRESHOLD = 15 — produce 16 so background refill does NOT trigger.
+    return Array.from({ length: 16 }, (_, i) => makeDbQuestion({ id: `q-${i + 1}`, ...overrides }));
+  }
+
   test("returns cached questions without calling the LLM", async () => {
-    // Provide >= 8 questions so background refill doesn't trigger (REFILL_THRESHOLD = 8)
-    mockFindMany.mockResolvedValue([
-      makeDbQuestion({ id: "q-1" }),
-      makeDbQuestion({ id: "q-2" }),
-      makeDbQuestion({ id: "q-3" }),
-      makeDbQuestion({ id: "q-4" }),
-      makeDbQuestion({ id: "q-5" }),
-      makeDbQuestion({ id: "q-6" }),
-      makeDbQuestion({ id: "q-7" }),
-      makeDbQuestion({ id: "q-8" }),
-    ]);
+    mockFindMany.mockResolvedValue(fullCachePool());
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
     expect(res.status).toBe(200);
@@ -203,16 +198,7 @@ describe("cache hit", () => {
 
   test("returns cached questions without ANTHROPIC_API_KEY when cache is sufficient", async () => {
     delete process.env.ANTHROPIC_API_KEY;
-    mockFindMany.mockResolvedValue([
-      makeDbQuestion({ id: "q-1" }),
-      makeDbQuestion({ id: "q-2" }),
-      makeDbQuestion({ id: "q-3" }),
-      makeDbQuestion({ id: "q-4" }),
-      makeDbQuestion({ id: "q-5" }),
-      makeDbQuestion({ id: "q-6" }),
-      makeDbQuestion({ id: "q-7" }),
-      makeDbQuestion({ id: "q-8" }),
-    ]);
+    mockFindMany.mockResolvedValue(fullCachePool());
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
 
@@ -221,16 +207,7 @@ describe("cache hit", () => {
   });
 
   test("parses options JSON string into array on cache hit", async () => {
-    mockFindMany.mockResolvedValue([
-      makeDbQuestion({ id: "q-1", options: '["A","B","C","D"]' }),
-      makeDbQuestion({ id: "q-2", options: '["True","False"]' }),
-      makeDbQuestion({ id: "q-3", options: '["X","Y"]' }),
-      makeDbQuestion({ id: "q-4" }),
-      makeDbQuestion({ id: "q-5" }),
-      makeDbQuestion({ id: "q-6" }),
-      makeDbQuestion({ id: "q-7" }),
-      makeDbQuestion({ id: "q-8" }),
-    ]);
+    mockFindMany.mockResolvedValue(fullCachePool({ options: '["A","B","C","D"]' }));
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
     const { questions } = await res.json();
@@ -255,15 +232,12 @@ describe("cache hit", () => {
   });
 
   test("allows fill_blank with valid options through cache hit", async () => {
+    const valid1 = { type: "fill_blank", options: '["photosynthesis","respiration","fermentation"]' };
     mockFindMany.mockResolvedValue([
-      makeDbQuestion({ id: "q-1", type: "fill_blank", options: '["photosynthesis","respiration","fermentation"]' }),
-      makeDbQuestion({ id: "q-2", type: "fill_blank", options: '["TCP","UDP","HTTP"]' }),
-      makeDbQuestion({ id: "q-3", type: "fill_blank", options: '["malware","spyware","adware"]' }),
-      makeDbQuestion({ id: "q-4" }),
-      makeDbQuestion({ id: "q-5" }),
-      makeDbQuestion({ id: "q-6" }),
-      makeDbQuestion({ id: "q-7" }),
-      makeDbQuestion({ id: "q-8" }),
+      makeDbQuestion({ id: "q-1", ...valid1 }),
+      makeDbQuestion({ id: "q-2", ...valid1 }),
+      makeDbQuestion({ id: "q-3", ...valid1 }),
+      ...Array.from({ length: 13 }, (_, i) => makeDbQuestion({ id: `q-${i + 4}` })),
     ]);
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
@@ -272,7 +246,7 @@ describe("cache hit", () => {
   });
 
   test("triggers background refill when cache is low (< REFILL_THRESHOLD)", async () => {
-    // validQuestions.length = 4 >= count(3), but still < REFILL_THRESHOLD(8)
+    // validQuestions.length = 4 >= count(3), but still < REFILL_THRESHOLD(15)
     mockFindMany.mockResolvedValue([
       makeDbQuestion({ id: "q-1", type: "multiple_choice", options: '["A","B","C","D"]' }),
       makeDbQuestion({ id: "q-2", type: "multiple_choice", options: '["A","B","C","D"]' }),
@@ -527,6 +501,48 @@ describe("generation path", () => {
     // Let the background promise run so the `.catch(...)` branch can execute.
     await new Promise((r) => setTimeout(r, 10));
     expect(mockCreate_llm.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ─── Prefetch warmup ──────────────────────────────────────────────────────────
+
+describe("prefetch warmup", () => {
+  test("returns 202 without charging rate limit when cache is already full", async () => {
+    // 16 cached >= PREFETCH_CACHE_TARGET (15) → no LLM call, no quota charge
+    mockFindMany.mockResolvedValue(
+      Array.from({ length: 16 }, (_, i) => makeDbQuestion({ id: `q-${i + 1}` }))
+    );
+
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 5, prefetch: true }));
+
+    expect(res.status).toBe(202);
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
+    expect(mockCreate_llm).not.toHaveBeenCalled();
+    const body = await res.json();
+    expect(body.prefetched).toBe(true);
+  });
+
+  test("fires background generation when cache is below target, without charging quota", async () => {
+    mockFindMany.mockResolvedValue([]); // empty cache
+    mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
+
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 5, prefetch: true }));
+
+    expect(res.status).toBe(202);
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
+
+    await new Promise((r) => setTimeout(r, 10));
+    expect(mockCreate_llm).toHaveBeenCalled();
+  });
+
+  test("non-prefetch request still charges rate limit", async () => {
+    mockFindMany.mockResolvedValue(
+      Array.from({ length: 16 }, (_, i) => makeDbQuestion({ id: `q-${i + 1}` }))
+    );
+
+    await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
+
+    expect(mockCheckRateLimit).toHaveBeenCalledWith("user-1", 3, "question");
   });
 });
 

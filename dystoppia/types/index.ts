@@ -42,6 +42,7 @@ export interface Question {
   options?: string[] | null;
   answer: string;
   explanation: string;
+  primer?: string | null;
   difficulty: number;
   timeLimit?: number | null;
   flaggedAt?: string | null;

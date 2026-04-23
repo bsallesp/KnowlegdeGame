@@ -35,9 +35,11 @@ function shuffleOptions(options: string[] | null, type: string): string[] | null
 }
 
 // Minimum cached questions before background refill kicks in
-const REFILL_THRESHOLD = 8;
+const REFILL_THRESHOLD = 15;
 // How many questions to generate per background refill
-const REFILL_BATCH = 5;
+const REFILL_BATCH = 10;
+// Cap per-subItem cache depth on prefetch warmups to avoid runaway LLM spend
+const PREFETCH_CACHE_TARGET = 15;
 const MAX_GENERATION_ATTEMPTS = 3;
 // Budget for generation output. Adaptive thinking consumes from this budget,
 // so it must be comfortably above the JSON payload size for REFILL_BATCH questions.
@@ -49,6 +51,7 @@ interface GeneratedQuestion {
   options?: string[];
   answer: string;
   explanation: string;
+  primer?: string | null;
   timeLimit?: number | null;
 }
 
@@ -125,6 +128,7 @@ function normalizeQuestion(raw: GeneratedQuestion): GeneratedQuestion | null {
 
   const content = typeof raw.content === "string" ? raw.content.trim() : "";
   const explanation = typeof raw.explanation === "string" ? raw.explanation.trim() : "";
+  const primer = typeof raw.primer === "string" ? raw.primer.trim() : "";
   let answer = typeof raw.answer === "string" ? raw.answer.trim() : "";
   let options = Array.isArray(raw.options)
     ? raw.options
@@ -167,8 +171,28 @@ function normalizeQuestion(raw: GeneratedQuestion): GeneratedQuestion | null {
     options,
     answer,
     explanation,
+    primer: primer || null,
     timeLimit,
   };
+}
+
+function buildPrimerInstruction(resolvedDifficulty: number, correctRate: number): string {
+  // Level band derived from difficulty + recent performance.
+  // Beginner: struggling OR difficulty 1-2; Intermediate: difficulty 3 or middling rate;
+  // Advanced: difficulty 4-5 and confident learner.
+  const strugglingOrEasy = correctRate < 55 || resolvedDifficulty <= 2;
+  const confidentAndHard = correctRate >= 70 && resolvedDifficulty >= 4;
+
+  if (strugglingOrEasy) {
+    return `LEVEL = BEGINNER (struggling or easy difficulty).
+  The primer must be 3-5 sentences. Teach the underlying principle step-by-step using a DIFFERENT worked example than the one in the question (different numbers, different wording, different scenario). State the invariant or rule in plain language. End with a one-line generalization the learner should apply — without ever revealing or paraphrasing the final answer of the actual question.`;
+  }
+  if (confidentAndHard) {
+    return `LEVEL = ADVANCED (confident learner, hard difficulty).
+  The primer must be 1-2 sentences. State only the abstract principle, invariant, or edge-case name. Do NOT include any worked example. Assume the learner has mastered basics and just needs the conceptual framing. Never hint at the specific answer.`;
+  }
+  return `LEVEL = INTERMEDIATE.
+  The primer must be 2-3 sentences. Briefly name the principle and give a compact analogy or mini-example using DIFFERENT surface details than the question (different numbers/scenario). Do not walk through a full solution. Never reveal or paraphrase the answer to the actual question.`;
 }
 
 function buildGenerationPrompt(
@@ -197,7 +221,9 @@ Source-grounding rules:
 `
     : "";
 
-  return `You are an expert educator creating quiz questions. All questions, options, answers, and explanations must be written in English.
+  const primerInstruction = buildPrimerInstruction(resolvedDifficulty, correctRate);
+
+  return `You are an expert educator creating quiz questions. All questions, options, answers, explanations, and primers must be written in English.
 
 Topic: "${subItem.item.topic.name}"
 Chapter: "${subItem.item.name}"
@@ -209,6 +235,10 @@ ${pedagogyBlock}
 ${sourceBlock}
 Generate exactly ${count} questions about this concept. Use a mix of question types.
 
+PRIMER (pre-question teaching text) — required for every question:
+${primerInstruction}
+Pearson-VUE style: the primer teaches the principle so the learner can REASON toward the answer, never hands the answer over. If the question uses specific numbers, entities, or a scenario, the primer's example must use DIFFERENT ones.
+
 Return ONLY valid JSON in this exact format:
 {
   "questions": [
@@ -218,6 +248,7 @@ Return ONLY valid JSON in this exact format:
       "options": ["Option B", "Option C", "Option A", "Option D"],
       "answer": "Option A",
       "explanation": "Explanation of why Option A is correct...",
+      "primer": "Short didactic text that teaches the principle using a different example than the question.",
       "timeLimit": null
     },
     {
@@ -226,6 +257,7 @@ Return ONLY valid JSON in this exact format:
       "options": ["True", "False"],
       "answer": "True",
       "explanation": "This is true because...",
+      "primer": "Short didactic text that teaches the principle using a different example than the question.",
       "timeLimit": null
     },
     {
@@ -234,6 +266,7 @@ Return ONLY valid JSON in this exact format:
       "options": ["respiration", "photosynthesis", "fermentation"],
       "answer": "photosynthesis",
       "explanation": "Photosynthesis is the process by which plants convert sunlight into chemical energy.",
+      "primer": "Short didactic text that teaches the principle using a different example than the question.",
       "timeLimit": null
     }
   ]
@@ -257,7 +290,8 @@ Rules:
 - Randomize the position of the correct answer within the options array — do NOT always put it first
 - For any arithmetic or numeric claim, compute the result before finalizing the answer
 - The explanation must support the exact final answer. Never let the explanation contradict the answer
-- If the explanation proves a true/false statement is false, the answer must be "False"`;
+- If the explanation proves a true/false statement is false, the answer must be "False"
+- The primer must never leak the specific answer — if it would, rewrite it to teach only the principle`;
 }
 
 async function requestQuestionBatch(prompt: string, userId: string): Promise<GeneratedQuestion[]> {
@@ -394,6 +428,7 @@ async function persistQuestions(
           options: question.options ? JSON.stringify(question.options) : null,
           answer: question.answer,
           explanation: question.explanation,
+          primer: question.primer ?? null,
           difficulty: resolvedDifficulty,
           timeLimit: question.timeLimit ?? null,
         },
@@ -537,7 +572,7 @@ export async function POST(req: NextRequest) {
       return res;
     }
 
-    const { subItemId, difficulty, count = 3, stats } = await req.json();
+    const { subItemId, difficulty, count = 3, stats, prefetch = false } = await req.json();
 
     if (!subItemId) {
       return NextResponse.json({ error: "subItemId is required" }, { status: 400 });
@@ -565,22 +600,27 @@ export async function POST(req: NextRequest) {
       throw error;
     }
 
-    try {
-      await checkRateLimit(auth.userId, count, "question");
-    } catch (error) {
-      if (error instanceof RateLimitError) {
-        return NextResponse.json(
-          {
-            error: "rate_limited",
-            window: error.window,
-            remaining: error.remaining,
-            resetsAt: error.resetsAt,
-            upgradeUrl: "/pricing",
-          },
-          { status: 429 }
-        );
+    // Prefetch mode: warmup shared cache without charging user quota.
+    // Abuse guard is the cache-depth check below — if we already have PREFETCH_CACHE_TARGET
+    // questions, no LLM call is made, so runaway spend is bounded by distinct subItems.
+    if (!prefetch) {
+      try {
+        await checkRateLimit(auth.userId, count, "question");
+      } catch (error) {
+        if (error instanceof RateLimitError) {
+          return NextResponse.json(
+            {
+              error: "rate_limited",
+              window: error.window,
+              remaining: error.remaining,
+              resetsAt: error.resetsAt,
+              upgradeUrl: "/pricing",
+            },
+            { status: 429 }
+          );
+        }
+        throw error;
       }
-      throw error;
     }
 
     const existingQuestions = await prisma.question.findMany({
@@ -600,7 +640,32 @@ export async function POST(req: NextRequest) {
     logger.info("generate-questions", `SubItem "${subItem.name}" — found ${validQuestions.length} cached, need ${count}`, {
       subItemId,
       difficulty: resolvedDifficulty,
+      prefetch,
     });
+
+    // Prefetch path: warm up the cache in the background and return 202 immediately.
+    // Does not block on generation and does not return questions (client discards).
+    if (prefetch) {
+      if (validQuestions.length < PREFETCH_CACHE_TARGET) {
+        const needed = Math.min(REFILL_BATCH, PREFETCH_CACHE_TARGET - validQuestions.length);
+        logger.debug(
+          "generate-questions",
+          `Prefetch warmup — generating ${needed} in background (cached=${validQuestions.length})`
+        );
+        generateAndSaveQuestions(
+          auth.userId,
+          subItemId,
+          subItem,
+          resolvedDifficulty,
+          correctRate,
+          needed,
+          sourceContext
+        ).catch((error) =>
+          logger.warn("generate-questions", "Prefetch warmup failed", error)
+        );
+      }
+      return NextResponse.json({ prefetched: true, cached: validQuestions.length }, { status: 202 });
+    }
 
     if (validQuestions.length >= count) {
       logger.debug("generate-questions", `Cache hit — returning ${count} from DB (${validQuestions.length} cached)`);
@@ -660,6 +725,7 @@ export async function POST(req: NextRequest) {
         options: shuffleOptions(question.options ?? null, question.type),
         answer: question.answer,
         explanation: question.explanation,
+        primer: question.primer ?? null,
         timeLimit: question.timeLimit ?? null,
         subItemId,
         difficulty: resolvedDifficulty,
