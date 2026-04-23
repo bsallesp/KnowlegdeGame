@@ -5,6 +5,11 @@ import { logger } from "@/lib/logger";
 import { requireUser } from "@/lib/authGuard";
 import { checkRateLimit, RateLimitError } from "@/lib/rateLimit";
 import { logLLMUsage } from "@/lib/llmLogger";
+import {
+  SourceContextAccessError,
+  getSourceContextForSubItem,
+  type BookSourceContext,
+} from "@/lib/bookSourceText";
 
 const GENERATION_MODEL = "claude-sonnet-4-6";
 const VALIDATION_MODEL = "claude-haiku-4-5";
@@ -173,8 +178,25 @@ function buildGenerationPrompt(
   count: number,
   pedagogyBlock: string,
   difficultyDesc: string,
-  timerInstruction: string
+  timerInstruction: string,
+  sourceContext: BookSourceContext | null = null
 ): string {
+  const sourceBlock = sourceContext
+    ? `
+SOURCE MATERIAL FROM THE USER'S UPLOADED BOOK
+Book: "${sourceContext.bookTitle}"
+Pages: ${sourceContext.pageStart}-${sourceContext.pageEnd}
+
+${sourceContext.text}
+
+Source-grounding rules:
+- Use the source material above as the authority for every generated question.
+- Do not introduce outside facts, dates, product behavior, or definitions unless they are explicitly present in the source material.
+- Explanations must point back to the source wording or page context.
+- If the source material is thin, ask narrower questions about what is present instead of filling gaps from general knowledge.
+`
+    : "";
+
   return `You are an expert educator creating quiz questions. All questions, options, answers, and explanations must be written in English.
 
 Topic: "${subItem.item.topic.name}"
@@ -184,6 +206,7 @@ Concept: "${subItem.name}"
 Difficulty level: ${resolvedDifficulty}/5 (${difficultyDesc})
 Learner's current correct rate: ${Math.round(correctRate)}%
 ${pedagogyBlock}
+${sourceBlock}
 Generate exactly ${count} questions about this concept. Use a mix of question types.
 
 Return ONLY valid JSON in this exact format:
@@ -393,7 +416,8 @@ async function generateAndSaveQuestions(
   subItem: SubItemWithContext,
   resolvedDifficulty: number,
   correctRate: number,
-  count: number
+  count: number,
+  sourceContext: BookSourceContext | null = null
 ): Promise<SavedQuestion[]> {
   if (!hasAnthropicApiKey()) {
     throw new QuestionGenerationConfigError();
@@ -447,7 +471,8 @@ Apply this pedagogical approach when writing all questions. The questions should
     count,
     pedagogyBlock,
     difficultyDesc,
-    timerInstruction
+    timerInstruction,
+    sourceContext
   );
 
   const acceptedQuestions: GeneratedQuestion[] = [];
@@ -529,6 +554,16 @@ export async function POST(req: NextRequest) {
 
     const resolvedDifficulty = difficulty || subItem.difficulty;
     const correctRate = stats?.totalCount > 0 ? (stats.correctCount / stats.totalCount) * 100 : 50;
+    let sourceContext: BookSourceContext | null = null;
+
+    try {
+      sourceContext = await getSourceContextForSubItem(auth.userId, subItemId);
+    } catch (error) {
+      if (error instanceof SourceContextAccessError) {
+        return NextResponse.json({ error: "SubItem not found" }, { status: 404 });
+      }
+      throw error;
+    }
 
     try {
       await checkRateLimit(auth.userId, count, "question");
@@ -574,7 +609,7 @@ export async function POST(req: NextRequest) {
 
       if (validQuestions.length < REFILL_THRESHOLD) {
         logger.debug("generate-questions", `Cache low (${validQuestions.length}), refilling ${REFILL_BATCH} in background`);
-        generateAndSaveQuestions(auth.userId, subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH).catch((error) =>
+        generateAndSaveQuestions(auth.userId, subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH, sourceContext).catch((error) =>
           logger.warn("generate-questions", "Background refill failed", error)
         );
       }
@@ -590,7 +625,7 @@ export async function POST(req: NextRequest) {
     if (validQuestions.length > 0) {
       logger.debug("generate-questions", `Partial cache (${validQuestions.length}) — returning now, generating ${REFILL_BATCH} in background`);
 
-      generateAndSaveQuestions(auth.userId, subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH).catch((error) =>
+      generateAndSaveQuestions(auth.userId, subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH, sourceContext).catch((error) =>
         logger.warn("generate-questions", "Background refill failed", error)
       );
 
@@ -609,10 +644,11 @@ export async function POST(req: NextRequest) {
       subItem,
       resolvedDifficulty,
       correctRate,
-      count
+      count,
+      sourceContext
     );
 
-    generateAndSaveQuestions(auth.userId, subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH).catch((error) =>
+    generateAndSaveQuestions(auth.userId, subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH, sourceContext).catch((error) =>
       logger.warn("generate-questions", "Post-generation background warmup failed", error)
     );
 

@@ -12,32 +12,43 @@ model Topic {
   slug            String   @unique
   createdAt       DateTime @default(now())
   teachingProfile String? // JSON: TeachingProfile
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id])
+  sourceBookId    String?
+  sourceBook      Book?    @relation(fields: [sourceBookId], references: [id])
   items           Item[]
+
+  @@index([userId])
+  @@index([sourceBookId])
 }
 
 model Item {
-  id       String    @id @default(cuid())
-  topicId  String
-  topic    Topic     @relation(fields: [topicId], references: [id])
-  name     String
-  order    Int
-  muted    Boolean   @default(false)
-  subItems SubItem[]
+  id              String    @id @default(cuid())
+  topicId         String
+  topic           Topic     @relation(fields: [topicId], references: [id])
+  name            String
+  order           Int
+  muted           Boolean   @default(false)
+  sourceStartPage Int?
+  sourceEndPage   Int?
+  subItems        SubItem[]
 }
 
 model SubItem {
-  id             String       @id @default(cuid())
-  itemId         String
-  item           Item         @relation(fields: [itemId], references: [id])
-  name           String
-  order          Int
-  muted          Boolean      @default(false)
-  difficulty     Int          @default(1)
-  easeFactor     Float        @default(2.5)
-  reviewInterval Int          @default(1)
-  nextReviewAt   DateTime?
-  questions      Question[]
-  answers        UserAnswer[]
+  id              String       @id @default(cuid())
+  itemId          String
+  item            Item         @relation(fields: [itemId], references: [id])
+  name            String
+  order           Int
+  muted           Boolean      @default(false)
+  difficulty      Int          @default(1)
+  easeFactor      Float        @default(2.5)
+  reviewInterval  Int          @default(1)
+  nextReviewAt    DateTime?
+  sourceStartPage Int?
+  sourceEndPage   Int?
+  questions       Question[]
+  answers         UserAnswer[]
 }
 
 model Question {
@@ -99,6 +110,8 @@ model User {
   resolvedApprovalGates   ApprovalGate[]           @relation("ApprovalResolvedBy")
   processedStripeEvents   ProcessedStripeEvent[]
   onboardingConversations OnboardingConversation[]
+  books                   Book[]
+  topics                  Topic[]
 }
 
 model UserProfile {
@@ -326,4 +339,60 @@ model OnboardingConversation {
   @@unique([userId, conversationId])
   @@index([userId, updatedAt])
   @@index([userId, lastActivityAt])
+}
+
+model Book {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  title          String
+  author         String?
+  mimeType       String
+  sha256         String
+  sourceUri      String
+  sizeBytes      Int
+  pageCount      Int           @default(0)
+  language       String?
+  status         String        @default("uploaded")
+  extractionMode String?
+  errorMessage   String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  chapters       BookChapter[]
+  pages          BookPage[]
+  topics         Topic[]
+
+  @@unique([userId, sha256])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model BookChapter {
+  id        String        @id @default(cuid())
+  bookId    String
+  book      Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  parentId  String?
+  parent    BookChapter?  @relation("BookChapterTree", fields: [parentId], references: [id])
+  children  BookChapter[] @relation("BookChapterTree")
+  title     String
+  order     Int
+  startPage Int
+  endPage   Int?
+
+  @@index([bookId, order])
+  @@index([parentId])
+}
+
+model BookPage {
+  id         String @id @default(cuid())
+  bookId     String
+  book       Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  pageNumber Int
+  text       String
+  charCount  Int    @default(0)
+  source     String
+  confidence Float?
+
+  @@unique([bookId, pageNumber])
+  @@index([bookId, pageNumber])
 }

@@ -7,12 +7,14 @@ const mockCreate = vi.hoisted(() => vi.fn());
 const mockFindMany = vi.hoisted(() => vi.fn());
 const mockFindUnique = vi.hoisted(() => vi.fn());
 const mockUserFindUnique = vi.hoisted(() => vi.fn());
+const mockBookPageFindMany = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: { findUnique: mockUserFindUnique },
     subItem: { findUnique: mockFindUnique },
     question: { findMany: mockFindMany, create: mockCreate },
+    bookPage: { findMany: mockBookPageFindMany },
   },
 }));
 
@@ -135,6 +137,7 @@ beforeEach(() => {
   process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
   mockUserFindUnique.mockResolvedValue({ id: "user-1" });
   mockFindUnique.mockResolvedValue(mockSubItem);
+  mockBookPageFindMany.mockResolvedValue([]);
   mockCreate.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
     Promise.resolve({ ...data, id: "new-q", createdAt: new Date() })
   );
@@ -462,6 +465,45 @@ describe("generation path", () => {
     mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
     expect(res.status).toBe(200);
+  });
+
+  test("grounds generation prompt in uploaded book source pages", async () => {
+    mockFindUnique.mockResolvedValue({
+      ...mockSubItem,
+      sourceStartPage: 19,
+      sourceEndPage: 21,
+      item: {
+        ...mockSubItem.item,
+        sourceStartPage: 19,
+        sourceEndPage: 35,
+        topic: {
+          ...mockSubItem.item.topic,
+          sourceBook: { id: "book-1", title: "Introducing Power BI", userId: "user-1" },
+        },
+      },
+    });
+    mockBookPageFindMany.mockResolvedValue([
+      { pageNumber: 19, text: "Power BI is a suite of business analytics tools." },
+      { pageNumber: 20, text: "Power BI Desktop can connect to multiple data sources." },
+    ]);
+
+    mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
+
+    expect(res.status).toBe(200);
+    const firstPrompt = mockCreate_llm.mock.calls[0][0].messages[0].content;
+    expect(firstPrompt).toContain("SOURCE MATERIAL FROM THE USER'S UPLOADED BOOK");
+    expect(firstPrompt).toContain("Book: \"Introducing Power BI\"");
+    expect(firstPrompt).toContain("[Page 19]");
+    expect(firstPrompt).toContain("Do not introduce outside facts");
+    expect(mockBookPageFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          bookId: "book-1",
+          pageNumber: { gte: 19, lte: 21 },
+        },
+      }),
+    );
   });
 
   test("returns 500 when Claude returns non-text content", async () => {

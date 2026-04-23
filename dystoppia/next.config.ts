@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
     "pg",
     "@prisma/adapter-pg",
     "applicationinsights",
+    "pdfjs-dist",
+    "yauzl",
   ],
 };
 

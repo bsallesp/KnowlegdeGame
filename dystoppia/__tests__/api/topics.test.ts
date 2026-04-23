@@ -148,6 +148,14 @@ describe("GET /api/topics — happy path", () => {
       expect.objectContaining({ orderBy: { createdAt: "desc" } })
     );
   });
+
+  test("does not include private book-derived topics in the public topic list", async () => {
+    mockFindMany.mockResolvedValue([]);
+    await GET(makeRequest());
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { sourceBookId: null } })
+    );
+  });
 });
 
 describe("GET /api/topics — slug branch", () => {
@@ -214,6 +222,21 @@ describe("GET /api/topics — slug branch", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.teachingProfile).toBeNull();
+  });
+
+  test("hides book-derived topics from the public slug endpoint", async () => {
+    mockFindUnique.mockResolvedValue({
+      id: "topic-private",
+      name: "Private Book",
+      slug: "private-book",
+      sourceBookId: "book-1",
+      createdAt: new Date("2026-01-01"),
+      teachingProfile: null,
+      items: [],
+    });
+
+    const res = await GET(makeRequestWithSlug("private-book"));
+    expect(res.status).toBe(404);
   });
 });
 

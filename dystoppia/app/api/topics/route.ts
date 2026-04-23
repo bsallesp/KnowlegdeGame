@@ -24,6 +24,9 @@ export async function GET(req: NextRequest) {
       if (!topic) {
         return NextResponse.json({ error: "Topic not found" }, { status: 404 });
       }
+      if (topic.sourceBookId) {
+        return NextResponse.json({ error: "Topic not found" }, { status: 404 });
+      }
 
       return NextResponse.json({
         id: topic.id,
@@ -51,6 +54,7 @@ export async function GET(req: NextRequest) {
 
     // Return summary list of all topics
     const topics = await prisma.topic.findMany({
+      where: { sourceBookId: null },
       orderBy: { createdAt: "desc" },
       include: {
         items: {
