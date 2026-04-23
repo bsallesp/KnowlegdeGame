@@ -25,7 +25,7 @@ describe("planBookTopic", () => {
     ]);
   });
 
-  test("splits large chapter ranges into page-bounded subitems", () => {
+  test("chapters without children become one subitem carrying the chapter title", () => {
     const plan = planBookTopic({
       id: "book_12345678",
       title: "Long Book",
@@ -33,12 +33,52 @@ describe("planBookTopic", () => {
       chapters: [{ title: "Big Chapter", order: 0, startPage: 1, endPage: 25 }],
     });
 
-    expect(plan.items[0].subItems.map((sub) => [sub.name, sub.sourceStartPage, sub.sourceEndPage])).toEqual([
-      ["Pages 1-8", 1, 8],
-      ["Pages 9-16", 9, 16],
-      ["Pages 17-24", 17, 24],
-      ["Page 25", 25, 25],
+    expect(plan.items[0].subItems).toEqual([
+      { name: "Big Chapter", order: 0, sourceStartPage: 1, sourceEndPage: 25 },
     ]);
+  });
+
+  test("child chapters become subitems with their real titles", () => {
+    const plan = planBookTopic({
+      id: "book_nested01",
+      title: "Nested Book",
+      pageCount: 100,
+      chapters: [
+        { id: "ch1", parentId: null, title: "Chapter 1: Foundations", order: 0, startPage: 1, endPage: null },
+        { id: "ch1-1", parentId: "ch1", title: "1.1 History", order: 0, startPage: 1, endPage: null },
+        { id: "ch1-2", parentId: "ch1", title: "1.2 Core Ideas", order: 1, startPage: 10, endPage: null },
+        { id: "ch2", parentId: null, title: "Chapter 2: Practice", order: 1, startPage: 30, endPage: null },
+        { id: "ch2-1", parentId: "ch2", title: "2.1 Setup", order: 0, startPage: 30, endPage: null },
+        { id: "ch2-2", parentId: "ch2", title: "2.2 Workflow", order: 1, startPage: 60, endPage: null },
+      ],
+    });
+
+    expect(plan.items.map((i) => i.title)).toEqual([
+      "Chapter 1: Foundations",
+      "Chapter 2: Practice",
+    ]);
+    expect(plan.items[0].subItems.map((s) => [s.name, s.sourceStartPage, s.sourceEndPage])).toEqual([
+      ["1.1 History", 1, 9],
+      ["1.2 Core Ideas", 10, 29],
+    ]);
+    expect(plan.items[1].subItems.map((s) => [s.name, s.sourceStartPage, s.sourceEndPage])).toEqual([
+      ["2.1 Setup", 30, 59],
+      ["2.2 Workflow", 60, 100],
+    ]);
+  });
+
+  test("orphan child whose parentId points nowhere is treated as a root", () => {
+    const plan = planBookTopic({
+      id: "book_orphan01",
+      title: "Orphan",
+      pageCount: 20,
+      chapters: [
+        { id: "c1", parentId: null, title: "Kept", order: 0, startPage: 1, endPage: null },
+        { id: "c2", parentId: "missing-parent", title: "Loose", order: 0, startPage: 10, endPage: null },
+      ],
+    });
+
+    expect(plan.items.map((i) => i.title)).toEqual(["Kept", "Loose"]);
   });
 
   test("falls back to synthetic sections when no chapter structure exists", () => {
@@ -54,6 +94,10 @@ describe("planBookTopic", () => {
       ["Section 2", 33, 64],
       ["Section 3", 65, 70],
     ]);
+    for (const item of plan.items) {
+      expect(item.subItems).toHaveLength(1);
+      expect(item.subItems[0].name).toBe(item.title);
+    }
   });
 
   test("normalizes noisy chapter titles", () => {

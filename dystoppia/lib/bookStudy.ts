@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/utils";
 
-const DEFAULT_SUBITEM_PAGE_SIZE = 8;
 const FALLBACK_ITEM_PAGE_SIZE = 32;
 
 export interface BookTopicPlanChapter {
@@ -69,11 +68,22 @@ type SourceBook = {
   title: string;
   pageCount: number;
   chapters: Array<{
+    id?: string;
+    parentId?: string | null;
     title: string;
     order: number;
     startPage: number;
     endPage: number | null;
   }>;
+};
+
+type ChapterNode = {
+  id: string;
+  title: string;
+  order: number;
+  startPage: number;
+  endPage: number | null;
+  children: ChapterNode[];
 };
 
 type TopicRecord = {
@@ -100,7 +110,6 @@ type TopicRecord = {
 };
 
 export function planBookTopic(book: SourceBook): BookTopicPlan {
-  const ranges = buildChapterRanges(book);
   return {
     name: book.title,
     slug: bookStudySlug(book.title, book.id),
@@ -116,18 +125,7 @@ export function planBookTopic(book: SourceBook): BookTopicPlan {
       exampleDomain: book.title,
       assessmentFocus: "comprehension",
     },
-    items: ranges.map((range, index) => ({
-      title: range.title,
-      order: index,
-      startPage: range.startPage,
-      endPage: range.endPage,
-      subItems: splitRange(range.startPage, range.endPage, DEFAULT_SUBITEM_PAGE_SIZE).map((subRange, subIndex) => ({
-        name: pageRangeLabel(subRange.startPage, subRange.endPage),
-        order: subIndex,
-        sourceStartPage: subRange.startPage,
-        sourceEndPage: subRange.endPage,
-      })),
-    })),
+    items: buildItemsFromTree(book),
   };
 }
 
@@ -139,13 +137,27 @@ export async function createStudyTopicFromBook(userId: string, bookId: string): 
   if (!book) return null;
   if (book.status !== "ready" || book.pageCount < 1) throw new BookNotReadyError();
 
+  const bookForPlan: SourceBook = {
+    id: book.id,
+    title: book.title,
+    pageCount: book.pageCount,
+    chapters: book.chapters.map((c) => ({
+      id: c.id,
+      parentId: c.parentId,
+      title: c.title,
+      order: c.order,
+      startPage: c.startPage,
+      endPage: c.endPage,
+    })),
+  };
+
   const existing = await prisma.topic.findFirst({
     where: { sourceBookId: book.id, userId },
     include: topicInclude,
   });
   if (existing) return { created: false, topic: serializeTopic(existing) };
 
-  const plan = planBookTopic(book);
+  const plan = planBookTopic(bookForPlan);
   const topic = await prisma.topic.create({
     data: {
       name: plan.name,
@@ -211,32 +223,129 @@ function serializeTopic(topic: TopicRecord): StudyTopicResult["topic"] {
   };
 }
 
-function buildChapterRanges(book: SourceBook): Array<{ title: string; startPage: number; endPage: number }> {
-  const sorted = book.chapters
-    .map((chapter) => ({
-      title: cleanTitle(chapter.title),
-      startPage: clampPage(chapter.startPage, book.pageCount),
-      endPage: chapter.endPage ? clampPage(chapter.endPage, book.pageCount) : null,
-    }))
-    .filter((chapter) => chapter.startPage >= 1)
-    .sort((a, b) => a.startPage - b.startPage);
+// Turn the flat chapter list (with optional parentId) into a tree, then produce one
+// Item per root chapter and one SubItem per child chapter using the real chapter
+// titles. When a root chapter has no children, it becomes a single SubItem carrying
+// the same title (covering the whole chapter range). When the book has no chapters
+// at all, we fall back to synthetic "Section N" buckets.
+function buildItemsFromTree(book: SourceBook): BookTopicPlanChapter[] {
+  const tree = buildChapterTree(book);
 
-  if (sorted.length === 0) {
+  if (tree.length === 0) {
     return splitRange(1, book.pageCount, FALLBACK_ITEM_PAGE_SIZE).map((range, index) => ({
       title: `Section ${index + 1}`,
+      order: index,
       startPage: range.startPage,
       endPage: range.endPage,
+      subItems: [
+        {
+          name: `Section ${index + 1}`,
+          order: 0,
+          sourceStartPage: range.startPage,
+          sourceEndPage: range.endPage,
+        },
+      ],
     }));
   }
 
-  return sorted
-    .map((chapter, index) => {
-      const nextStart = sorted[index + 1]?.startPage;
-      const inferredEnd = nextStart ? nextStart - 1 : book.pageCount;
-      const endPage = Math.max(chapter.startPage, Math.min(chapter.endPage ?? inferredEnd, inferredEnd, book.pageCount));
-      return { title: chapter.title || `Section ${index + 1}`, startPage: chapter.startPage, endPage };
+  return tree.map((root, rootIndex) => {
+    const nextRootStart = tree[rootIndex + 1]?.startPage;
+    const rootEnd = resolveEndPage(root, nextRootStart, book.pageCount);
+    return {
+      title: root.title,
+      order: rootIndex,
+      startPage: root.startPage,
+      endPage: rootEnd,
+      subItems: buildSubItems(root, rootEnd, book.pageCount),
+    };
+  });
+}
+
+function buildSubItems(
+  parent: ChapterNode,
+  parentEnd: number,
+  pageCount: number,
+): BookTopicPlanChapter["subItems"] {
+  if (parent.children.length === 0) {
+    return [
+      {
+        name: parent.title,
+        order: 0,
+        sourceStartPage: parent.startPage,
+        sourceEndPage: parentEnd,
+      },
+    ];
+  }
+
+  return parent.children
+    .map((child, index, all) => {
+      const nextSiblingStart = all[index + 1]?.startPage;
+      const fallback = nextSiblingStart ? nextSiblingStart - 1 : parentEnd;
+      const childEnd = resolveEndPage(child, nextSiblingStart, pageCount, fallback);
+      return {
+        name: child.title,
+        order: index,
+        sourceStartPage: child.startPage,
+        sourceEndPage: childEnd,
+      };
     })
-    .filter((range) => range.endPage >= range.startPage);
+    .filter((sub) => sub.sourceEndPage >= sub.sourceStartPage);
+}
+
+function resolveEndPage(
+  node: ChapterNode,
+  nextSiblingStart: number | undefined,
+  pageCount: number,
+  fallback?: number,
+): number {
+  const inferred = nextSiblingStart
+    ? nextSiblingStart - 1
+    : fallback ?? pageCount;
+  const declared = node.endPage ?? inferred;
+  return Math.max(node.startPage, Math.min(declared, inferred, pageCount));
+}
+
+function buildChapterTree(book: SourceBook): ChapterNode[] {
+  const sanitized = book.chapters
+    .map((chapter) => {
+      const startPage = clampPage(chapter.startPage, book.pageCount);
+      if (startPage < 1) return null;
+      return {
+        id: chapter.id ?? `__c${chapter.order}__${startPage}`,
+        parentId: chapter.parentId ?? null,
+        title: cleanTitle(chapter.title) || "Untitled",
+        order: chapter.order,
+        startPage,
+        endPage: chapter.endPage ? clampPage(chapter.endPage, book.pageCount) : null,
+      };
+    })
+    .filter((c): c is NonNullable<typeof c> => c !== null);
+
+  const ids = new Set(sanitized.map((c) => c.id));
+  const byParent = new Map<string | null, typeof sanitized>();
+  for (const c of sanitized) {
+    // Treat parentId pointing at a chapter we don't have as "orphan root"; keeps
+    // us resilient to stale/corrupted data instead of silently dropping nodes.
+    const key = c.parentId && ids.has(c.parentId) ? c.parentId : null;
+    const bucket = byParent.get(key);
+    if (bucket) bucket.push(c);
+    else byParent.set(key, [c]);
+  }
+  for (const list of byParent.values()) {
+    list.sort((a, b) => a.startPage - b.startPage || a.order - b.order);
+  }
+
+  const build = (parentId: string | null): ChapterNode[] =>
+    (byParent.get(parentId) ?? []).map((c) => ({
+      id: c.id,
+      title: c.title,
+      order: c.order,
+      startPage: c.startPage,
+      endPage: c.endPage,
+      children: build(c.id),
+    }));
+
+  return build(null);
 }
 
 function splitRange(startPage: number, endPage: number, size: number): Array<{ startPage: number; endPage: number }> {
@@ -250,10 +359,6 @@ function splitRange(startPage: number, endPage: number, size: number): Array<{ s
 function bookStudySlug(title: string, bookId: string): string {
   const base = slugify(title) || "uploaded-book";
   return `${base}-${bookId.slice(-8).toLowerCase()}`;
-}
-
-function pageRangeLabel(startPage: number, endPage: number): string {
-  return startPage === endPage ? `Page ${startPage}` : `Pages ${startPage}-${endPage}`;
 }
 
 function cleanTitle(title: string): string {

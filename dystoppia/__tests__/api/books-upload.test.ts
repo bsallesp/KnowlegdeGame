@@ -16,9 +16,12 @@ vi.mock("@/lib/logger", () => ({
 
 const mockBookFindUnique = vi.hoisted(() => vi.fn());
 const mockBookCreate = vi.hoisted(() => vi.fn());
+const mockBookChapterCreate = vi.hoisted(() => vi.fn());
+const mockTransaction = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     book: { findUnique: mockBookFindUnique, create: mockBookCreate },
+    $transaction: mockTransaction,
   },
 }));
 
@@ -53,13 +56,21 @@ beforeEach(async () => {
   tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "book-upload-test-"));
   mockRequireUser.mockResolvedValue({ userId: "user-1" });
   mockBookFindUnique.mockResolvedValue(null);
-  mockBookCreate.mockImplementation(async (args) => ({
+  mockBookCreate.mockImplementation(async (args: { data: { title: string; pageCount: number; status: string; extractionMode: string | null } }) => ({
     id: "book-1",
     title: args.data.title,
     pageCount: args.data.pageCount,
     status: args.data.status,
     extractionMode: args.data.extractionMode,
   }));
+  mockBookChapterCreate.mockResolvedValue({ id: "chapter-1" });
+  const tx = {
+    book: { create: mockBookCreate },
+    bookChapter: { create: mockBookChapterCreate },
+  };
+  mockTransaction.mockImplementation(async (callback: (txClient: typeof tx) => Promise<unknown>) =>
+    callback(tx),
+  );
 });
 
 describe("POST /api/books/upload", () => {

@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { extractForMime, createAzureDocumentIntelligenceAdapter } from "@/lib/bookIngestion";
@@ -6,7 +7,7 @@ import { detectMimeType } from "@/lib/bookIngestion/detect";
 import { createLocalFileStorage, sha256Hex, type BookStorage } from "@/lib/bookStorage";
 
 // Domain orchestrator: extraction + storage + Prisma writes live here so route handlers stay thin.
-// The pure `bookIngestion` library knows nothing about Prisma or the filesystem — everything dirty passes through here.
+// The pure `bookIngestion` library knows nothing about Prisma or the filesystem.
 
 export interface IngestInput {
   userId: string;
@@ -70,63 +71,91 @@ export async function ingestBook(input: IngestInput): Promise<IngestedBook> {
     throw err;
   }
 
-  const book = await prisma.book.create({
-    data: {
-      userId,
-      title,
-      mimeType: mime,
-      sha256,
-      sourceUri,
-      sizeBytes: bytes.byteLength,
-      pageCount: extraction.pages.length,
-      status: "ready",
-      extractionMode: extraction.mode,
-      pages: {
-        create: extraction.pages.map((p) => ({
-          pageNumber: p.pageNumber,
-          text: p.text,
-          charCount: p.text.length,
-          source: p.source,
-          confidence: p.confidence,
-        })),
+  let book: IngestedBook;
+  try {
+    book = await prisma.$transaction(
+      async (tx) => {
+        const created = await tx.book.create({
+          data: {
+            userId,
+            title,
+            mimeType: mime,
+            sha256,
+            sourceUri,
+            sizeBytes: bytes.byteLength,
+            pageCount: extraction.pages.length,
+            status: "ready",
+            extractionMode: extraction.mode,
+            pages: {
+              create: extraction.pages.map((p) => ({
+                pageNumber: p.pageNumber,
+                text: p.text,
+                charCount: p.text.length,
+                source: p.source,
+                confidence: p.confidence,
+              })),
+            },
+          },
+          select: { id: true, title: true, pageCount: true, status: true, extractionMode: true },
+        });
+        await writeChapterTree(tx, created.id, extraction.chapters, null);
+        return created;
       },
-      chapters: {
-        create: flattenChapters(extraction.chapters),
-      },
-    },
-    select: { id: true, title: true, pageCount: true, status: true, extractionMode: true },
-  });
+      { timeout: 60_000, maxWait: 10_000 },
+    );
+  } catch (err) {
+    logger.error("bookService", "Persistence failed", err);
+    await storage.delete(sourceUri).catch(() => {});
+    throw err;
+  }
 
   logger.info("bookService", "Book ingested", {
     id: book.id,
     pages: extraction.pages.length,
-    chapters: extraction.chapters.length,
+    chapters: countChapters(extraction.chapters),
     mode: extraction.mode,
   });
 
   return book;
 }
 
-function flattenChapters(chapters: ExtractedChapter[]): Array<{
-  title: string;
-  order: number;
-  startPage: number;
-  endPage: number | null;
-}> {
-  const flat: Array<{ title: string; order: number; startPage: number; endPage: number | null }> = [];
-  const walk = (nodes: ExtractedChapter[]) => {
-    for (const node of nodes) {
-      flat.push({
+// Chapters are persisted as a tree via parentId. We write level-by-level so each child
+// can reference its parent's generated id. Sequential writes are fine for typical
+// book sizes (50-200 TOC nodes) and the enclosing transaction keeps it atomic.
+async function writeChapterTree(
+  tx: Prisma.TransactionClient,
+  bookId: string,
+  nodes: ExtractedChapter[],
+  parentId: string | null,
+): Promise<void> {
+  for (const node of nodes) {
+    const created = await tx.bookChapter.create({
+      data: {
+        bookId,
+        parentId,
         title: node.title,
         order: node.order,
         startPage: node.startPage,
         endPage: node.endPage ?? null,
-      });
-      if (node.children) walk(node.children);
+      },
+      select: { id: true },
+    });
+    if (node.children && node.children.length > 0) {
+      await writeChapterTree(tx, bookId, node.children, created.id);
+    }
+  }
+}
+
+function countChapters(nodes: ExtractedChapter[]): number {
+  let total = 0;
+  const walk = (ns: ExtractedChapter[]) => {
+    for (const n of ns) {
+      total++;
+      if (n.children) walk(n.children);
     }
   };
-  walk(chapters);
-  return flat;
+  walk(nodes);
+  return total;
 }
 
 export async function listBooks(userId: string) {
@@ -151,6 +180,9 @@ export async function getBook(userId: string, id: string) {
     include: { chapters: { orderBy: { order: "asc" } } },
   });
   if (!book) return null;
+  // Return chapters in DFS order so nested children follow their parent in the flat list,
+  // which matches how a reader would traverse a TOC top-to-bottom.
+  const chapters = sortChaptersDfs(book.chapters);
   return {
     id: book.id,
     title: book.title,
@@ -160,14 +192,45 @@ export async function getBook(userId: string, id: string) {
     status: book.status,
     extractionMode: book.extractionMode,
     createdAt: book.createdAt,
-    chapters: book.chapters.map((c) => ({
+    chapters: chapters.map((c) => ({
       id: c.id,
+      parentId: c.parentId,
       title: c.title,
       order: c.order,
       startPage: c.startPage,
       endPage: c.endPage,
     })),
   };
+}
+
+type FlatChapter = {
+  id: string;
+  parentId: string | null;
+  order: number;
+  title: string;
+  startPage: number;
+  endPage: number | null;
+};
+
+function sortChaptersDfs<T extends FlatChapter>(chapters: T[]): T[] {
+  const byParent = new Map<string | null, T[]>();
+  for (const c of chapters) {
+    const key = c.parentId ?? null;
+    const bucket = byParent.get(key);
+    if (bucket) bucket.push(c);
+    else byParent.set(key, [c]);
+  }
+  for (const list of byParent.values()) list.sort((a, b) => a.order - b.order);
+
+  const result: T[] = [];
+  const walk = (parentId: string | null) => {
+    for (const c of byParent.get(parentId) ?? []) {
+      result.push(c);
+      walk(c.id);
+    }
+  };
+  walk(null);
+  return result;
 }
 
 export async function getBookPage(userId: string, id: string, pageNumber: number) {

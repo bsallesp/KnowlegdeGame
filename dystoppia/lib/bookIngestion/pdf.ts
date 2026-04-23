@@ -1,4 +1,5 @@
 import type { ExtractedChapter, ExtractedPage } from "./types";
+import { parseTextualToc } from "./tocText";
 
 export interface PdfExtraction {
   pages: ExtractedPage[];
@@ -10,7 +11,7 @@ export interface PdfExtraction {
 // Below this char count we treat a page as "no native text layer" and mark it for OCR.
 const MIN_TEXT_CHARS = 20;
 
-type PdfTextItem = { str?: string };
+type PdfTextItem = { str?: string; hasEOL?: boolean };
 type PdfOutlineNode = {
   title?: string;
   dest?: unknown;
@@ -41,7 +42,10 @@ export async function extractPdf(bytes: Uint8Array): Promise<PdfExtraction> {
 
   try {
     const { pages, needsOcrPages, hasTextCount } = await extractPages(doc);
-    const chapters = await extractOutline(doc);
+    let chapters = await extractOutline(doc);
+    // Metadata outline missing (scanned scans, bad export): try to recover the TOC
+    // from the first pages' text. Keeps the upstream ingest flow unchanged.
+    if (chapters.length === 0) chapters = parseTextualToc(pages, { pageCount: doc.numPages });
     return {
       pages,
       chapters,
@@ -62,7 +66,7 @@ async function extractPages(doc: PdfDoc) {
   for (let i = 1; i <= doc.numPages; i++) {
     const page = await doc.getPage(i);
     const content = await page.getTextContent();
-    const text = normalizeText(content.items.map((it) => it.str ?? "").join(" "));
+    const text = joinTextItems(content.items);
 
     if (text.length >= MIN_TEXT_CHARS) {
       hasTextCount++;
@@ -75,8 +79,22 @@ async function extractPages(doc: PdfDoc) {
   return { pages, needsOcrPages, hasTextCount };
 }
 
-function normalizeText(raw: string): string {
-  return raw.replace(/\s+/g, " ").trim();
+// Preserve line breaks signaled by pdfjs (hasEOL) so downstream heuristics such
+// as TOC parsing and chapter-title matching can still see line structure. Horizontal
+// whitespace is collapsed; vertical structure is not.
+function joinTextItems(items: PdfTextItem[]): string {
+  let out = "";
+  for (const item of items) {
+    const str = item.str ?? "";
+    out += str;
+    if (item.hasEOL) out += "\n";
+    else if (str.length > 0 && !str.endsWith(" ")) out += " ";
+  }
+  return out
+    .replace(/[ \t]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 async function extractOutline(doc: PdfDoc): Promise<ExtractedChapter[]> {
@@ -88,23 +106,21 @@ async function extractOutline(doc: PdfDoc): Promise<ExtractedChapter[]> {
   }
   if (!outline || outline.length === 0) return [];
 
-  const counter = { n: 0 };
-  return walkOutline(doc, outline, counter);
+  return walkOutline(doc, outline);
 }
 
-async function walkOutline(
-  doc: PdfDoc,
-  nodes: PdfOutlineNode[],
-  counter: { n: number },
-): Promise<ExtractedChapter[]> {
+// order is local to siblings: roots are 0..N-1, each chapter's children are 0..M-1.
+// That keeps the tree well-ordered within each parent and makes storage/sort predictable.
+async function walkOutline(doc: PdfDoc, nodes: PdfOutlineNode[]): Promise<ExtractedChapter[]> {
   const result: ExtractedChapter[] = [];
-  for (const node of nodes) {
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
     const startPage = await resolveDestPage(doc, node.dest);
     const children =
-      node.items && node.items.length > 0 ? await walkOutline(doc, node.items, counter) : undefined;
+      node.items && node.items.length > 0 ? await walkOutline(doc, node.items) : undefined;
     result.push({
       title: String(node.title ?? "Untitled").replace(/\s+/g, " ").trim() || "Untitled",
-      order: counter.n++,
+      order: i,
       startPage: startPage ?? 1,
       children,
     });
