@@ -30,9 +30,6 @@ export function useRequireUser() {
             hourlyUsage: data.hourlyUsage ?? 0,
             hourlyRemaining: data.hourlyRemaining ?? 5,
             hourlyResetsAt: data.hourlyResetsAt ?? null,
-            weeklyUsage: data.weeklyUsage ?? 0,
-            weeklyRemaining: data.weeklyRemaining ?? 30,
-            weeklyResetsAt: data.weeklyResetsAt ?? null,
           });
           setLoading(false);
         } else {

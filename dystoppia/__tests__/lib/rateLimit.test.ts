@@ -21,9 +21,6 @@ function baseUser(overrides: Record<string, unknown> = {}) {
     hourlyUsage: 0,
     hourlyWindowStart: t0,
     hourlyCurriculumUsage: 0,
-    weeklyUsage: 0,
-    weeklyWindowStart: t0,
-    weeklyCurriculumUsage: 0,
     ...overrides,
   };
 }
@@ -49,8 +46,6 @@ describe("checkRateLimit", () => {
     expect(mockUpdateMany).toHaveBeenCalled();
     expect(state.hourlyUsage).toBe(1);
     expect(state.hourlyRemaining).toBe(4);
-    expect(state.weeklyUsage).toBe(1);
-    expect(state.weeklyRemaining).toBe(29);
   });
 
   test("throws RateLimitError when hourly question cap reached", async () => {
@@ -81,14 +76,12 @@ describe("checkRateLimit", () => {
 
 describe("getRateLimitState", () => {
   test("returns remaining without mutating", async () => {
-    mockFindUnique.mockResolvedValue(baseUser({ hourlyUsage: 2, weeklyUsage: 10 }));
+    mockFindUnique.mockResolvedValue(baseUser({ hourlyUsage: 2 }));
 
     const state = await getRateLimitState("uid");
 
     expect(state.hourlyUsage).toBe(2);
     expect(state.hourlyRemaining).toBe(3);
-    expect(state.weeklyUsage).toBe(10);
-    expect(state.weeklyRemaining).toBe(20);
     expect(mockUpdateMany).not.toHaveBeenCalled();
   });
 

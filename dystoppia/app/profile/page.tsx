@@ -16,17 +16,16 @@ interface UserProfile {
 export default function ProfilePage() {
   const { loading: authLoading } = useRequireUser();
   const router = useRouter();
-  const userEmail = useAppStore((s) => s.userEmail);
-  const weeklyRemaining = useAppStore((s) => s.weeklyRemaining);
-  const weeklyUsage = useAppStore((s) => s.weeklyUsage);
-  const plan = useAppStore((s) => s.plan);
+  const userEmail = useAppStore((state) => state.userEmail);
+  const plan = useAppStore((state) => state.plan);
+  const hourlyRemaining = useAppStore((state) => state.hourlyRemaining);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
     fetch("/api/user/profile")
-      .then((r) => r.json())
+      .then((response) => response.json())
       .then((data) => setProfile(data.profile))
       .catch(() => {});
   }, [authLoading]);
@@ -44,7 +43,6 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#09090E" }}>
-      {/* Header */}
       <header
         className="flex items-center gap-3 px-6 py-4"
         style={{ backgroundColor: "#09090E", borderBottom: "1px solid #2E2E40" }}
@@ -69,7 +67,6 @@ export default function ProfilePage() {
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
-          {/* Title */}
           <div>
             <h2 className="text-2xl font-bold" style={{ color: "#EEEEFF" }}>Profile</h2>
             <p className="text-sm mt-1" style={{ color: "#9494B8" }}>
@@ -77,7 +74,6 @@ export default function ProfilePage() {
             </p>
           </div>
 
-          {/* Account info */}
           <div
             className="rounded-xl p-6 space-y-4"
             style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}
@@ -107,15 +103,14 @@ export default function ProfilePage() {
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: "#9494B8" }}>This week</span>
+                <span className="text-xs" style={{ color: "#9494B8" }}>Questions left this hour</span>
                 <span className="text-sm font-medium" style={{ color: "#818CF8" }}>
-                  {weeklyUsage} used · {weeklyRemaining} left
+                  {hourlyRemaining}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Learning preferences */}
           {profile && (
             <div
               className="rounded-xl p-6 space-y-4"
@@ -144,9 +139,9 @@ export default function ProfilePage() {
                   <div className="space-y-2">
                     <span className="text-xs" style={{ color: "#9494B8" }}>Goals</span>
                     <div className="flex flex-wrap gap-2 mt-1">
-                      {profile.goals.map((goal, i) => (
+                      {profile.goals.map((goal, index) => (
                         <span
-                          key={i}
+                          key={index}
                           className="text-xs px-2 py-1 rounded-lg"
                           style={{
                             backgroundColor: "rgba(129,140,248,0.08)",
@@ -164,7 +159,6 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* Logout */}
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}

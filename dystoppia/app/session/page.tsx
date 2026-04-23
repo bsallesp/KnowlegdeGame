@@ -11,7 +11,6 @@ import SkeletonBlock from "@/components/ui/SkeletonBlock";
 import AchievementToast from "@/components/AchievementToast";
 import SessionSummary from "@/components/SessionSummary";
 import RateLimitPaywall from "@/components/RateLimitPaywall";
-import DailyGoalBar from "@/components/DailyGoalBar";
 import BossRound from "@/components/BossRound";
 import FlashCard from "@/components/FlashCard";
 import InfoButton from "@/components/InfoButton";
@@ -32,7 +31,6 @@ interface AnswerMeta {
   subItemId: string;
   correct: boolean;
   xpAwarded: number;
-  lifeLost: boolean;
   wasBossRound: boolean;
   bossQuestionsLeftBefore: number;
 }
@@ -59,12 +57,6 @@ export default function SessionPage() {
     sessionId,
     xp,
     sessionXP,
-    streak,
-    lives,
-    maxLives,
-    weeklyUsage,
-    weeklyRemaining,
-    plan,
     setCurrentTopic,
     addToQueue,
     prependToQueue,
@@ -80,13 +72,7 @@ export default function SessionPage() {
     soloItem,
     soloSubItem,
     addXP,
-    checkAndUpdateStreak,
-    loseLife,
-    gainLife,
-    resetLives,
     checkAchievements,
-    incrementDailyProgress,
-    decrementDailyProgress,
     saveSessionEntry,
   } = useAppStore();
 
@@ -95,10 +81,9 @@ export default function SessionPage() {
   const [answerCount, setAnswerCount] = useState(0);
   const [sessionCorrect, setSessionCorrect] = useState(0);
   const [xpPopups, setXpPopups] = useState<XPPopup[]>([]);
-  const [showGameOver, setShowGameOver] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
-  const [rateLimitInfo, setRateLimitInfo] = useState<{ window: "hourly" | "weekly"; resetsAt: string | null }>({ window: "hourly", resetsAt: null });
+  const [rateLimitInfo, setRateLimitInfo] = useState<{ resetsAt: string | null }>({ resetsAt: null });
   const [showBossIntro, setShowBossIntro] = useState(false);
   const [isBossGenerating, setIsBossGenerating] = useState(false);
   const [isBossRound, setIsBossRound] = useState(false);
@@ -200,7 +185,7 @@ export default function SessionPage() {
 
         if (res.status === 429) {
           const body = await res.json().catch(() => ({}));
-          setRateLimitInfo({ window: body.window ?? "hourly", resetsAt: body.resetsAt ?? null });
+          setRateLimitInfo({ resetsAt: body.resetsAt ?? null });
           setShowPaywall(true);
           return;
         }
@@ -306,7 +291,6 @@ export default function SessionPage() {
     if (!currentTopic || isInitialized) return;
     if (currentTopic.id.startsWith("pending_")) return;
     setIsInitialized(true);
-    checkAndUpdateStreak();
 
     const init = async () => {
       await new Promise((r) => setTimeout(r, 100));
@@ -323,7 +307,7 @@ export default function SessionPage() {
       if (questionQueue.length === 0) await fillQueue();
     };
     init();
-  }, [currentTopic, isInitialized, questionQueue.length, fillQueue, hydrateSubItemStats, checkAndUpdateStreak]);
+  }, [currentTopic, isInitialized, questionQueue.length, fillQueue, hydrateSubItemStats]);
 
   // Auto-advance to first question
   useEffect(() => {
@@ -377,13 +361,6 @@ export default function SessionPage() {
         }
       }
 
-      if (meta.lifeLost) {
-        gainLife();
-        setShowGameOver(false);
-      }
-
-      decrementDailyProgress();
-
       if (meta.wasBossRound) {
         setIsBossRound(true);
         setBossQuestionsLeft(meta.bossQuestionsLeftBefore);
@@ -391,7 +368,7 @@ export default function SessionPage() {
 
       setLastAnswerMeta(null);
     },
-    [addXP, decrementDailyProgress, gainLife]
+    [addXP]
   );
 
   const handleAnswer = async (answer: string, timeSpent: number) => {
@@ -416,7 +393,7 @@ export default function SessionPage() {
     // XP: boss round = double
     const xpMultiplier = isBossRound ? 2 : 1;
     const xpGain = isCorrect
-      ? Math.round(10 * (questionAtAnswer.difficulty || 1) * Math.min(2, 1 + streak * 0.05) * xpMultiplier)
+      ? Math.round(10 * (questionAtAnswer.difficulty || 1) * xpMultiplier)
       : 0;
 
     const answerMeta: AnswerMeta = {
@@ -424,7 +401,6 @@ export default function SessionPage() {
       subItemId: questionAtAnswer.subItemId,
       correct: isCorrect,
       xpAwarded: xpGain,
-      lifeLost: !isCorrect,
       wasBossRound: isBossRound,
       bossQuestionsLeftBefore: bossQuestionsLeft,
     };
@@ -436,15 +412,9 @@ export default function SessionPage() {
       const popupId = Date.now();
       setXpPopups((prev) => [...prev, { id: popupId, amount: xpGain }]);
       setTimeout(() => setXpPopups((prev) => prev.filter((p) => p.id !== popupId)), 1400);
-    } else {
-      loseLife();
-      setTimeout(() => {
-        if (useAppStore.getState().lives === 0) setShowGameOver(true);
-      }, 800);
     }
 
-    // Achievements + daily goal
-    incrementDailyProgress();
+    // Achievements
     checkAchievements({ correct: isCorrect, timeSpent, usedHint: false });
 
     if (!isCorrect) {
@@ -743,76 +713,13 @@ export default function SessionPage() {
       {/* Achievement toasts */}
       <AchievementToast />
 
-      {/* 60% weekly usage nudge — only for free plan */}
-      <AnimatePresence>
-        {plan === "free" && weeklyUsage > 0 && weeklyRemaining / (weeklyUsage + weeklyRemaining) <= 0.4 && weeklyRemaining > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
-            className="flex items-center justify-between px-4 py-2 text-xs"
-            style={{ backgroundColor: "rgba(129,140,248,0.1)", borderBottom: "1px solid rgba(129,140,248,0.2)" }}
-          >
-            <span style={{ color: "#9494B8" }}>
-              {weeklyRemaining} questions left this week
-            </span>
-            <a
-              href="/pricing"
-              className="font-semibold px-3 py-1 rounded-lg text-xs transition-all"
-              style={{ backgroundColor: "#818CF8", color: "#09090E" }}
-            >
-              Upgrade
-            </a>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Rate limit paywall */}
       <AnimatePresence>
         {showPaywall && (
           <RateLimitPaywall
-            window={rateLimitInfo.window}
             resetsAt={rateLimitInfo.resetsAt}
             onClose={() => setShowPaywall(false)}
           />
-        )}
-      </AnimatePresence>
-
-      {/* Game over overlay */}
-      <AnimatePresence>
-        {showGameOver && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center"
-            style={{ backgroundColor: "rgba(9,9,14,0.92)", backdropFilter: "blur(8px)" }}
-          >
-            <motion.div
-              initial={{ scale: 0.85, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }}
-              transition={{ type: "spring", damping: 20 }}
-              className="flex flex-col items-center gap-6 p-10 rounded-2xl text-center max-w-sm"
-              style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}
-            >
-              <div className="text-5xl">💔</div>
-              <div>
-                <h2 className="text-2xl font-bold mb-2" style={{ color: "#EEEEFF" }}>Out of lives!</h2>
-                <p className="text-sm" style={{ color: "#9494B8" }}>You answered {answerCount} questions this session.</p>
-              </div>
-              <div className="flex flex-col gap-3 w-full">
-                <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                  onClick={() => { resetLives(); setShowGameOver(false); }}
-                  className="w-full py-3 rounded-xl font-semibold text-sm"
-                  style={{ backgroundColor: "#818CF8", color: "white" }}>
-                  Continue anyway
-                </motion.button>
-                <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                  onClick={handleShowSummary}
-                  className="w-full py-3 rounded-xl font-semibold text-sm"
-                  style={{ backgroundColor: "#1C1C28", color: "#9494B8", border: "1px solid #2E2E40" }}>
-                  View summary
-                </motion.button>
-              </div>
-            </motion.div>
-          </motion.div>
         )}
       </AnimatePresence>
 
@@ -877,58 +784,17 @@ export default function SessionPage() {
 
         {/* Desktop stats bar */}
         <div className="hidden shrink-0 sm:flex items-center gap-4">
-          {/* Weekly usage */}
-          <div
-            className="flex items-center gap-1 text-xs font-semibold"
-            style={{ color: weeklyRemaining <= 6 ? "#F97316" : "#818CF8" }}
-          >
-            <span>⚡</span>
-            <span>{weeklyRemaining} left this week</span>
-            <InfoButton
-              title="Weekly Questions"
-              content="How many AI-generated questions you have left this week. The counter resets every 7 days. Upgrade your plan for a higher limit."
-              side="below"
-            />
-          </div>
-
-          {/* Daily goal */}
-          <DailyGoalBar />
-
           {/* Session XP */}
           {sessionXP > 0 && (
             <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: "#FACC15" }}>
               <span>⚡</span><span>{sessionXP} XP</span>
               <InfoButton
                 title="Session XP"
-                content="XP earned this session. Correct answers give 10 × difficulty × streak bonus. Boss Round questions give 2× XP."
+                content="XP earned this session. Correct answers give 10 × difficulty, and Boss Round questions give 2× XP."
                 side="below"
               />
             </div>
           )}
-
-          {/* Streak */}
-          {streak > 1 && (
-            <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: "#F97316" }}>
-              <span>🔥</span><span>{streak}</span>
-              <InfoButton
-                title="Daily Streak"
-                content="Consecutive days you've studied. Miss a day and it resets to 1. Reach 7 days to earn the Strong Week achievement."
-                side="below"
-              />
-            </div>
-          )}
-
-          {/* Lives */}
-          <div className="flex items-center gap-0.5">
-            {Array.from({ length: maxLives }).map((_, i) => (
-              <span key={i} className="text-sm" style={{ filter: i < lives ? "none" : "grayscale(1) opacity(0.3)" }}>❤️</span>
-            ))}
-            <InfoButton
-              title="Lives"
-              content="You have 3 lives per session. Each wrong answer costs one life. Run out and you'll see Game Over — but you can always continue anyway."
-              side="below"
-            />
-          </div>
 
           {/* Session accuracy */}
           {totalCount > 0 && (
@@ -973,14 +839,6 @@ export default function SessionPage() {
 
         {/* Mobile compact bar */}
         <div className="flex shrink-0 sm:hidden items-center gap-2">
-          {streak > 1 && (
-            <span className="text-xs font-semibold" style={{ color: "#F97316" }}>🔥{streak}</span>
-          )}
-          <div className="flex items-center gap-0.5">
-            {Array.from({ length: maxLives }).map((_, i) => (
-              <span key={i} className="text-xs" style={{ filter: i < lives ? "none" : "grayscale(1) opacity(0.3)" }}>❤️</span>
-            ))}
-          </div>
           <button
             onClick={() => setShowMobileStats((v) => !v)}
             className="p-1.5 rounded-lg"
@@ -1017,10 +875,6 @@ export default function SessionPage() {
             style={{ backgroundColor: "#12121A", borderBottom: "1px solid #2E2E40" }}
           >
             <div className="flex flex-wrap gap-x-4 gap-y-2 px-4 py-3">
-              <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: weeklyRemaining <= 6 ? "#F97316" : "#818CF8" }}>
-                <span>⚡</span><span>{weeklyRemaining} left this week</span>
-              </div>
-              <DailyGoalBar />
               {sessionXP > 0 && (
                 <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: "#FACC15" }}>
                   <span>⚡</span><span>{sessionXP} XP</span>

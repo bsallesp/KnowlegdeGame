@@ -60,8 +60,6 @@ describe("GET /api/billing/status", () => {
       subscriptionStatus: "inactive",
       hourlyUsage: 2,
       hourlyWindowStart: windowStart,
-      weeklyUsage: 10,
-      weeklyWindowStart: windowStart,
     });
     const res = await GET(new NextRequest("http://localhost/api/billing/status"));
     expect(res.status).toBe(200);
@@ -69,8 +67,6 @@ describe("GET /api/billing/status", () => {
     expect(body.plan).toBe("free");
     expect(body.hourlyUsage).toBe(2);
     expect(body.hourlyRemaining).toBe(3);
-    expect(body.weeklyUsage).toBe(10);
-    expect(body.weeklyRemaining).toBe(20);
     expect(body.creditBalance).toBe(180);
     expect(body.creditPackages).toHaveLength(1);
   });
@@ -82,8 +78,6 @@ describe("GET /api/billing/status", () => {
       subscriptionStatus: "active",
       hourlyUsage: 5,
       hourlyWindowStart: windowStart,
-      weeklyUsage: 1,
-      weeklyWindowStart: windowStart,
     });
     const res = await GET(new NextRequest("http://localhost/api/billing/status"));
     const body = await res.json();

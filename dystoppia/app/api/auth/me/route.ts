@@ -36,8 +36,6 @@ export async function GET() {
         subscriptionStatus: true,
         hourlyUsage: true,
         hourlyWindowStart: true,
-        weeklyUsage: true,
-        weeklyWindowStart: true,
       },
     });
 
@@ -45,22 +43,17 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 401 });
     }
 
-    const PLAN_LIMITS: Record<string, { hourly: number; weekly: number }> = {
-      free: { hourly: 5, weekly: 30 },
-      learner: { hourly: 30, weekly: 250 },
-      master: { hourly: 100, weekly: 1000 },
+    const PLAN_LIMITS: Record<string, { hourly: number }> = {
+      free: { hourly: 5 },
+      learner: { hourly: 30 },
+      master: { hourly: 100 },
     };
-    const limits = PLAN_LIMITS[user.plan] ?? PLAN_LIMITS["free"];
+    const limits = PLAN_LIMITS[user.plan] ?? PLAN_LIMITS.free;
 
     const now = new Date();
     const HOUR_MS = 60 * 60 * 1000;
-    const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-
     const hourlyExpired = now.getTime() - user.hourlyWindowStart.getTime() >= HOUR_MS;
-    const weeklyExpired = now.getTime() - user.weeklyWindowStart.getTime() >= WEEK_MS;
-
     const hourlyUsage = hourlyExpired ? 0 : user.hourlyUsage;
-    const weeklyUsage = weeklyExpired ? 0 : user.weeklyUsage;
 
     return NextResponse.json({
       id: user.id,
@@ -73,9 +66,6 @@ export async function GET() {
       hourlyUsage,
       hourlyRemaining: limits.hourly - hourlyUsage,
       hourlyResetsAt: new Date(user.hourlyWindowStart.getTime() + HOUR_MS).toISOString(),
-      weeklyUsage,
-      weeklyRemaining: limits.weekly - weeklyUsage,
-      weeklyResetsAt: new Date(user.weeklyWindowStart.getTime() + WEEK_MS).toISOString(),
     });
   } catch (error) {
     return NextResponse.json(

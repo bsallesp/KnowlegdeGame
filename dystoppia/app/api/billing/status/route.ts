@@ -4,14 +4,13 @@ import { requireUser } from "@/lib/authGuard";
 import { getCurrentCreditBalance } from "@/lib/credits";
 import { CREDIT_PACKAGES } from "@/lib/stripe";
 
-const PLAN_LIMITS: Record<string, { hourly: number; weekly: number }> = {
-  free: { hourly: 5, weekly: 30 },
-  learner: { hourly: 30, weekly: 250 },
-  master: { hourly: 100, weekly: 1000 },
+const PLAN_LIMITS: Record<string, { hourly: number }> = {
+  free: { hourly: 5 },
+  learner: { hourly: 30 },
+  master: { hourly: 100 },
 };
 
 const HOUR_MS = 60 * 60 * 1000;
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function GET(req: NextRequest) {
   try {
@@ -25,8 +24,6 @@ export async function GET(req: NextRequest) {
         subscriptionStatus: true,
         hourlyUsage: true,
         hourlyWindowStart: true,
-        weeklyUsage: true,
-        weeklyWindowStart: true,
       },
     });
 
@@ -35,14 +32,10 @@ export async function GET(req: NextRequest) {
     }
 
     const now = new Date();
-    const limits = PLAN_LIMITS[user.plan] ?? PLAN_LIMITS["free"];
+    const limits = PLAN_LIMITS[user.plan] ?? PLAN_LIMITS.free;
     const creditBalance = await getCurrentCreditBalance(auth.userId);
-
     const hourlyExpired = now.getTime() - user.hourlyWindowStart.getTime() >= HOUR_MS;
-    const weeklyExpired = now.getTime() - user.weeklyWindowStart.getTime() >= WEEK_MS;
-
     const hourlyUsage = hourlyExpired ? 0 : user.hourlyUsage;
-    const weeklyUsage = weeklyExpired ? 0 : user.weeklyUsage;
 
     return NextResponse.json({
       plan: user.plan,
@@ -50,9 +43,6 @@ export async function GET(req: NextRequest) {
       hourlyUsage,
       hourlyRemaining: limits.hourly - hourlyUsage,
       hourlyResetsAt: new Date(user.hourlyWindowStart.getTime() + HOUR_MS).toISOString(),
-      weeklyUsage,
-      weeklyRemaining: limits.weekly - weeklyUsage,
-      weeklyResetsAt: new Date(user.weeklyWindowStart.getTime() + WEEK_MS).toISOString(),
       creditBalance,
       creditPackages: CREDIT_PACKAGES.map((pkg) => ({
         id: pkg.id,

@@ -48,9 +48,6 @@ describe("useCheckUser", () => {
           hourlyUsage: 1,
           hourlyRemaining: 29,
           hourlyResetsAt: "2026-01-01T00:00:00.000Z",
-          weeklyUsage: 2,
-          weeklyRemaining: 248,
-          weeklyResetsAt: "2026-01-08T00:00:00.000Z",
         }),
     });
 

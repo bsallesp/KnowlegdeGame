@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { Topic, Item, Question, SubItemStats, Settings, Achievement, DailyGoal, SessionHistoryEntry } from "@/types";
+import type { Topic, Item, Question, SubItemStats, Settings, Achievement, SessionHistoryEntry } from "@/types";
 import { applyItemSolo, applySubItemSolo } from "@/lib/topicFocus";
 
 function generateSessionId(): string {
@@ -10,16 +10,14 @@ function generateSessionId(): string {
 }
 
 const ACHIEVEMENT_DEFINITIONS: Omit<Achievement, "unlockedAt">[] = [
-  { id: "first_answer",    name: "First Step",       description: "Answer your first question",          icon: "🎯" },
-  { id: "perfect_10",     name: "Perfect!",          description: "10 correct answers in a row",            icon: "🔥" },
-  { id: "streak_7",       name: "Strong Week",       description: "7-day streak",                            icon: "📅" },
-  { id: "xp_100",         name: "Centurion",        description: "Accumulate 100 XP",                          icon: "⚡" },
-  { id: "xp_1000",        name: "XP Master",         description: "Accumulate 1000 XP",                      icon: "👑" },
-  { id: "boss_slayer",    name: "Boss Slayer",        description: "Defeat a Boss Round",                     icon: "🗡️" },
-  { id: "speed_demon",    name: "Speed Demon",        description: "Answer correctly in under 10s",          icon: "⚡" },
-  { id: "topic_master",   name: "Topic Master",       description: "Score 80%+ on 20 questions from one topic",icon: "🏆" },
-  { id: "no_hints",       name: "No Crutches",        description: "Complete 20 questions without hints",      icon: "💪" },
-  { id: "daily_goal",     name: "Goal Crushed",        description: "Reach the daily goal",                    icon: "🎖️" },
+  { id: "first_answer", name: "First Step", description: "Answer your first question", icon: "🎯" },
+  { id: "perfect_10", name: "Perfect!", description: "10 correct answers in a row", icon: "🔥" },
+  { id: "xp_100", name: "Centurion", description: "Accumulate 100 XP", icon: "⚡" },
+  { id: "xp_1000", name: "XP Master", description: "Accumulate 1000 XP", icon: "👑" },
+  { id: "boss_slayer", name: "Boss Slayer", description: "Defeat a Boss Round", icon: "🗡️" },
+  { id: "speed_demon", name: "Speed Demon", description: "Answer correctly in under 10s", icon: "⚡" },
+  { id: "topic_master", name: "Topic Master", description: "Score 80%+ on 20 questions from one topic", icon: "🏆" },
+  { id: "no_hints", name: "No Crutches", description: "Complete 20 questions without hints", icon: "💪" },
 ];
 
 interface AppState {
@@ -33,36 +31,24 @@ interface AppState {
   isGenerating: boolean;
   answerShown: boolean;
   lastAnswerCorrect: boolean | null;
-
-  // XP & streaks
   xp: number;
-  streak: number;
-  lastActiveDate: string | null;
   sessionXP: number;
-
-  // Lives
-  lives: number;
-  maxLives: number;
-
-  // Review mode (not persisted)
   reviewMode: boolean;
-
-  // Achievements
   achievements: Achievement[];
-  pendingAchievements: string[]; // ids to show as toast
-
-  // Daily goal
-  dailyGoal: DailyGoal;
-
-  // Session history
+  pendingAchievements: string[];
   sessionHistory: SessionHistoryEntry[];
-
-  // Consecutive correct (for perfect_10 achievement)
   consecutiveCorrect: number;
-  // Consecutive no-hints (for no_hints achievement)
   consecutiveNoHint: number;
-
-  // Actions
+  userId: string | null;
+  userEmail: string | null;
+  userRole: string;
+  userStatus: string;
+  isInternalUser: boolean;
+  plan: string;
+  subscriptionStatus: string;
+  hourlyUsage: number;
+  hourlyRemaining: number;
+  hourlyResetsAt: string | null;
   setCurrentTopic: (topic: Topic) => void;
   addItemToCurrentTopic: (item: Item) => void;
   setQuestionQueue: (questions: Question[]) => void;
@@ -82,54 +68,19 @@ interface AppState {
   toggleSubItemMute: (subItemId: string) => void;
   soloItem: (itemId: string) => void;
   soloSubItem: (subItemId: string) => void;
-
-  // XP & streak actions
   addXP: (amount: number) => void;
-  checkAndUpdateStreak: () => void;
   setReviewMode: (val: boolean) => void;
-
-  // Lives actions
-  loseLife: () => void;
-  gainLife: () => void;
-  resetLives: () => void;
-
-  // User identity
-  userId: string | null;
-  userEmail: string | null;
-  userRole: string;
-  userStatus: string;
-  isInternalUser: boolean;
-  plan: string;
-  subscriptionStatus: string;
-  hourlyUsage: number;
-  hourlyRemaining: number;
-  hourlyResetsAt: string | null;
-  weeklyUsage: number;
-  weeklyRemaining: number;
-  weeklyResetsAt: string | null;
   setUser: (id: string, email: string, role?: string, status?: string, isInternal?: boolean) => void;
   clearUser: () => void;
   setRateLimitState: (state: {
     hourlyUsage: number;
     hourlyRemaining: number;
-    hourlyResetsAt: string;
-    weeklyUsage: number;
-    weeklyRemaining: number;
-    weeklyResetsAt: string;
+    hourlyResetsAt: string | null;
   }) => void;
   setPlan: (p: string) => void;
   setSubscriptionStatus: (s: string) => void;
-
-  // Achievement actions
   checkAchievements: (context: { correct?: boolean; timeSpent?: number; usedHint?: boolean; bossCompleted?: boolean }) => void;
   dismissAchievement: (id: string) => void;
-
-  // Daily goal actions
-  incrementDailyProgress: () => void;
-  decrementDailyProgress: () => void;
-  setDailyGoalTarget: (target: number) => void;
-
-  // Session history
   saveSessionEntry: (entry: Omit<SessionHistoryEntry, "date">) => void;
 }
 
@@ -150,19 +101,9 @@ const useAppStore = create<AppState>()(
       isGenerating: false,
       answerShown: false,
       lastAnswerCorrect: null,
-
-      // XP & streaks
       xp: 0,
-      streak: 0,
-      lastActiveDate: null,
       sessionXP: 0,
       reviewMode: false,
-
-      // Lives
-      lives: 3,
-      maxLives: 3,
-
-      // User identity
       userId: null,
       userEmail: null,
       userRole: "customer",
@@ -173,25 +114,9 @@ const useAppStore = create<AppState>()(
       hourlyUsage: 0,
       hourlyRemaining: 5,
       hourlyResetsAt: null,
-      weeklyUsage: 0,
-      weeklyRemaining: 30,
-      weeklyResetsAt: null,
-
-      // Achievements — initialize all as locked
       achievements: ACHIEVEMENT_DEFINITIONS.map((a) => ({ ...a, unlockedAt: null })),
       pendingAchievements: [],
-
-      // Daily goal
-      dailyGoal: {
-        target: 20,
-        progress: 0,
-        date: new Date().toISOString().split("T")[0],
-      },
-
-      // Session history
       sessionHistory: [],
-
-      // Streaks
       consecutiveCorrect: 0,
       consecutiveNoHint: 0,
 
@@ -246,6 +171,7 @@ const useAppStore = create<AppState>()(
             totalCount: 0,
             difficulty: 1,
           };
+
           return {
             subItemStats: {
               ...state.subItemStats,
@@ -299,7 +225,7 @@ const useAppStore = create<AppState>()(
       setLastAnswerCorrect: (val) => set({ lastAnswerCorrect: val }),
 
       resetSession: () =>
-        set((state) => ({
+        set({
           currentTopic: null,
           questionQueue: [],
           currentQuestion: null,
@@ -308,14 +234,14 @@ const useAppStore = create<AppState>()(
           answerShown: false,
           lastAnswerCorrect: null,
           sessionXP: 0,
-          lives: state.maxLives,
           consecutiveCorrect: 0,
           consecutiveNoHint: 0,
-        })),
+        }),
 
       toggleItemMute: (itemId) =>
         set((state) => {
           if (!state.currentTopic) return {};
+
           return {
             currentTopic: {
               ...state.currentTopic,
@@ -329,6 +255,7 @@ const useAppStore = create<AppState>()(
       toggleSubItemMute: (subItemId) =>
         set((state) => {
           if (!state.currentTopic) return {};
+
           return {
             currentTopic: {
               ...state.currentTopic,
@@ -345,6 +272,7 @@ const useAppStore = create<AppState>()(
       soloItem: (itemId) =>
         set((state) => {
           if (!state.currentTopic) return {};
+
           return {
             currentTopic: {
               ...state.currentTopic,
@@ -356,6 +284,7 @@ const useAppStore = create<AppState>()(
       soloSubItem: (subItemId) =>
         set((state) => {
           if (!state.currentTopic) return {};
+
           return {
             currentTopic: {
               ...state.currentTopic,
@@ -370,19 +299,8 @@ const useAppStore = create<AppState>()(
           sessionXP: state.sessionXP + amount,
         })),
 
-      checkAndUpdateStreak: () =>
-        set((state) => {
-          const today = new Date().toISOString().split("T")[0];
-          const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-          if (state.lastActiveDate === today) return {};
-          if (state.lastActiveDate === yesterday) return { streak: state.streak + 1, lastActiveDate: today };
-          return { streak: 1, lastActiveDate: today };
-        }),
-
       setReviewMode: (val) => set({ reviewMode: val }),
-      loseLife: () => set((state) => ({ lives: Math.max(0, state.lives - 1) })),
-      gainLife: () => set((state) => ({ lives: Math.min(state.maxLives, state.lives + 1) })),
-      resetLives: () => set((state) => ({ lives: state.maxLives })),
+
       setUser: (id, email, role = "customer", status = "active", isInternal = false) =>
         set({
           userId: id,
@@ -391,6 +309,7 @@ const useAppStore = create<AppState>()(
           userStatus: status,
           isInternalUser: isInternal,
         }),
+
       clearUser: () =>
         set({
           userId: null,
@@ -399,27 +318,28 @@ const useAppStore = create<AppState>()(
           userStatus: "active",
           isInternalUser: false,
         }),
-      setRateLimitState: (s) => set({
-        hourlyUsage: s.hourlyUsage,
-        hourlyRemaining: s.hourlyRemaining,
-        hourlyResetsAt: s.hourlyResetsAt,
-        weeklyUsage: s.weeklyUsage,
-        weeklyRemaining: s.weeklyRemaining,
-        weeklyResetsAt: s.weeklyResetsAt,
-      }),
+
+      setRateLimitState: (state) =>
+        set({
+          hourlyUsage: state.hourlyUsage,
+          hourlyRemaining: state.hourlyRemaining,
+          hourlyResetsAt: state.hourlyResetsAt,
+        }),
+
       setPlan: (p) => set({ plan: p }),
       setSubscriptionStatus: (s) => set({ subscriptionStatus: s }),
 
       checkAchievements: ({ correct, timeSpent, usedHint, bossCompleted }) =>
         set((state) => {
           const newUnlocked: string[] = [];
-          const totalAnswered = Object.values(state.subItemStats).reduce((s, v) => s + v.totalCount, 0);
+          const totalAnswered = Object.values(state.subItemStats).reduce((sum, value) => sum + value.totalCount, 0);
 
           let newConsecutiveCorrect = state.consecutiveCorrect;
           let newConsecutiveNoHint = state.consecutiveNoHint;
 
-          // usedHint resets the no-hint streak regardless of correct/incorrect
-          if (usedHint) newConsecutiveNoHint = 0;
+          if (usedHint) {
+            newConsecutiveNoHint = 0;
+          }
 
           if (correct !== undefined) {
             newConsecutiveCorrect = correct ? state.consecutiveCorrect + 1 : 0;
@@ -428,38 +348,42 @@ const useAppStore = create<AppState>()(
             }
           }
 
-          const isUnlocked = (id: string) => state.achievements.find((a) => a.id === id)?.unlockedAt !== null;
+          const isUnlocked = (id: string) => state.achievements.find((achievement) => achievement.id === id)?.unlockedAt !== null;
 
           const check = (id: string, condition: boolean) => {
-            if (condition && !isUnlocked(id)) newUnlocked.push(id);
+            if (condition && !isUnlocked(id)) {
+              newUnlocked.push(id);
+            }
           };
 
           check("first_answer", totalAnswered >= 1);
           check("perfect_10", newConsecutiveCorrect >= 10);
-          check("streak_7", state.streak >= 7);
           check("xp_100", state.xp >= 100);
           check("xp_1000", state.xp >= 1000);
           check("speed_demon", !!(correct && timeSpent !== undefined && timeSpent < 10000));
           check("no_hints", newConsecutiveNoHint >= 20);
-          check("daily_goal", state.dailyGoal.progress + 1 >= state.dailyGoal.target);
           check("boss_slayer", !!bossCompleted);
 
-          // topic_master: 80%+ in 20 questions of any subItem
           const topicMaster = Object.values(state.subItemStats).some(
-            (s) => s.totalCount >= 20 && s.correctCount / s.totalCount >= 0.8
+            (stats) => stats.totalCount >= 20 && stats.correctCount / stats.totalCount >= 0.8
           );
           check("topic_master", topicMaster);
 
-          if (newUnlocked.length === 0 && newConsecutiveCorrect === state.consecutiveCorrect && newConsecutiveNoHint === state.consecutiveNoHint) {
+          if (
+            newUnlocked.length === 0 &&
+            newConsecutiveCorrect === state.consecutiveCorrect &&
+            newConsecutiveNoHint === state.consecutiveNoHint
+          ) {
             return {};
           }
 
           const now = new Date().toISOString();
+
           return {
             consecutiveCorrect: newConsecutiveCorrect,
             consecutiveNoHint: newConsecutiveNoHint,
-            achievements: state.achievements.map((a) =>
-              newUnlocked.includes(a.id) ? { ...a, unlockedAt: now } : a
+            achievements: state.achievements.map((achievement) =>
+              newUnlocked.includes(achievement.id) ? { ...achievement, unlockedAt: now } : achievement
             ),
             pendingAchievements: [...state.pendingAchievements, ...newUnlocked],
           };
@@ -467,48 +391,29 @@ const useAppStore = create<AppState>()(
 
       dismissAchievement: (id) =>
         set((state) => ({
-          pendingAchievements: state.pendingAchievements.filter((a) => a !== id),
+          pendingAchievements: state.pendingAchievements.filter((achievementId) => achievementId !== id),
         })),
-
-      incrementDailyProgress: () =>
-        set((state) => {
-          const today = new Date().toISOString().split("T")[0];
-          const goal = state.dailyGoal.date === today
-            ? state.dailyGoal
-            : { target: state.dailyGoal.target, progress: 0, date: today };
-          return { dailyGoal: { ...goal, progress: goal.progress + 1 } };
-        }),
-
-      decrementDailyProgress: () =>
-        set((state) => {
-          const today = new Date().toISOString().split("T")[0];
-          const goal = state.dailyGoal.date === today
-            ? state.dailyGoal
-            : { target: state.dailyGoal.target, progress: 0, date: today };
-          return { dailyGoal: { ...goal, progress: Math.max(0, goal.progress - 1) } };
-        }),
-
-      setDailyGoalTarget: (target) =>
-        set((state) => ({ dailyGoal: { ...state.dailyGoal, target } })),
 
       saveSessionEntry: (entry) =>
         set((state) => {
           const today = new Date().toISOString().split("T")[0];
-          const existing = state.sessionHistory.find((e) => e.date === today && e.topicId === entry.topicId);
+          const existing = state.sessionHistory.find((historyEntry) => historyEntry.date === today && historyEntry.topicId === entry.topicId);
+
           if (existing) {
             return {
-              sessionHistory: state.sessionHistory.map((e) =>
-                e.date === today && e.topicId === entry.topicId
+              sessionHistory: state.sessionHistory.map((historyEntry) =>
+                historyEntry.date === today && historyEntry.topicId === entry.topicId
                   ? {
-                      ...e,
-                      correctCount: e.correctCount + entry.correctCount,
-                      totalCount: e.totalCount + entry.totalCount,
-                      xpEarned: e.xpEarned + entry.xpEarned,
+                      ...historyEntry,
+                      correctCount: historyEntry.correctCount + entry.correctCount,
+                      totalCount: historyEntry.totalCount + entry.totalCount,
+                      xpEarned: historyEntry.xpEarned + entry.xpEarned,
                     }
-                  : e
+                  : historyEntry
               ),
             };
           }
+
           return {
             sessionHistory: [...state.sessionHistory.slice(-89), { ...entry, date: today }],
           };
@@ -518,7 +423,9 @@ const useAppStore = create<AppState>()(
       name: "dystoppia-store",
       storage: createJSONStorage(() => localStorage),
       onRehydrateStorage: () => (state) => {
-        if (state) state._hasHydrated = true;
+        if (state) {
+          state._hasHydrated = true;
+        }
       },
       partialize: (state) => ({
         sessionId: state.sessionId,
@@ -526,10 +433,6 @@ const useAppStore = create<AppState>()(
         subItemStats: state.subItemStats,
         currentTopic: state.currentTopic,
         xp: state.xp,
-        streak: state.streak,
-        lastActiveDate: state.lastActiveDate,
-        lives: state.lives,
-        maxLives: state.maxLives,
         userId: state.userId,
         userEmail: state.userEmail,
         userRole: state.userRole,
@@ -540,11 +443,7 @@ const useAppStore = create<AppState>()(
         hourlyUsage: state.hourlyUsage,
         hourlyRemaining: state.hourlyRemaining,
         hourlyResetsAt: state.hourlyResetsAt,
-        weeklyUsage: state.weeklyUsage,
-        weeklyRemaining: state.weeklyRemaining,
-        weeklyResetsAt: state.weeklyResetsAt,
         achievements: state.achievements,
-        dailyGoal: state.dailyGoal,
         sessionHistory: state.sessionHistory,
         consecutiveCorrect: state.consecutiveCorrect,
         consecutiveNoHint: state.consecutiveNoHint,
@@ -554,4 +453,3 @@ const useAppStore = create<AppState>()(
 );
 
 export default useAppStore;
-

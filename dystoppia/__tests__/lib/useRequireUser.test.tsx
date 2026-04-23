@@ -57,9 +57,6 @@ describe("useRequireUser", () => {
           hourlyUsage: 0,
           hourlyRemaining: 5,
           hourlyResetsAt: null,
-          weeklyUsage: 1,
-          weeklyRemaining: 29,
-          weeklyResetsAt: null,
         }),
     });
 
@@ -72,7 +69,6 @@ describe("useRequireUser", () => {
     expect(mockSetRateLimitState).toHaveBeenCalledWith(
       expect.objectContaining({
         hourlyRemaining: 5,
-        weeklyRemaining: 29,
       })
     );
     expect(mockReplace).not.toHaveBeenCalled();

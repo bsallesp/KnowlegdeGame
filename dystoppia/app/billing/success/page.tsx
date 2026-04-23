@@ -24,9 +24,6 @@ export default function BillingSuccessPage() {
             hourlyUsage: data.hourlyUsage ?? 0,
             hourlyRemaining: data.hourlyRemaining ?? 30,
             hourlyResetsAt: data.hourlyResetsAt ?? null,
-            weeklyUsage: data.weeklyUsage ?? 0,
-            weeklyRemaining: data.weeklyRemaining ?? 250,
-            weeklyResetsAt: data.weeklyResetsAt ?? null,
           });
         }
       })

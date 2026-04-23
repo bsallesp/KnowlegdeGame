@@ -84,12 +84,6 @@ export interface Achievement {
   unlockedAt: string | null;
 }
 
-export interface DailyGoal {
-  target: number;
-  progress: number;
-  date: string;
-}
-
 export interface SessionHistoryEntry {
   date: string;
   correctCount: number;

@@ -7,7 +7,6 @@ interface Plan {
   name: string;
   price: number;
   hourlyLimit: number;
-  weeklyLimit: number;
   audiobook: boolean;
   curriculumPerWeek: number;
   features: string[];
@@ -19,40 +18,27 @@ const PLANS: Plan[] = [
     name: "Free",
     price: 0,
     hourlyLimit: 5,
-    weeklyLimit: 30,
     curriculumPerWeek: 2,
     audiobook: false,
-    features: ["5 questions/hour", "30 questions/week", "2 curricula/week"],
+    features: ["5 questions/hour", "2 curricula/week"],
   },
   {
     id: "learner",
     name: "Learner",
     price: 7.99,
     hourlyLimit: 30,
-    weeklyLimit: 250,
     curriculumPerWeek: 10,
     audiobook: true,
-    features: [
-      "30 questions/hour",
-      "250 questions/week",
-      "10 curricula/week",
-      "Audiobook generation",
-    ],
+    features: ["30 questions/hour", "10 curricula/week", "Audiobook generation"],
   },
   {
     id: "master",
     name: "Master",
     price: 16.99,
     hourlyLimit: 100,
-    weeklyLimit: 1000,
     curriculumPerWeek: 9999,
     audiobook: true,
-    features: [
-      "100 questions/hour",
-      "1000 questions/week",
-      "Unlimited curricula",
-      "Audiobook generation",
-    ],
+    features: ["100 questions/hour", "Unlimited curricula", "Audiobook generation"],
   },
 ];
 
@@ -68,15 +54,15 @@ export default function PricingTable({ onUpgrade, currentPlan = "free" }: Pricin
       onUpgrade(planId);
       return;
     }
-    // Default: redirect to Stripe checkout
+
     const res = await fetch("/api/billing/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ plan: planId }),
     });
+
     if (res.ok) {
       const { url } = await res.json();
-      // eslint-disable-next-line react-hooks/immutability
       window.location.href = url;
     }
   };
@@ -126,10 +112,10 @@ export default function PricingTable({ onUpgrade, currentPlan = "free" }: Pricin
             </div>
 
             <ul className="flex flex-col gap-2 mb-6 flex-1">
-              {plan.features.map((f) => (
-                <li key={f} className="flex items-center gap-2 text-sm" style={{ color: "#9494B8" }}>
+              {plan.features.map((feature) => (
+                <li key={feature} className="flex items-center gap-2 text-sm" style={{ color: "#9494B8" }}>
                   <span style={{ color: "#818CF8" }}>✓</span>
-                  {f}
+                  {feature}
                 </li>
               ))}
             </ul>

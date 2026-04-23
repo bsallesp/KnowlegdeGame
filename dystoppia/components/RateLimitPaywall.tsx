@@ -4,7 +4,6 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 
 interface RateLimitPaywallProps {
-  window: "hourly" | "weekly";
   resetsAt: string | null;
   onClose: () => void;
 }
@@ -15,7 +14,6 @@ const UPGRADE_PLANS = [
     name: "Learner",
     price: "$7.99/mo",
     hourly: "30 questions/hour",
-    weekly: "250 questions/week",
     highlight: true,
   },
   {
@@ -23,7 +21,6 @@ const UPGRADE_PLANS = [
     name: "Master",
     price: "$16.99/mo",
     hourly: "100 questions/hour",
-    weekly: "1000 questions/week",
     highlight: false,
   },
 ];
@@ -38,27 +35,24 @@ function formatTimeUntil(isoDate: string | null): string {
   return `${hours}h`;
 }
 
-export default function RateLimitPaywall({
-  window: limitWindow,
-  resetsAt,
-  onClose,
-}: RateLimitPaywallProps) {
+export default function RateLimitPaywall({ resetsAt, onClose }: RateLimitPaywallProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
   const timeUntilReset = formatTimeUntil(resetsAt);
-  const windowLabel = limitWindow === "hourly" ? "hourly" : "weekly";
 
   const handleUpgrade = async (planId: string) => {
     setLoading(true);
     setError("");
+
     try {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan: planId }),
       });
+
       if (!res.ok) throw new Error("Failed to create checkout session");
+
       const { url } = await res.json();
       window.location.href = url;
     } catch {
@@ -85,13 +79,13 @@ export default function RateLimitPaywall({
         <div className="text-3xl mb-3 text-center">🚀</div>
 
         <h2 className="text-xl font-bold mb-1 text-center" style={{ color: "#EEEEFF" }}>
-          You&apos;re learning fast
+          Hourly limit reached
         </h2>
         <p className="text-sm mb-2 text-center" style={{ color: "#9494B8" }}>
-          Your {windowLabel} limit is full.
+          You have used all questions available for this hour.
         </p>
         <p className="text-xs mb-6 text-center" style={{ color: "#6B6B8A" }}>
-          Resets in {timeUntilReset} — or upgrade now to keep going.
+          Resets in {timeUntilReset} or upgrade now to keep going.
         </p>
 
         <div className="flex flex-col gap-3 mb-4">
@@ -119,7 +113,7 @@ export default function RateLimitPaywall({
                 </span>
               </div>
               <div className="text-xs mt-1" style={{ color: "#9494B8" }}>
-                {plan.hourly} · {plan.weekly}
+                {plan.hourly}
               </div>
             </motion.button>
           ))}

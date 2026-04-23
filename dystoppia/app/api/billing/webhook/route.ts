@@ -135,8 +135,6 @@ async function handleSubscriptionCheckoutCompleted(session: Stripe.Checkout.Sess
       stripeSubscriptionId: subscriptionId,
       subscriptionStatus: "active",
       plan,
-      weeklyUsage: 0,
-      weeklyWindowStart: new Date(),
     },
   });
 

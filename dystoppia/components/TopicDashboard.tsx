@@ -228,10 +228,10 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute, onSo
                             }}
                           >
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1 justify-between">
+                              <div className="flex items-start flex-col gap-1">
                                 <span
-                                  className="text-xs truncate"
-                                  style={{ color: sub.muted ? "#9494B8" : "#EEEEFF" }}
+                                  className="text-xs"
+                                  style={{ color: sub.muted ? "#9494B8" : "#EEEEFF", wordBreak: "break-word" }}
                                 >
                                   {(() => {
                                     const rate = stats && stats.totalCount >= 3 ? stats.correctCount / stats.totalCount : null;
@@ -240,43 +240,45 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute, onSo
                                     return "";
                                   })()}{sub.name}
                                 </span>
-                                {onOpenAudiobooks && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  {onOpenAudiobooks && (
+                                    <button
+                                      onClick={() => onOpenAudiobooks(sub.id, "subitem", sub.name)}
+                                      className="flex-shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                      style={{ color: "#818CF8" }}
+                                      title="Audiobooks for this concept"
+                                      aria-label="Open concept audiobooks"
+                                    >
+                                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 18v-6a9 9 0 0118 0v6" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                  {onSolo && (
+                                    <button
+                                      onClick={() => onSolo(sub.id, "subitem")}
+                                      className="flex-shrink-0 px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                      style={{
+                                        backgroundColor: subItemSoloActive ? "rgba(250,204,21,0.14)" : "transparent",
+                                        border: `1px solid ${subItemSoloActive ? "rgba(250,204,21,0.35)" : "#2E2E40"}`,
+                                      }}
+                                      title={subItemSoloActive ? "Show all concepts again" : "Solo this concept"}
+                                      aria-label={subItemSoloActive ? "Exit subitem solo" : "Solo subitem"}
+                                    >
+                                      <SoloBadge active={subItemSoloActive} />
+                                    </button>
+                                  )}
                                   <button
-                                    onClick={() => onOpenAudiobooks(sub.id, "subitem", sub.name)}
+                                    onClick={() => onToggleMute(sub.id, "subitem")}
                                     className="flex-shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                                    style={{ color: "#818CF8" }}
-                                    title="Audiobooks for this concept"
-                                    aria-label="Open concept audiobooks"
+                                    style={{ color: sub.muted ? "#F97316" : "#9494B8" }}
+                                    title={sub.muted ? "Unmute" : "Mute"}
+                                    aria-label={sub.muted ? "Unmute subitem" : "Mute subitem"}
                                   >
-                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 18v-6a9 9 0 0118 0v6" />
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
-                                    </svg>
+                                    <MuteIcon muted={sub.muted} />
                                   </button>
-                                )}
-                                {onSolo && (
-                                  <button
-                                    onClick={() => onSolo(sub.id, "subitem")}
-                                    className="flex-shrink-0 px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                                    style={{
-                                      backgroundColor: subItemSoloActive ? "rgba(250,204,21,0.14)" : "transparent",
-                                      border: `1px solid ${subItemSoloActive ? "rgba(250,204,21,0.35)" : "#2E2E40"}`,
-                                    }}
-                                    title={subItemSoloActive ? "Show all concepts again" : "Solo this concept"}
-                                    aria-label={subItemSoloActive ? "Exit subitem solo" : "Solo subitem"}
-                                  >
-                                    <SoloBadge active={subItemSoloActive} />
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => onToggleMute(sub.id, "subitem")}
-                                  className="flex-shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                                  style={{ color: sub.muted ? "#F97316" : "#9494B8" }}
-                                  title={sub.muted ? "Unmute" : "Mute"}
-                                  aria-label={sub.muted ? "Unmute subitem" : "Mute subitem"}
-                                >
-                                  <MuteIcon muted={sub.muted} />
-                                </button>
+                                </div>
                               </div>
                               <div className="flex items-center gap-2 mt-1">
                                 <DifficultyDots level={difficulty} />

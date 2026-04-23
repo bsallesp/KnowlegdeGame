@@ -49,26 +49,21 @@ describe("GET /api/billing/plans", () => {
     for (const plan of plans) {
       expect(typeof plan.hourlyLimit).toBe("number");
       expect(plan.hourlyLimit).toBeGreaterThan(0);
-      expect(typeof plan.weeklyLimit).toBe("number");
-      expect(plan.weeklyLimit).toBeGreaterThan(0);
     }
   });
 
-  test("free plan has 5 hourly and 30 weekly limit", async () => {
+  test("free plan has 5 hourly limit", async () => {
     const free = PLANS.find((p) => p.id === "free")!;
     expect(free.hourlyLimit).toBe(5);
-    expect(free.weeklyLimit).toBe(30);
   });
 
-  test("learner plan has 30 hourly and 250 weekly limit", async () => {
+  test("learner plan has 30 hourly limit", async () => {
     const learner = PLANS.find((p) => p.id === "learner")!;
     expect(learner.hourlyLimit).toBe(30);
-    expect(learner.weeklyLimit).toBe(250);
   });
 
-  test("master plan has 100 hourly and 1000 weekly limit", async () => {
+  test("master plan has 100 hourly limit", async () => {
     const master = PLANS.find((p) => p.id === "master")!;
     expect(master.hourlyLimit).toBe(100);
-    expect(master.weeklyLimit).toBe(1000);
   });
 });

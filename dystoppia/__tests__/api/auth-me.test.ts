@@ -89,7 +89,6 @@ describe("GET /api/auth/me — valid token", () => {
   const now = new Date();
   // Keep windows unexpired to avoid flakiness.
   const hourlyWindowStart = new Date(now.getTime() - 10 * 60 * 1000); // 10 minutes ago
-  const weeklyWindowStart = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
 
   function makeUser(params: Partial<{
     role: string;
@@ -98,7 +97,6 @@ describe("GET /api/auth/me — valid token", () => {
     plan: string;
     subscriptionStatus: string;
     hourlyUsage: number;
-    weeklyUsage: number;
   }> = {}) {
     return {
       id: "user-1",
@@ -110,8 +108,6 @@ describe("GET /api/auth/me — valid token", () => {
       subscriptionStatus: params.subscriptionStatus ?? "inactive",
       hourlyUsage: params.hourlyUsage ?? 2,
       hourlyWindowStart,
-      weeklyUsage: params.weeklyUsage ?? 10,
-      weeklyWindowStart,
     };
   }
 
@@ -142,20 +138,17 @@ describe("GET /api/auth/me — valid token", () => {
   test("returns remaining usage for plan", async () => {
     mockCookieValue = "user-1.mac";
     mockVerify.mockReturnValue("user-1");
-    mockUserFindUnique.mockResolvedValue(makeUser({ plan: "learner", subscriptionStatus: "active", hourlyUsage: 2, weeklyUsage: 10 }));
+    mockUserFindUnique.mockResolvedValue(makeUser({ plan: "learner", subscriptionStatus: "active", hourlyUsage: 2 }));
     const res = await GET();
     const data = await res.json();
-    // learner: hourly=30, weekly=250
     expect(data.hourlyRemaining).toBe(28);
-    expect(data.weeklyRemaining).toBe(240);
     expect(typeof data.hourlyResetsAt).toBe("string");
-    expect(typeof data.weeklyResetsAt).toBe("string");
   });
 
   test("returns plan in response", async () => {
     mockCookieValue = "user-1.mac";
     mockVerify.mockReturnValue("user-1");
-    mockUserFindUnique.mockResolvedValue(makeUser({ plan: "learner", subscriptionStatus: "active", hourlyUsage: 5, weeklyUsage: 30 }));
+    mockUserFindUnique.mockResolvedValue(makeUser({ plan: "learner", subscriptionStatus: "active", hourlyUsage: 5 }));
     const res = await GET();
     const data = await res.json();
     expect(data.plan).toBe("learner");
@@ -169,7 +162,6 @@ describe("GET /api/auth/me — valid token", () => {
         plan: "free",
         subscriptionStatus: "inactive",
         hourlyUsage: 2,
-        weeklyUsage: 10,
       }) as any,
     );
     await GET();
@@ -185,8 +177,6 @@ describe("GET /api/auth/me — valid token", () => {
         subscriptionStatus: true,
         hourlyUsage: true,
         hourlyWindowStart: true,
-        weeklyUsage: true,
-        weeklyWindowStart: true,
       },
     });
   });

@@ -50,9 +50,6 @@ beforeEach(() => {
           hourlyUsage: 0,
           hourlyRemaining: 30,
           hourlyResetsAt: "2026-01-01T01:00:00.000Z",
-          weeklyUsage: 0,
-          weeklyRemaining: 250,
-          weeklyResetsAt: "2026-01-08T00:00:00.000Z",
         }),
     }),
   ) as typeof fetch;
