@@ -12,8 +12,13 @@ import {
 } from "@/lib/bookSourceText";
 import { getDifficultyDescription, getLearningStage } from "@/lib/learningStage";
 
-const GENERATION_MODEL = "claude-sonnet-4-6";
-const VALIDATION_MODEL = "claude-haiku-4-5";
+const GENERATION_MODEL_HARD = "claude-sonnet-4-6";
+const GENERATION_MODEL_EASY = "claude-haiku-4-5-20251001";
+const VALIDATION_MODEL = "claude-haiku-4-5-20251001";
+
+function getGenerationModel(difficulty: number): string {
+  return difficulty <= 2 ? GENERATION_MODEL_EASY : GENERATION_MODEL_HARD;
+}
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -36,14 +41,13 @@ function shuffleOptions(options: string[] | null, type: string): string[] | null
 }
 
 // Minimum cached questions before background refill kicks in
-const REFILL_THRESHOLD = 15;
+const REFILL_THRESHOLD = 25;
 // How many questions to generate per background refill
-const REFILL_BATCH = 10;
+const REFILL_BATCH = 20;
 // Cap per-subItem cache depth on prefetch warmups to avoid runaway LLM spend
-const PREFETCH_CACHE_TARGET = 15;
+const PREFETCH_CACHE_TARGET = 30;
 const MAX_GENERATION_ATTEMPTS = 3;
-// Budget for generation output. Adaptive thinking consumes from this budget,
-// so it must be comfortably above the JSON payload size for REFILL_BATCH questions.
+// Budget for generation output — must be above JSON payload for REFILL_BATCH questions.
 const GENERATION_MAX_TOKENS = 8000;
 
 interface GeneratedQuestion {
@@ -355,11 +359,11 @@ Rules:
 - The fact must be true, interesting, and completely independent of the specific question being asked`;
 }
 
-async function requestQuestionBatch(prompt: string, userId: string): Promise<GeneratedQuestion[]> {
+async function requestQuestionBatch(prompt: string, userId: string, difficulty: number): Promise<GeneratedQuestion[]> {
+  const model = getGenerationModel(difficulty);
   const message = await client.messages.create({
-    model: GENERATION_MODEL,
+    model,
     max_tokens: GENERATION_MAX_TOKENS,
-    thinking: { type: "adaptive", display: "omitted" },
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -369,7 +373,7 @@ async function requestQuestionBatch(prompt: string, userId: string): Promise<Gen
 
   logLLMUsage({
     userId,
-    model: GENERATION_MODEL,
+    model,
     endpoint: "generate-questions",
     inputTokens: message.usage.input_tokens,
     outputTokens: message.usage.output_tokens,
@@ -571,8 +575,11 @@ Apply this pedagogical approach when writing all questions. The questions should
 
   for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS && acceptedQuestions.length < count; attempt++) {
     const requestedCount = count - acceptedQuestions.length;
-    const candidateBatch = await requestQuestionBatch(prompt, userId);
-    const validatedBatch = await validateGeneratedQuestions(candidateBatch, userId);
+    const candidateBatch = await requestQuestionBatch(prompt, userId, resolvedDifficulty);
+    // Preflight questions are trivially simple (true/false, obvious options) — skip LLM validation
+    const validatedBatch = resolvedDifficulty === 0
+      ? candidateBatch.map(normalizeQuestion).filter((q): q is GeneratedQuestion => q !== null)
+      : await validateGeneratedQuestions(candidateBatch, userId);
 
     for (const question of validatedBatch) {
       const dedupeKey = `${question.type}:${question.content.toLowerCase()}`;
