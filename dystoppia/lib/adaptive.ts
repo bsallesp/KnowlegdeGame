@@ -8,10 +8,17 @@
  * - We look at a rolling window of the last 5 answers for the subItem
  */
 
+interface DifficultyOpts {
+  lastCorrect?: boolean;
+  lastTimeSpent?: number;
+  lastExpectedTime?: number;
+}
+
 export function calculateNewDifficulty(
   currentDifficulty: number,
   recentCorrect: number,
-  recentTotal: number
+  recentTotal: number,
+  opts?: DifficultyOpts
 ): number {
   if (recentTotal === 0) return currentDifficulty;
 
@@ -20,13 +27,18 @@ export function calculateNewDifficulty(
   const promoteThreshold = beginnerBand ? 0.85 : 0.8;
   const promoteSampleSize = beginnerBand ? 4 : 3;
 
-  // If last answer was wrong (we check via the correctRate drop), reduce
-  // We receive stats *after* recording the answer, so we check the rate
-  if (correctRate >= promoteThreshold && recentTotal >= promoteSampleSize) {
-    // Strong performance → increase difficulty
+  // Hesitation: answered correctly but took >1.5× the expected time → stay at this level.
+  // The learner knows it but hasn't automated the recognition yet.
+  const hesitating =
+    opts?.lastCorrect === true &&
+    opts.lastTimeSpent != null &&
+    opts.lastExpectedTime != null &&
+    opts.lastExpectedTime > 0 &&
+    opts.lastTimeSpent > opts.lastExpectedTime * 1.5;
+
+  if (correctRate >= promoteThreshold && recentTotal >= promoteSampleSize && !hesitating) {
     return Math.min(5, currentDifficulty + 1);
   } else if (correctRate < 0.5) {
-    // Poor performance → decrease difficulty
     return Math.max(1, currentDifficulty - 1);
   }
 

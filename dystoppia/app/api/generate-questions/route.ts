@@ -53,6 +53,7 @@ interface GeneratedQuestion {
   answer: string;
   explanation: string;
   primer?: string | null;
+  fact?: string | null;
   timeLimit?: number | null;
 }
 
@@ -130,6 +131,7 @@ function normalizeQuestion(raw: GeneratedQuestion): GeneratedQuestion | null {
   const content = typeof raw.content === "string" ? raw.content.trim() : "";
   const explanation = typeof raw.explanation === "string" ? raw.explanation.trim() : "";
   const primer = typeof raw.primer === "string" ? raw.primer.trim() : "";
+  const fact = typeof raw.fact === "string" && raw.fact.trim().length > 0 ? raw.fact.trim() : null;
   let answer = typeof raw.answer === "string" ? raw.answer.trim() : "";
   let options = Array.isArray(raw.options)
     ? raw.options
@@ -173,6 +175,7 @@ function normalizeQuestion(raw: GeneratedQuestion): GeneratedQuestion | null {
     answer,
     explanation,
     primer: primer || null,
+    fact,
     timeLimit,
   };
 }
@@ -245,6 +248,21 @@ Source-grounding rules:
   const questionWritingInstruction = buildQuestionWritingInstruction(resolvedDifficulty, correctRate);
   const stage = getLearningStage(resolvedDifficulty, correctRate);
 
+  const isPreflightMode = resolvedDifficulty === 0;
+
+  const preflightBlock = isPreflightMode
+    ? `
+PREFLIGHT MODE — this is the learner's very first contact with this concept:
+- Question types: ONLY "true_false" or "single_choice" (2-3 options). No multiple_choice, no fill_blank.
+- Test pure vocabulary recognition: "What does X mean?", "Which of these is X?", "X is true/false."
+- Options must be completely obvious — no tricky distractors, no close alternatives.
+- Stems must be under 12 words. No scenarios, no prior knowledge required.
+- The primer must be 1-2 sentences: name the concept, give the shortest accurate definition, nothing else.
+- These questions are diagnostic: reveal whether the learner has seen this concept before.
+- timeLimit: null for all preflight questions.
+`
+    : "";
+
   return `You are an expert educator creating quiz questions. All questions, options, answers, explanations, and primers must be written in English.
 
 Topic: "${subItem.item.topic.name}"
@@ -254,13 +272,15 @@ Concept: "${subItem.name}"
 Difficulty level: ${resolvedDifficulty}/5 (${difficultyDesc})
 Learner's current correct rate: ${Math.round(correctRate)}%
 Current learning stage: ${stage.label}
+${preflightBlock}
 ${pedagogyBlock}
 ${sourceBlock}
-Generate exactly ${count} questions about this concept. Use a mix of question types.
+Generate exactly ${count} questions about this concept.${isPreflightMode ? " Use only true_false and single_choice types." : " Use a mix of question types."}
 
 ${questionWritingInstruction}
 
 Question design rules by stage:
+- Orientation (difficulty 0): pure vocabulary recognition, true/false, completely obvious options. No scenarios.
 - Recognize: use definition, term-to-cue, and simple true/false checks. Avoid decorative scenarios.
 - Explain: ask why a rule fits, what a phrase means, or which option best explains the concept.
 - Apply: use one short scenario with one decision point.
@@ -270,6 +290,10 @@ Question design rules by stage:
 PRIMER (pre-question teaching text) — required for every question:
 ${primerInstruction}
 Pearson-VUE style: the primer teaches the principle so the learner can REASON toward the answer, never hands the answer over. If the question uses specific numbers, entities, or a scenario, the primer's example must use DIFFERENT ones.
+
+FACT — required for every question:
+Write a single surprising, real-world, or memory-anchor fact about the broader topic (not about this specific question). Max 2 sentences. Prefer: counterintuitive truths, historical context, real-world applications, or mnemonic hooks. The fact must NOT hint at or reveal the current question's answer. It should make the learner feel the topic is alive and interesting.
+Examples of good facts: "Zero was not always used — ancient civilizations did all their math without it." / "An index can speed up searches dramatically, but may slow down inserts." / "Cleopatra lived closer in time to the iPhone than to the pyramids."
 
 Return ONLY valid JSON in this exact format:
 {
@@ -281,6 +305,7 @@ Return ONLY valid JSON in this exact format:
       "answer": "Option A",
       "explanation": "Explanation of why Option A is correct...",
       "primer": "Short didactic text that teaches the principle using a different example than the question.",
+      "fact": "One surprising or memorable fact about the broader topic. 1-2 sentences.",
       "timeLimit": null
     },
     {
@@ -290,6 +315,7 @@ Return ONLY valid JSON in this exact format:
       "answer": "True",
       "explanation": "This is true because...",
       "primer": "Short didactic text that teaches the principle using a different example than the question.",
+      "fact": "One surprising or memorable fact about the broader topic. 1-2 sentences.",
       "timeLimit": null
     },
     {
@@ -299,6 +325,7 @@ Return ONLY valid JSON in this exact format:
       "answer": "photosynthesis",
       "explanation": "Photosynthesis is the process by which plants convert sunlight into chemical energy.",
       "primer": "Short didactic text that teaches the principle using a different example than the question.",
+      "fact": "One surprising or memorable fact about the broader topic. 1-2 sentences.",
       "timeLimit": null
     }
   ]
@@ -324,7 +351,8 @@ Rules:
 - For any arithmetic or numeric claim, compute the result before finalizing the answer
 - The explanation must support the exact final answer. Never let the explanation contradict the answer
 - If the explanation proves a true/false statement is false, the answer must be "False"
-- The primer must never leak the specific answer — if it would, rewrite it to teach only the principle`;
+- The primer must never leak the specific answer — if it would, rewrite it to teach only the principle
+- The fact must be true, interesting, and completely independent of the specific question being asked`;
 }
 
 async function requestQuestionBatch(prompt: string, userId: string): Promise<GeneratedQuestion[]> {
@@ -462,6 +490,7 @@ async function persistQuestions(
           answer: question.answer,
           explanation: question.explanation,
           primer: question.primer ?? null,
+          fact: question.fact ?? null,
           difficulty: resolvedDifficulty,
           timeLimit: question.timeLimit ?? null,
         },
@@ -522,7 +551,9 @@ Apply this pedagogical approach when writing all questions. The questions should
 
   const timeLimitByDifficulty: Record<number, number> = { 1: 210, 2: 180, 3: 150, 4: 120, 5: 120 };
   const defaultTimeLimit = timeLimitByDifficulty[resolvedDifficulty] ?? 150;
-  const timerInstruction = `- "timeLimit": use ${defaultTimeLimit} for multiple_choice, true_false, and single_choice. Use null for fill_blank.`;
+  const timerInstruction = resolvedDifficulty === 0
+    ? `- "timeLimit": use null for all questions (preflight/orientation level — no time pressure)`
+    : `- "timeLimit": use ${defaultTimeLimit} for multiple_choice, true_false, and single_choice. Use null for fill_blank.`;
 
   const prompt = buildGenerationPrompt(
     subItem,
@@ -707,7 +738,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         questions: shuffled.map((question) => {
           const options = question.options ? JSON.parse(question.options) : null;
-          return { ...question, options: shuffleOptions(options, question.type) };
+          return { ...question, options: shuffleOptions(options, question.type), fact: (question as { fact?: string | null }).fact ?? null };
         }),
       });
     }
@@ -722,7 +753,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         questions: validQuestions.map((question) => {
           const options = question.options ? JSON.parse(question.options) : null;
-          return { ...question, options: shuffleOptions(options, question.type) };
+          return { ...question, options: shuffleOptions(options, question.type), fact: (question as { fact?: string | null }).fact ?? null };
         }),
       });
     }
@@ -751,6 +782,7 @@ export async function POST(req: NextRequest) {
         answer: question.answer,
         explanation: question.explanation,
         primer: question.primer ?? null,
+        fact: question.fact ?? null,
         timeLimit: question.timeLimit ?? null,
         subItemId,
         difficulty: resolvedDifficulty,

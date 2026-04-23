@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
     const question = await prisma.question.findUnique({
       where: { id: questionId },
-      select: { subItemId: true, flaggedAt: true },
+      select: { subItemId: true, flaggedAt: true, timeLimit: true },
     });
 
     if (!question) {
@@ -134,7 +134,12 @@ export async function POST(req: NextRequest) {
       const newDifficulty = calculateNewDifficulty(
         subItem.difficulty,
         recentCorrect,
-        recentTotal
+        recentTotal,
+        {
+          lastCorrect: Boolean(correct),
+          lastTimeSpent: timeSpent || 0,
+          lastExpectedTime: question.timeLimit ? question.timeLimit * 1000 : 15000,
+        }
       );
 
       // Calculate SM-2 values (expected time: 15 seconds = 15000ms)

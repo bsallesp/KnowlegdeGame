@@ -67,6 +67,7 @@ model Question {
   flaggedByUserId  String?
   flaggedReason    String?
   flaggedSessionId String?
+  fact             String?
   createdAt        DateTime     @default(now())
   answers          UserAnswer[]
 

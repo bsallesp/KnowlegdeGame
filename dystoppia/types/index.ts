@@ -43,6 +43,7 @@ export interface Question {
   answer: string;
   explanation: string;
   primer?: string | null;
+  fact?: string | null;
   difficulty: number;
   timeLimit?: number | null;
   flaggedAt?: string | null;

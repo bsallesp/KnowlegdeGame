@@ -1,4 +1,4 @@
-export type LearningStageKey = "recognize" | "explain" | "apply" | "compare" | "transfer";
+export type LearningStageKey = "preflight" | "recognize" | "explain" | "apply" | "compare" | "transfer";
 
 export interface LearningStage {
   key: LearningStageKey;
@@ -12,6 +12,16 @@ export interface LearningStage {
 }
 
 const STAGES: Record<LearningStageKey, LearningStage> = {
+  preflight: {
+    key: "preflight",
+    label: "Orientation",
+    learnerGoal: "encounter the concept for the very first time and recognize its name",
+    promptFocus: "Use only true/false or single_choice (2-3 options). Ask for the simplest possible definition match or yes/no recognition. No scenarios. Stems under 10 words. Options must be completely obvious with no tricky distractors.",
+    primerGuidance: "Write 1-2 sentences in the plainest language possible. Name the concept, give the shortest accurate definition, and nothing else. No examples, no comparisons.",
+    correctCoaching: "You recognized this concept. You are ready to start building real understanding.",
+    incorrectCoaching: "That is okay — this is your first encounter. The next question will reintroduce the same idea with a slightly different angle.",
+    nextStepLabel: "Next: confirm you can spot this concept reliably.",
+  },
   recognize: {
     key: "recognize",
     label: "Recognize",
@@ -67,6 +77,9 @@ const STAGES: Record<LearningStageKey, LearningStage> = {
 export function getLearningStage(difficulty: number, correctRate?: number): LearningStage {
   const rate = typeof correctRate === "number" ? correctRate : null;
 
+  if (difficulty <= 0) {
+    return STAGES.preflight;
+  }
   if (difficulty <= 1 || (rate !== null && rate < 55)) {
     return STAGES.recognize;
   }
@@ -86,6 +99,8 @@ export function getDifficultyDescription(difficulty: number): string {
   const stage = getLearningStage(difficulty);
 
   switch (stage.key) {
+    case "preflight":
+      return "first-contact orientation, pure vocabulary recognition";
     case "recognize":
       return "recognition, simple definitions, core cues";
     case "explain":

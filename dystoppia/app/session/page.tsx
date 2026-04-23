@@ -26,6 +26,36 @@ interface XPPopup {
   amount: number;
 }
 
+function FactOverlay({ fact, onDismiss }: { fact: string; onDismiss: () => void }) {
+  return (
+    <motion.div
+      key="fact-overlay"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.35 }}
+      className="w-full max-w-2xl mx-auto"
+    >
+      <div
+        className="rounded-xl p-8 flex flex-col items-center gap-5"
+        style={{ backgroundColor: "#12121A", border: "1px solid rgba(129,140,248,0.3)" }}
+      >
+        <span className="text-3xl select-none">💡</span>
+        <p className="text-center text-base leading-relaxed max-w-md" style={{ color: "#C7C7E0" }}>
+          {fact}
+        </p>
+        <button
+          onClick={onDismiss}
+          className="mt-1 text-xs px-5 py-2 rounded-lg transition-colors"
+          style={{ color: "#9494B8", border: "1px solid #2E2E40", backgroundColor: "#1C1C28" }}
+        >
+          Continue
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
 interface AnswerMeta {
   questionId: string;
   subItemId: string;
@@ -105,10 +135,13 @@ export default function SessionPage() {
   const [reportState, setReportState] = useState<QuestionReportState>("idle");
   const [reportMessage, setReportMessage] = useState("");
   const [lastAnswerMeta, setLastAnswerMeta] = useState<AnswerMeta | null>(null);
+  const [displayingFact, setDisplayingFact] = useState<string | null>(null);
   const generatingRef = useRef(false);
   const isFetchingRef = useRef(false);
   const recoveryFetchesRef = useRef<Set<string>>(new Set());
   const reportedQuestionIdsRef = useRef<Set<string>>(new Set());
+  const preflightTriggeredRef = useRef<Set<string>>(new Set());
+  const factTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const syncTopicFromServer = useCallback(async () => {
     const res = await fetch(`/api/topics?slug=${encodeURIComponent(GED_SLUG)}`);
@@ -172,12 +205,25 @@ export default function SessionPage() {
         if (!subItem) return;
         const stats = subItemStats[subItemId];
 
+        // First-contact detection: use preflight difficulty (0) for subItems the learner
+        // has never answered before. Preflight questions are ultra-simple orientation checks.
+        const isFirstContact =
+          forceDifficulty === undefined &&
+          !preflightTriggeredRef.current.has(subItemId) &&
+          (!stats || stats.totalCount === 0);
+
+        if (isFirstContact) {
+          preflightTriggeredRef.current.add(subItemId);
+        }
+
+        const resolvedDifficulty = forceDifficulty ?? (isFirstContact ? 0 : subItem.difficulty);
+
         const res = await fetch("/api/generate-questions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             subItemId,
-            difficulty: forceDifficulty ?? subItem.difficulty,
+            difficulty: resolvedDifficulty,
             count,
             stats,
           }),
@@ -543,11 +589,18 @@ export default function SessionPage() {
 
   const handleNext = () => {
     const newCount = answerCount; // already incremented
-    // Trigger boss round every BOSS_EVERY answers (not while already in boss)
+    const fact = currentQuestion?.fact ?? null;
+
     if (!isBossRound && newCount > 0 && newCount % BOSS_EVERY === 0) {
       setShowBossIntro(true);
     } else {
       advanceQueue();
+      // Show the fact from the just-answered question during the loading transition
+      if (fact) {
+        setDisplayingFact(fact);
+        if (factTimeoutRef.current) clearTimeout(factTimeoutRef.current);
+        factTimeoutRef.current = setTimeout(() => setDisplayingFact(null), 2800);
+      }
     }
     setUserAnswer("");
   };
@@ -1064,8 +1117,18 @@ export default function SessionPage() {
             </div>
 
             <AnimatePresence mode="wait">
-              {/* Flashcard before new subItem */}
-              {showFlashCard && pendingQuestion?.subItem && (
+              {/* Fact overlay between questions */}
+              {displayingFact ? (
+                <FactOverlay
+                  key="fact-overlay"
+                  fact={displayingFact}
+                  onDismiss={() => {
+                    if (factTimeoutRef.current) clearTimeout(factTimeoutRef.current);
+                    setDisplayingFact(null);
+                  }}
+                />
+              ) : showFlashCard && pendingQuestion?.subItem ? (
+                /* Flashcard before new subItem */
                 <motion.div key="flashcard" className="w-full max-w-2xl">
                   <FlashCard
                     subItem={pendingQuestion.subItem}
@@ -1073,10 +1136,10 @@ export default function SessionPage() {
                     onReady={() => setShowFlashCard(false)}
                   />
                 </motion.div>
-              )}
+              ) : null}
 
               {/* Question card */}
-              {!showFlashCard && currentQuestion ? (
+              {!displayingFact && !showFlashCard && currentQuestion ? (
                 <div key={currentQuestion.id} className="w-full max-w-2xl">
                   <QuestionCard
                     question={currentQuestion}
@@ -1118,7 +1181,7 @@ export default function SessionPage() {
                     )}
                   </AnimatePresence>
                 </div>
-              ) : !showFlashCard ? (
+              ) : !displayingFact && !showFlashCard ? (
                 <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full max-w-2xl space-y-4">
                   <div className="p-6 rounded-xl space-y-3" style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}>
                     <SkeletonBlock width="30%" height="1.25rem" />

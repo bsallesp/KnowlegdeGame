@@ -53,14 +53,26 @@ function AnswerFeedback({ correct }: { correct: boolean }) {
   );
 }
 
-function buildRecoveryCoaching(question: Question, correct: boolean) {
+function buildRecoveryCoaching(question: Question, correct: boolean, timeSpentMs: number | null) {
   const stage = getLearningStage(question.difficulty);
-  return {
-    stage,
-    title: correct ? "What You Just Reinforced" : "What To Focus On Next",
-    body: correct ? stage.correctCoaching : stage.incorrectCoaching,
-    nextStep: stage.nextStepLabel,
-  };
+  const expectedMs = (question.timeLimit ?? 150) * 1000;
+  const hesitating = correct && timeSpentMs !== null && timeSpentMs > expectedMs * 1.3;
+
+  let title: string;
+  let body: string;
+
+  if (correct && hesitating) {
+    title = "Correct — but you hesitated";
+    body = "You know this, but the recognition isn't automatic yet. One more repetition at this level will lock it in before moving up.";
+  } else if (correct) {
+    title = "What You Just Reinforced";
+    body = stage.correctCoaching;
+  } else {
+    title = "Before you move on";
+    body = stage.incorrectCoaching;
+  }
+
+  return { stage, title, body, nextStep: stage.nextStepLabel, hesitating };
 }
 
 export default function QuestionCard({
@@ -83,6 +95,7 @@ export default function QuestionCard({
   const [hintLoading, setHintLoading] = useState(false);
   const [hintUsed, setHintUsed] = useState(false);
   const [hintError, setHintError] = useState(false);
+  const [lastTimeSpentMs, setLastTimeSpentMs] = useState<number | null>(null);
   const startTimeRef = useRef<number>(Date.now());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -94,6 +107,7 @@ export default function QuestionCard({
     setHint(null);
     setHintUsed(false);
     setHintError(false);
+    setLastTimeSpentMs(null);
     startTimeRef.current = Date.now();
 
     if (settings.timerEnabled && question.timeLimit && question.timeLimit > 0) {
@@ -136,6 +150,7 @@ export default function QuestionCard({
     if (!selectedAnswer) return;
     if (timerRef.current) clearInterval(timerRef.current);
     const timeSpent = Date.now() - startTimeRef.current;
+    setLastTimeSpentMs(timeSpent);
     onAnswer(selectedAnswer, timeSpent);
   };
 
@@ -198,7 +213,7 @@ export default function QuestionCard({
 
   const difficultyColor = ["", "#60A5FA", "#38BDF8", "#818CF8", "#F97316", "#EF4444"][question.difficulty] || "#818CF8";
   const learningStage = getLearningStage(question.difficulty);
-  const coaching = lastAnswerCorrect === null ? null : buildRecoveryCoaching(question, lastAnswerCorrect);
+  const coaching = lastAnswerCorrect === null ? null : buildRecoveryCoaching(question, lastAnswerCorrect, lastTimeSpentMs);
 
   const timerPct = question.timeLimit && timeLeft !== null ? (timeLeft / question.timeLimit) * 100 : null;
   const timerColor = timerPct !== null ? (timerPct > 50 ? "#60A5FA" : timerPct > 20 ? "#FACC15" : "#F97316") : "#60A5FA";
@@ -485,13 +500,24 @@ export default function QuestionCard({
               <div
                 className="p-4 rounded-lg text-sm leading-relaxed space-y-2"
                 style={{
-                  backgroundColor: lastAnswerCorrect ? "rgba(96, 165, 250, 0.08)" : "rgba(249, 115, 22, 0.08)",
-                  border: `1px solid ${lastAnswerCorrect ? "rgba(96, 165, 250, 0.3)" : "rgba(249, 115, 22, 0.3)"}`,
+                  backgroundColor: lastAnswerCorrect
+                    ? coaching.hesitating
+                      ? "rgba(250,204,21,0.07)"
+                      : "rgba(96, 165, 250, 0.08)"
+                    : "rgba(249, 115, 22, 0.08)",
+                  border: `1px solid ${lastAnswerCorrect ? (coaching.hesitating ? "rgba(250,204,21,0.35)" : "rgba(96, 165, 250, 0.3)") : "rgba(249, 115, 22, 0.3)"}`,
                   color: "#C7C7E0",
                 }}
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: lastAnswerCorrect ? "#93C5FD" : "#FDBA74" }}>
+                  <span
+                    className="text-xs font-semibold uppercase tracking-wider"
+                    style={{
+                      color: lastAnswerCorrect
+                        ? coaching.hesitating ? "#FDE68A" : "#93C5FD"
+                        : "#FDBA74",
+                    }}
+                  >
                     {coaching.title}
                   </span>
                   <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: "#12121A", color: "#A5B4FC", border: "1px solid #2E2E40" }}>
@@ -499,6 +525,14 @@ export default function QuestionCard({
                   </span>
                 </div>
                 <p>{coaching.body}</p>
+                {!lastAnswerCorrect && (
+                  <div
+                    className="mt-1 px-3 py-2 rounded-md text-xs leading-relaxed"
+                    style={{ backgroundColor: "rgba(249,115,22,0.06)", border: "1px solid rgba(249,115,22,0.2)", color: "#FDBA74" }}
+                  >
+                    Core idea: {question.explanation}
+                  </div>
+                )}
                 <p style={{ color: "#EEEEFF" }}>{coaching.nextStep}</p>
               </div>
             )}
