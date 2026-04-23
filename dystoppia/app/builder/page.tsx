@@ -1,5 +1,5 @@
-import BuilderWorkspace from "@/components/BuilderWorkspace";
+import { redirect } from "next/navigation";
 
 export default function BuilderPage() {
-  return <BuilderWorkspace />;
+  redirect("/game");
 }

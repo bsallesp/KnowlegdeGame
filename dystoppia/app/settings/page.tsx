@@ -43,11 +43,11 @@ export default function SettingsPage() {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => router.push("/session")}
+            onClick={() => router.push("/game")}
             className="w-full mt-8 py-3 rounded-xl font-semibold text-sm"
             style={{ backgroundColor: "#818CF8", color: "white" }}
           >
-            Back to Learning Session
+            Back to Game
           </motion.button>
         )}
 

@@ -169,7 +169,7 @@ function setupFetchWithDone() {
   }) as any;
 }
 
-/** Topic slug matches search query so flow skips approval and navigates straight to /session. */
+/** Topic slug matches search query so flow skips approval and navigates straight to /game. */
 function setupFetchWithDoneExistingTopic() {
   const sseBody = makeSseStream([
     { type: "item", data: { name: "Cloud Concepts", subItems: [{ name: "Cloud Concepts" }] } },
@@ -535,17 +535,6 @@ describe("SearchPage — history click", () => {
 
 // ─── Additional coverage to reach 200+ React tests ──────────────────────────
 describe("SearchPage — additional UI coverage", () => {
-  test("renders Settings navigation link", async () => {
-    render(<SearchPage />);
-    expect(screen.getByText("Settings")).toBeTruthy();
-  });
-
-  test("Settings link points to /settings", async () => {
-    render(<SearchPage />);
-    const settings = document.querySelector('a[href="/settings"]');
-    expect(settings).toBeTruthy();
-  });
-
   test("Learn button is hidden when input is empty", async () => {
     render(<SearchPage />);
     expect(screen.queryByRole("button", { name: /^learn$/i })).toBeNull();
@@ -652,15 +641,6 @@ describe("SearchPage — additional UI coverage", () => {
       expect(screen.getByText("Continue learning")).toBeTruthy();
     });
     expect(screen.queryByText("Quantum Computing")).toBeNull();
-  });
-
-  test("empty-history mode still keeps Settings link", async () => {
-    setupFetch(true, true, undefined, { topics: [] });
-    render(<SearchPage />);
-    await waitFor(() => {
-      const settings = document.querySelector('a[href="/settings"]');
-      expect(settings).toBeTruthy();
-    });
   });
 
   test("typing whitespace only keeps Learn button hidden", async () => {
@@ -810,7 +790,7 @@ describe("SearchPage — question prefetch on done event", () => {
     }, { timeout: 3000 });
   });
 
-  test("prefetch does not block navigation to /session", async () => {
+  test("prefetch does not block navigation to /game", async () => {
     setupFetchWithDoneExistingTopic();
     render(<SearchPage />);
     const user = userEvent.setup();
@@ -820,7 +800,7 @@ describe("SearchPage — question prefetch on done event", () => {
     });
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/session");
+      expect(mockPush).toHaveBeenCalledWith("/game");
     }, { timeout: 10_000 });
   });
 

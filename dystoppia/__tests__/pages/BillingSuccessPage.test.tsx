@@ -62,7 +62,7 @@ describe("BillingSuccessPage", () => {
   test("fetches billing status and updates store", async () => {
     render(<BillingSuccessPage />);
     expect(screen.getByRole("heading", { name: /billing updated/i })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /back to builder/i })).toHaveAttribute("href", "/builder");
+    expect(screen.getByRole("link", { name: /start learning/i })).toHaveAttribute("href", "/");
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith("/api/billing/status");

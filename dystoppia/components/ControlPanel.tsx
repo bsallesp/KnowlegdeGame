@@ -292,11 +292,11 @@ export default function ControlPanel() {
               Workspace
             </Link>
             <Link
-              href="/governance"
+              href="/game"
               className="px-3 py-1.5 rounded-full"
               style={{ backgroundColor: "#1C1C28", border: "1px solid #2E2E40", color: "#9494B8" }}
             >
-              Governance
+              Game
             </Link>
             <span
               className="px-3 py-1.5 rounded-full font-semibold"

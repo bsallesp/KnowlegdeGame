@@ -102,6 +102,23 @@ describe("SettingsPage — interactions", () => {
     expect(useAppStore.getState().settings.refillTrigger).toBe(4);
   });
 
+  test("returns to /game when the current topic exists", async () => {
+    useAppStore.setState({
+      currentTopic: {
+        id: "topic-1",
+        name: "Azure Fundamentals",
+        slug: "azure-fundamentals",
+        createdAt: new Date().toISOString(),
+        teachingProfile: null,
+        items: [],
+      },
+    });
+
+    render(<SettingsPage />);
+    await userEvent.click(screen.getByText("Back to Game"));
+    expect(mockPush).toHaveBeenCalledWith("/game");
+  });
+
   test("queue depth slider min is 2", () => {
     render(<SettingsPage />);
     const sliders = screen.getAllByRole("slider");

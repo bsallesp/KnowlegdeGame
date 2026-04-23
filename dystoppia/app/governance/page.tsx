@@ -1,5 +1,5 @@
-import GovernanceConsole from "@/components/GovernanceConsole";
+import { redirect } from "next/navigation";
 
 export default function GovernancePage() {
-  return <GovernanceConsole />;
+  redirect("/game");
 }
