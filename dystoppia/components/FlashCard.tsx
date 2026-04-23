@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import type { SubItem } from "@/types";
+import { getLearningStage } from "@/lib/learningStage";
 
 interface FlashCardProps {
   subItem: SubItem;
@@ -12,6 +13,7 @@ interface FlashCardProps {
 export default function FlashCard({ subItem, topicName, onReady }: FlashCardProps) {
   const difficultyLabel = ["", "Beginner", "Basic", "Intermediate", "Advanced", "Expert"][subItem.difficulty] || "Intermediate";
   const difficultyColor = ["", "#60A5FA", "#38BDF8", "#818CF8", "#F97316", "#EF4444"][subItem.difficulty] || "#818CF8";
+  const learningStage = getLearningStage(subItem.difficulty);
 
   return (
     <motion.div
@@ -35,7 +37,7 @@ export default function FlashCard({ subItem, topicName, onReady }: FlashCardProp
           className="inline-block px-3 py-1 rounded-full text-xs font-semibold mb-6"
           style={{ backgroundColor: `${difficultyColor}22`, color: difficultyColor, border: `1px solid ${difficultyColor}44` }}
         >
-          {difficultyLabel}
+          {difficultyLabel} · {learningStage.label}
         </span>
 
         {subItem.difficulty === 1 && (
@@ -53,8 +55,8 @@ export default function FlashCard({ subItem, topicName, onReady }: FlashCardProp
 
         <p className="text-sm mb-8" style={{ color: "#9494B8" }}>
           {subItem.difficulty === 1
-            ? "Answer at least 3 questions with 80%+ accuracy to advance."
-            : "Ready to answer questions about this concept?"}
+            ? "Start with signal recognition first. Consistency matters more than speed here."
+            : learningStage.nextStepLabel}
         </p>
 
         <motion.button

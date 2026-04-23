@@ -3,8 +3,8 @@ import { calculateNewDifficulty, calculateSM2, selectNextSubItem } from "@/lib/a
 
 // ─── calculateNewDifficulty ────────────────────────────────────────────────────
 describe("calculateNewDifficulty — strong performance", () => {
-  test("increases difficulty when correctRate >= 0.8 and total >= 3", () => {
-    expect(calculateNewDifficulty(2, 8, 10)).toBe(3);
+  test("increases difficulty when the learner earns stronger beginner-band evidence", () => {
+    expect(calculateNewDifficulty(2, 9, 10)).toBe(3);
   });
 
   test("caps difficulty at 5", () => {
@@ -19,9 +19,13 @@ describe("calculateNewDifficulty — strong performance", () => {
     expect(calculateNewDifficulty(4, 10, 10)).toBe(5);
   });
 
-  test("requires at least 3 answers to increase difficulty", () => {
+  test("requires more than 2 answers to increase difficulty", () => {
     // recentTotal = 2 with 100% rate — should NOT increase
     expect(calculateNewDifficulty(2, 2, 2)).toBe(2);
+  });
+
+  test("keeps difficulty 2 stable at 80% until the learner is more consistent", () => {
+    expect(calculateNewDifficulty(2, 4, 5)).toBe(2);
   });
 });
 

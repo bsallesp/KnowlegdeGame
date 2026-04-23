@@ -314,6 +314,19 @@ describe("generation path", () => {
     expect(callArg.data).toHaveProperty("timeLimit");
   });
 
+  test("teaches the LLM the current learning stage for beginner questions", async () => {
+    mockCreate_llm.mockResolvedValue(makeLLMResponse([
+      makeLLMQuestion({ primer: "Look for the signal word first." }),
+    ]));
+
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 1, difficulty: 1 }));
+
+    expect(res.status).toBe(200);
+    const firstPrompt = mockCreate_llm.mock.calls[0][0].messages[0].content;
+    expect(firstPrompt).toContain("Current learning stage: Recognize");
+    expect(firstPrompt).toContain("Difficulty 1-2 must feel welcoming and low-friction");
+  });
+
   test("saves timeLimit as null when not provided by LLM", async () => {
     mockCreate_llm.mockResolvedValue(makeLLMResponse([
       makeLLMQuestion({ timeLimit: null }),

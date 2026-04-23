@@ -10,6 +10,7 @@ import {
   getSourceContextForSubItem,
   type BookSourceContext,
 } from "@/lib/bookSourceText";
+import { getDifficultyDescription, getLearningStage } from "@/lib/learningStage";
 
 const GENERATION_MODEL = "claude-sonnet-4-6";
 const VALIDATION_MODEL = "claude-haiku-4-5";
@@ -195,6 +196,25 @@ function buildPrimerInstruction(resolvedDifficulty: number, correctRate: number)
   The primer must be 2-3 sentences. Briefly name the principle and give a compact analogy or mini-example using DIFFERENT surface details than the question (different numbers/scenario). Do not walk through a full solution. Never reveal or paraphrase the answer to the actual question.`;
 }
 
+function buildStagePrimerInstruction(resolvedDifficulty: number, correctRate: number): string {
+  const stage = getLearningStage(resolvedDifficulty, correctRate);
+  return `LEARNING STAGE = ${stage.label.toUpperCase()}.
+  ${stage.primerGuidance}
+  Never reveal or paraphrase the exact answer to the actual question.`;
+}
+
+function buildQuestionWritingInstruction(resolvedDifficulty: number, correctRate: number): string {
+  const stage = getLearningStage(resolvedDifficulty, correctRate);
+
+  return `QUESTION-WRITING STRATEGY FOR THIS LEARNER:
+- Current stage: ${stage.label}
+- Learner goal: ${stage.learnerGoal}
+- Authoring focus: ${stage.promptFocus}
+- Match the wording complexity to this stage before increasing scenario complexity.
+- If the learner is in ${stage.label}, do not accidentally write a harder-stage question just because the concept allows it.
+- Difficulty 1-2 must feel welcoming and low-friction: short stems, one idea at a time, and distractors based on common beginner confusions.`;
+}
+
 function buildGenerationPrompt(
   subItem: SubItemWithContext,
   resolvedDifficulty: number,
@@ -221,7 +241,9 @@ Source-grounding rules:
 `
     : "";
 
-  const primerInstruction = buildPrimerInstruction(resolvedDifficulty, correctRate);
+  const primerInstruction = buildStagePrimerInstruction(resolvedDifficulty, correctRate);
+  const questionWritingInstruction = buildQuestionWritingInstruction(resolvedDifficulty, correctRate);
+  const stage = getLearningStage(resolvedDifficulty, correctRate);
 
   return `You are an expert educator creating quiz questions. All questions, options, answers, explanations, and primers must be written in English.
 
@@ -231,9 +253,19 @@ Concept: "${subItem.name}"
 
 Difficulty level: ${resolvedDifficulty}/5 (${difficultyDesc})
 Learner's current correct rate: ${Math.round(correctRate)}%
+Current learning stage: ${stage.label}
 ${pedagogyBlock}
 ${sourceBlock}
 Generate exactly ${count} questions about this concept. Use a mix of question types.
+
+${questionWritingInstruction}
+
+Question design rules by stage:
+- Recognize: use definition, term-to-cue, and simple true/false checks. Avoid decorative scenarios.
+- Explain: ask why a rule fits, what a phrase means, or which option best explains the concept.
+- Apply: use one short scenario with one decision point.
+- Compare: use close alternatives and make the deciding detail matter.
+- Transfer: use nuanced scenarios, edge cases, or synthesis.
 
 PRIMER (pre-question teaching text) — required for every question:
 ${primerInstruction}
@@ -285,6 +317,7 @@ Rules:
 - All questions must be factually accurate
 - Explanations should be educational and clear
 - Difficulty ${resolvedDifficulty} means: ${difficultyDesc}
+- The explanation should name the cue, rule, or contrast that should have driven the learner's choice
 - No markdown in JSON strings, no newlines in strings
 - Answer must exactly match one of the options (for choice questions)
 - Randomize the position of the correct answer within the options array — do NOT always put it first
@@ -467,15 +500,7 @@ async function generateAndSaveQuestions(
     }
   }
 
-  const difficultyDescriptions: Record<number, string> = {
-    1: "basic recall, simple definitions",
-    2: "understanding concepts, explaining",
-    3: "application, examples",
-    4: "analysis, comparison, nuanced understanding",
-    5: "synthesis, edge cases, expert-level",
-  };
-
-  const difficultyDesc = difficultyDescriptions[resolvedDifficulty] || "intermediate";
+  const difficultyDesc = getDifficultyDescription(resolvedDifficulty);
 
   const pedagogyBlock = teachingProfile
     ? `
@@ -495,7 +520,7 @@ Apply this pedagogical approach when writing all questions. The questions should
     logger.debug("generate-questions", `Using teaching profile: ${teachingProfile.style} / ${teachingProfile.assessmentFocus}`);
   }
 
-  const timeLimitByDifficulty: Record<number, number> = { 1: 180, 2: 180, 3: 150, 4: 120, 5: 120 };
+  const timeLimitByDifficulty: Record<number, number> = { 1: 210, 2: 180, 3: 150, 4: 120, 5: 120 };
   const defaultTimeLimit = timeLimitByDifficulty[resolvedDifficulty] ?? 150;
   const timerInstruction = `- "timeLimit": use ${defaultTimeLimit} for multiple_choice, true_false, and single_choice. Use null for fill_blank.`;
 

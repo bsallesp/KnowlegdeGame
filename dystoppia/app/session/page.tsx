@@ -67,6 +67,7 @@ export default function SessionPage() {
     plan,
     setCurrentTopic,
     addToQueue,
+    prependToQueue,
     advanceQueue,
     updateSubItemStats,
     setSubItemStatsEntry,
@@ -121,6 +122,7 @@ export default function SessionPage() {
   const [lastAnswerMeta, setLastAnswerMeta] = useState<AnswerMeta | null>(null);
   const generatingRef = useRef(false);
   const isFetchingRef = useRef(false);
+  const recoveryFetchesRef = useRef<Set<string>>(new Set());
   const reportedQuestionIdsRef = useRef<Set<string>>(new Set());
 
   const syncTopicFromServer = useCallback(async () => {
@@ -222,6 +224,43 @@ export default function SessionPage() {
       }
     },
     [getAllSubItems, subItemStats, addToQueue, setIsGenerating]
+  );
+
+  const queueRecoveryQuestions = useCallback(
+    async (subItemId: string, targetDifficulty: number) => {
+      if (recoveryFetchesRef.current.has(subItemId)) return;
+
+      const subItems = getAllSubItems();
+      const subItem = subItems.find((s) => s.id === subItemId);
+      if (!subItem) return;
+
+      recoveryFetchesRef.current.add(subItemId);
+
+      try {
+        const stats = subItemStats[subItemId];
+        const res = await fetch("/api/generate-questions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subItemId,
+            difficulty: Math.max(1, targetDifficulty),
+            count: 2,
+            stats,
+          }),
+        });
+
+        if (!res.ok) return;
+
+        const data = await res.json();
+        const questionsWithSubItem: Question[] = data.questions.map((q: Question) => ({ ...q, subItem }));
+        prependToQueue(questionsWithSubItem);
+      } catch (error) {
+        logger.warn("session", "Could not queue recovery questions", { subItemId, error: String(error) });
+      } finally {
+        recoveryFetchesRef.current.delete(subItemId);
+      }
+    },
+    [getAllSubItems, prependToQueue, subItemStats]
   );
 
   const fillQueue = useCallback(async () => {
@@ -407,6 +446,11 @@ export default function SessionPage() {
     // Achievements + daily goal
     incrementDailyProgress();
     checkAchievements({ correct: isCorrect, timeSpent, usedHint: false });
+
+    if (!isCorrect) {
+      const recoveryDifficulty = Math.max(1, (subItemStats[questionAtAnswer.subItemId]?.difficulty || questionAtAnswer.difficulty || 1) - 1);
+      void queueRecoveryQuestions(questionAtAnswer.subItemId, recoveryDifficulty);
+    }
 
     // Boss round tracking
     if (isBossRound) {

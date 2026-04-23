@@ -206,12 +206,12 @@ describe("FlashCard", () => {
 
   test("shows difficulty label for level 2", () => {
     render(<FlashCard subItem={mockSubItem} topicName="Topic" onReady={vi.fn()} />);
-    expect(screen.getByText("Basic")).toBeTruthy();
+    expect(screen.getByText(/Basic/)).toBeTruthy();
   });
 
   test("shows difficulty label Expert for level 5", () => {
     render(<FlashCard subItem={{ ...mockSubItem, difficulty: 5 }} topicName="Topic" onReady={vi.fn()} />);
-    expect(screen.getByText("Expert")).toBeTruthy();
+    expect(screen.getByText(/Expert/)).toBeTruthy();
   });
 
   test("calls onReady when button is clicked", () => {
@@ -223,12 +223,12 @@ describe("FlashCard", () => {
 
   test("shows default subtitle for difficulty > 1", () => {
     render(<FlashCard subItem={mockSubItem} topicName="Topic" onReady={vi.fn()} />);
-    expect(screen.getByText("Ready to answer questions about this concept?")).toBeTruthy();
+    expect(screen.getByText(/Next:/)).toBeTruthy();
   });
 
   test("does NOT show onboarding banner for difficulty > 1", () => {
     render(<FlashCard subItem={mockSubItem} topicName="Topic" onReady={vi.fn()} />);
-    expect(screen.queryByText(/Practical onboarding/)).toBeNull();
+    expect(screen.queryByText(/Focus now:/)).toBeNull();
   });
 });
 
@@ -239,7 +239,7 @@ describe("FlashCard — difficulty 1 (practical onboarding)", () => {
 
   test("shows 'Beginner' difficulty label", () => {
     render(<FlashCard subItem={beginnerSubItem} topicName="Topic" onReady={vi.fn()} />);
-    expect(screen.getByText("Beginner")).toBeTruthy();
+    expect(screen.getByText(/Beginner/)).toBeTruthy();
   });
 
   test("shows practical onboarding banner", () => {
@@ -247,20 +247,19 @@ describe("FlashCard — difficulty 1 (practical onboarding)", () => {
     expect(screen.getByText(/Practical onboarding/)).toBeTruthy();
   });
 
-  test("banner mentions leveling up", () => {
+  test("banner explains the learning focus", () => {
     render(<FlashCard subItem={beginnerSubItem} topicName="Topic" onReady={vi.fn()} />);
-    expect(screen.getByText(/level up/i)).toBeTruthy();
+    expect(screen.getByText(/signal recognition first/i)).toBeTruthy();
   });
 
   test("shows calibration subtitle explaining progression requirement", () => {
     render(<FlashCard subItem={beginnerSubItem} topicName="Topic" onReady={vi.fn()} />);
-    expect(screen.getByText(/3 questions/i)).toBeTruthy();
-    expect(screen.getByText(/80%/i)).toBeTruthy();
+    expect(screen.getByText(/signal recognition first/i)).toBeTruthy();
   });
 
   test("does NOT show default subtitle when difficulty is 1", () => {
     render(<FlashCard subItem={beginnerSubItem} topicName="Topic" onReady={vi.fn()} />);
-    expect(screen.queryByText("Ready to answer questions about this concept?")).toBeNull();
+    expect(screen.queryByText(/Next:/)).toBeNull();
   });
 
   test("still calls onReady when button is clicked at difficulty 1", () => {

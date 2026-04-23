@@ -16,10 +16,13 @@ export function calculateNewDifficulty(
   if (recentTotal === 0) return currentDifficulty;
 
   const correctRate = recentCorrect / recentTotal;
+  const beginnerBand = currentDifficulty <= 2;
+  const promoteThreshold = beginnerBand ? 0.85 : 0.8;
+  const promoteSampleSize = beginnerBand ? 4 : 3;
 
   // If last answer was wrong (we check via the correctRate drop), reduce
   // We receive stats *after* recording the answer, so we check the rate
-  if (correctRate >= 0.8 && recentTotal >= 3) {
+  if (correctRate >= promoteThreshold && recentTotal >= promoteSampleSize) {
     // Strong performance → increase difficulty
     return Math.min(5, currentDifficulty + 1);
   } else if (correctRate < 0.5) {

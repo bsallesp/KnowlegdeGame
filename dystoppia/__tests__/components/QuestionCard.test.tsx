@@ -83,6 +83,18 @@ describe("QuestionCard — multiple_choice", () => {
     expect(screen.getByText("Difficulty")).toBeTruthy();
   });
 
+  test("shows the learning focus badge", () => {
+    render(
+      <QuestionCard
+        question={makeQuestion({ difficulty: 1 })}
+        onAnswer={vi.fn()}
+        answerShown={false}
+        lastAnswerCorrect={null}
+      />
+    );
+    expect(screen.getByText("Focus: Recognize")).toBeTruthy();
+  });
+
   test("submit button is disabled with no selection", async () => {
     render(
       <QuestionCard
@@ -149,6 +161,20 @@ describe("QuestionCard — multiple_choice", () => {
       />
     );
     expect(screen.getByText("Incorrect")).toBeTruthy();
+  });
+
+  test("shows coaching after an incorrect answer", () => {
+    render(
+      <QuestionCard
+        question={makeQuestion()}
+        onAnswer={vi.fn()}
+        answerShown={true}
+        lastAnswerCorrect={false}
+        userAnswer="A database"
+      />
+    );
+    expect(screen.getByText("What To Focus On Next")).toBeTruthy();
+    expect(screen.getByText(/signal word or definition first/i)).toBeTruthy();
   });
 
   test("shows subItem name when present", () => {

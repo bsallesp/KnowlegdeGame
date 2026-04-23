@@ -8,12 +8,12 @@ describe("calculateNewDifficulty", () => {
     expect(calculateNewDifficulty(3, 0, 0)).toBe(3);
   });
 
-  test("increases difficulty when correctRate >= 0.8 and recentTotal >= 3", () => {
-    expect(calculateNewDifficulty(2, 4, 5)).toBe(3); // 80% correct, 5 answers
+  test("increases difficulty when beginner band has stronger evidence", () => {
+    expect(calculateNewDifficulty(2, 4, 4)).toBe(3); // 100% correct, 4 answers
   });
 
   test("increases by exactly 1 step at a time", () => {
-    expect(calculateNewDifficulty(1, 3, 3)).toBe(2); // 100%, 3 answers
+    expect(calculateNewDifficulty(1, 4, 4)).toBe(2); // 100%, 4 answers
   });
 
   test("does NOT increase when correctRate >= 0.8 but recentTotal < 3", () => {
@@ -48,18 +48,18 @@ describe("calculateNewDifficulty", () => {
     expect(calculateNewDifficulty(1, 0, 3)).toBe(1); // already at min, all wrong
   });
 
-  test("handles perfect score (1.0) with 3+ answers", () => {
-    expect(calculateNewDifficulty(2, 3, 3)).toBe(3);
+  test("handles perfect score (1.0) with 4+ answers in beginner band", () => {
+    expect(calculateNewDifficulty(2, 4, 4)).toBe(3);
   });
 
   test("handles zero correct answers with 3+ total", () => {
     expect(calculateNewDifficulty(3, 0, 5)).toBe(2);
   });
 
-  test("correctRate of exactly 0.8 with 3 answers triggers increase", () => {
+  test("correctRate of exactly 0.8 no longer advances the beginner band", () => {
     // 0.8 * 5 = 4 correct out of 5 — but we need exactly 0.8
     // 4/5 = 0.8, recentTotal=5 >= 3 → should increase
-    expect(calculateNewDifficulty(2, 4, 5)).toBe(3);
+    expect(calculateNewDifficulty(2, 4, 5)).toBe(2);
   });
 
   test("correctRate just below 0.8 (0.79) does not increase", () => {

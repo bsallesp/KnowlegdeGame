@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Question } from "@/types";
 import InfoButton from "@/components/InfoButton";
 import useAppStore from "@/store/useAppStore";
+import { getLearningStage } from "@/lib/learningStage";
 
 interface QuestionCardProps {
   question: Question;
@@ -50,6 +51,16 @@ function AnswerFeedback({ correct }: { correct: boolean }) {
       )}
     </motion.div>
   );
+}
+
+function buildRecoveryCoaching(question: Question, correct: boolean) {
+  const stage = getLearningStage(question.difficulty);
+  return {
+    stage,
+    title: correct ? "What You Just Reinforced" : "What To Focus On Next",
+    body: correct ? stage.correctCoaching : stage.incorrectCoaching,
+    nextStep: stage.nextStepLabel,
+  };
 }
 
 export default function QuestionCard({
@@ -186,6 +197,8 @@ export default function QuestionCard({
   };
 
   const difficultyColor = ["", "#60A5FA", "#38BDF8", "#818CF8", "#F97316", "#EF4444"][question.difficulty] || "#818CF8";
+  const learningStage = getLearningStage(question.difficulty);
+  const coaching = lastAnswerCorrect === null ? null : buildRecoveryCoaching(question, lastAnswerCorrect);
 
   const timerPct = question.timeLimit && timeLeft !== null ? (timeLeft / question.timeLimit) * 100 : null;
   const timerColor = timerPct !== null ? (timerPct > 50 ? "#60A5FA" : timerPct > 20 ? "#FACC15" : "#F97316") : "#60A5FA";
@@ -213,6 +226,12 @@ export default function QuestionCard({
             style={{ backgroundColor: "#1C1C28", color: "#9494B8" }}
           >
             {typeLabel[question.type] || question.type}
+          </span>
+          <span
+            className="text-xs px-2 py-1 rounded font-medium shrink-0"
+            style={{ backgroundColor: "rgba(129, 140, 248, 0.1)", color: "#A5B4FC", border: "1px solid rgba(129, 140, 248, 0.25)" }}
+          >
+            Focus: {learningStage.label}
           </span>
           <div className="flex flex-wrap items-center justify-end gap-2 min-w-0 flex-1">
             {!answerShown && question.type !== "fill_blank" && (
@@ -462,6 +481,27 @@ export default function QuestionCard({
               <span className="font-semibold" style={{ color: "#EEEEFF" }}>Explanation: </span>
               {question.explanation}
             </div>
+            {coaching && (
+              <div
+                className="p-4 rounded-lg text-sm leading-relaxed space-y-2"
+                style={{
+                  backgroundColor: lastAnswerCorrect ? "rgba(96, 165, 250, 0.08)" : "rgba(249, 115, 22, 0.08)",
+                  border: `1px solid ${lastAnswerCorrect ? "rgba(96, 165, 250, 0.3)" : "rgba(249, 115, 22, 0.3)"}`,
+                  color: "#C7C7E0",
+                }}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: lastAnswerCorrect ? "#93C5FD" : "#FDBA74" }}>
+                    {coaching.title}
+                  </span>
+                  <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: "#12121A", color: "#A5B4FC", border: "1px solid #2E2E40" }}>
+                    {coaching.stage.label}
+                  </span>
+                </div>
+                <p>{coaching.body}</p>
+                <p style={{ color: "#EEEEFF" }}>{coaching.nextStep}</p>
+              </div>
+            )}
             {onReportQuestion && reportMessage && (
               <p className="text-xs leading-relaxed" style={{ color: reportState === "error" ? "#F97316" : "#9494B8" }}>
                 {reportMessage}

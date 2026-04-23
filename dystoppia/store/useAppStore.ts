@@ -67,6 +67,7 @@ interface AppState {
   addItemToCurrentTopic: (item: Item) => void;
   setQuestionQueue: (questions: Question[]) => void;
   addToQueue: (questions: Question[]) => void;
+  prependToQueue: (questions: Question[]) => void;
   setCurrentQuestion: (question: Question | null) => void;
   advanceQueue: () => void;
   updateSubItemStats: (subItemId: string, correct: boolean, difficulty: number) => void;
@@ -213,6 +214,16 @@ const useAppStore = create<AppState>()(
           ]);
           const unique = questions.filter((q) => !existingIds.has(q.id));
           return { questionQueue: [...state.questionQueue, ...unique] };
+        }),
+
+      prependToQueue: (questions) =>
+        set((state) => {
+          const existingIds = new Set([
+            ...state.questionQueue.map((q) => q.id),
+            ...(state.currentQuestion ? [state.currentQuestion.id] : []),
+          ]);
+          const unique = questions.filter((q) => !existingIds.has(q.id));
+          return { questionQueue: [...unique, ...state.questionQueue] };
         }),
 
       setCurrentQuestion: (question) => set({ currentQuestion: question, answerShown: false, lastAnswerCorrect: null }),
