@@ -1,8 +1,9 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-// ─── Prisma mock — matches actual API: subItem.findUnique, subItem.update,
-//     userAnswer.create, userAnswer.findMany ────────────────────────────────
+// ─── Prisma mock — matches actual API: question.findUnique, subItem.findUnique,
+//     subItem.updateMany, userAnswer.create, userAnswer.findMany ─────────────
+const mockQuestionFindUnique = vi.hoisted(() => vi.fn());
 const mockFindUnique = vi.hoisted(() => vi.fn());
 const mockFindMany = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
@@ -11,6 +12,7 @@ const mockAnswerFindUnique = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
+    question: { findUnique: mockQuestionFindUnique },
     subItem: { findUnique: mockFindUnique, updateMany: mockUpdate },
     userAnswer: { create: mockCreate, findMany: mockFindMany, findUnique: mockAnswerFindUnique },
   },
@@ -46,13 +48,22 @@ const mockSubItem = {
   reviewInterval: 1,
 };
 
+// Default question fixture: belongs to "sub-1", not flagged, no time limit
+const mockQuestion = {
+  subItemId: "sub-1",
+  flaggedAt: null,
+  timeLimit: null,
+};
+
 beforeEach(() => {
+  mockQuestionFindUnique.mockReset();
   mockFindUnique.mockReset();
   mockFindMany.mockReset();
   mockUpdate.mockReset();
   mockCreate.mockReset();
   mockAnswerFindUnique.mockReset();
 
+  mockQuestionFindUnique.mockResolvedValue(mockQuestion);
   mockAnswerFindUnique.mockResolvedValue(null);
   mockFindUnique.mockResolvedValue(mockSubItem);
   mockCreate.mockResolvedValue({ id: "answer-1" });
