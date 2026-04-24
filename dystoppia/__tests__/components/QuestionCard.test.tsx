@@ -173,7 +173,7 @@ describe("QuestionCard — multiple_choice", () => {
         userAnswer="A database"
       />
     );
-    expect(screen.getByText("What To Focus On Next")).toBeTruthy();
+    expect(screen.getByText("Before you move on")).toBeTruthy();
     expect(screen.getByText(/signal word or definition first/i)).toBeTruthy();
   });
 

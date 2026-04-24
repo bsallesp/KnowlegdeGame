@@ -18,13 +18,23 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-// ─── Anthropic mock ───────────────────────────────────────────────────────────
+// ─── Anthropic mock (used for hard questions d3-5) ───────────────────────────
 
 const mockCreate_llm = vi.hoisted(() => vi.fn());
 
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class {
     messages = { create: mockCreate_llm };
+  },
+}));
+
+// ─── OpenAI mock (used for easy questions d0-2 and validation) ────────────────
+
+const mockOpenAICreate = vi.hoisted(() => vi.fn());
+
+vi.mock("openai", () => ({
+  default: class {
+    chat = { completions: { create: mockOpenAICreate } };
   },
 }));
 
@@ -109,10 +119,19 @@ function makeLLMQuestion(overrides: Record<string, unknown> = {}) {
   };
 }
 
+// Anthropic response format (used for hard questions d3-5)
 function makeLLMResponse(questions: unknown[]) {
   return {
     content: [{ type: "text", text: JSON.stringify({ questions }) }],
     usage: { input_tokens: 10, output_tokens: 20 },
+  };
+}
+
+// OpenAI response format (used for easy questions d0-2 and validation)
+function makeOpenAIResponse(questions: unknown[]) {
+  return {
+    choices: [{ message: { content: JSON.stringify({ questions }) }, finish_reason: "stop" }],
+    usage: { prompt_tokens: 10, completion_tokens: 20 },
   };
 }
 
@@ -135,6 +154,7 @@ const originalAnthropicApiKey = process.env.ANTHROPIC_API_KEY;
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
+  process.env.OPENAI_API_KEY = "test-openai-key";
   mockUserFindUnique.mockResolvedValue({ id: "user-1" });
   mockFindUnique.mockResolvedValue(mockSubItem);
   mockBookPageFindMany.mockResolvedValue([]);
@@ -151,6 +171,8 @@ beforeEach(() => {
     weeklyRemaining: 0,
     weeklyResetsAt: new Date(),
   });
+  // Default: OpenAI returns a valid response (used for d0-2 and validation)
+  mockOpenAICreate.mockResolvedValue(makeOpenAIResponse([makeLLMQuestion()]));
 });
 
 afterAll(() => {
@@ -182,8 +204,8 @@ describe("input validation", () => {
 
 describe("cache hit", () => {
   function fullCachePool(overrides: Partial<ReturnType<typeof makeDbQuestion>> = {}) {
-    // REFILL_THRESHOLD = 15 — produce 16 so background refill does NOT trigger.
-    return Array.from({ length: 16 }, (_, i) => makeDbQuestion({ id: `q-${i + 1}`, ...overrides }));
+    // REFILL_THRESHOLD = 25 — produce 26 so background refill does NOT trigger.
+    return Array.from({ length: 26 }, (_, i) => makeDbQuestion({ id: `q-${i + 1}`, ...overrides }));
   }
 
   test("returns cached questions without calling the LLM", async () => {
@@ -224,11 +246,9 @@ describe("cache hit", () => {
       makeDbQuestion({ id: "q-2", type: "multiple_choice", options: '["A","B","C","D"]' }),
       makeDbQuestion({ id: "q-3", type: "fill_blank", options: null }), // broken
     ]);
-    mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
-
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
     // validQuestions.length (2) < count (3) → falls through to LLM generation
-    expect(mockCreate_llm).toHaveBeenCalled();
+    expect(mockOpenAICreate).toHaveBeenCalled();
   });
 
   test("allows fill_blank with valid options through cache hit", async () => {
@@ -255,14 +275,14 @@ describe("cache hit", () => {
     ]);
 
     // Background refill fails -> covers logger.warn inside `.catch(...)`.
-    mockCreate_llm.mockRejectedValueOnce(new Error("Background LLM down"));
+    mockOpenAICreate.mockRejectedValueOnce(new Error("Background LLM down"));
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
     expect(res.status).toBe(200);
 
     // Let the background promise run.
     await new Promise((r) => setTimeout(r, 10));
-    expect(mockCreate_llm).toHaveBeenCalled();
+    expect(mockOpenAICreate).toHaveBeenCalled();
   });
 });
 
@@ -273,26 +293,28 @@ describe("generation path", () => {
     mockFindMany.mockResolvedValue([]); // no cache
   });
 
-  test("returns 503 before calling the LLM when ANTHROPIC_API_KEY is missing", async () => {
+  test("returns 503 before calling the LLM when no API keys are configured", async () => {
     delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.OPENAI_API_KEY;
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
 
     expect(res.status).toBe(503);
     expect(mockCreate_llm).not.toHaveBeenCalled();
+    expect(mockOpenAICreate).not.toHaveBeenCalled();
     const body = await res.json();
     expect(body.error).toBe("question_generation_not_configured");
   });
 
   test("calls the LLM when cache is insufficient", async () => {
-    mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
+    mockOpenAICreate.mockResolvedValue(makeOpenAIResponse([makeLLMQuestion()]));
     await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
     // Background warmup may also call LLM, so just verify at least once
-    expect(mockCreate_llm).toHaveBeenCalled();
+    expect(mockOpenAICreate).toHaveBeenCalled();
   });
 
   test("saves generated questions to DB via prisma.question.create", async () => {
-    mockCreate_llm.mockResolvedValue(makeLLMResponse([
+    mockOpenAICreate.mockResolvedValue(makeOpenAIResponse([
       makeLLMQuestion({ type: "multiple_choice" }),
       makeLLMQuestion({ type: "true_false", options: ["True", "False"], answer: "True" }),
     ]));
@@ -304,7 +326,7 @@ describe("generation path", () => {
 
   // ── Bug regression: timeLimit field was unknown in Prisma client ───────────
   test("passes timeLimit to prisma.question.create", async () => {
-    mockCreate_llm.mockResolvedValue(makeLLMResponse([
+    mockOpenAICreate.mockResolvedValue(makeOpenAIResponse([
       makeLLMQuestion({ timeLimit: 30 }),
     ]));
 
@@ -315,20 +337,20 @@ describe("generation path", () => {
   });
 
   test("teaches the LLM the current learning stage for beginner questions", async () => {
-    mockCreate_llm.mockResolvedValue(makeLLMResponse([
+    mockOpenAICreate.mockResolvedValue(makeOpenAIResponse([
       makeLLMQuestion({ primer: "Look for the signal word first." }),
     ]));
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 1, difficulty: 1 }));
 
     expect(res.status).toBe(200);
-    const firstPrompt = mockCreate_llm.mock.calls[0][0].messages[0].content;
+    const firstPrompt = mockOpenAICreate.mock.calls[0][0].messages[0].content;
     expect(firstPrompt).toContain("Current learning stage: Recognize");
     expect(firstPrompt).toContain("Difficulty 1-2 must feel welcoming and low-friction");
   });
 
   test("saves timeLimit as null when not provided by LLM", async () => {
-    mockCreate_llm.mockResolvedValue(makeLLMResponse([
+    mockOpenAICreate.mockResolvedValue(makeOpenAIResponse([
       makeLLMQuestion({ timeLimit: null }),
     ]));
 
@@ -339,7 +361,7 @@ describe("generation path", () => {
   });
 
   test("serializes options array to JSON string before saving", async () => {
-    mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
+    mockOpenAICreate.mockResolvedValue(makeOpenAIResponse([makeLLMQuestion()]));
     await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
 
     const callArg = mockCreate.mock.calls[0][0];
@@ -348,7 +370,7 @@ describe("generation path", () => {
   });
 
   test("returns options as parsed array (not JSON string) to client", async () => {
-    mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
+    mockOpenAICreate.mockResolvedValue(makeOpenAIResponse([makeLLMQuestion()]));
     mockCreate.mockResolvedValue({
       ...makeLLMQuestion(),
       id: "new-q",
@@ -363,7 +385,7 @@ describe("generation path", () => {
   });
 
   test("returns 500 when prisma.question.create throws (e.g. schema mismatch)", async () => {
-    mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
+    mockOpenAICreate.mockResolvedValue(makeOpenAIResponse([makeLLMQuestion()]));
     mockCreate.mockRejectedValue(new Error("Unknown argument `timeLimit`"));
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
@@ -372,45 +394,27 @@ describe("generation path", () => {
     expect(body.error).toBeDefined();
   });
 
-  test("returns 500 when LLM response is not valid JSON", async () => {
-    mockCreate_llm.mockResolvedValue({
-      content: [{ type: "text", text: "not json at all" }],
+  test("returns 500 when OpenAI response is not valid JSON", async () => {
+    mockOpenAICreate.mockResolvedValue({
+      choices: [{ message: { content: "not json at all" }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 10, completion_tokens: 5 },
     });
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
     expect(res.status).toBe(500);
   });
 
-  // ── Bug regression: response truncated at max_tokens produces invalid JSON ───
-  // The wild failure: max_tokens=3000 with adaptive thinking + REFILL_BATCH=5
-  // questions cut the payload mid-array and JSON.parse threw. Root cause fixed
-  // by raising GENERATION_MAX_TOKENS to 8000. This test pins current behavior:
-  // a truncated batch surfaces as 500 (the retry loop around requestQuestionBatch
-  // does not catch parseJsonPayload exceptions — a batch-level try/catch with
-  // retry on parse failure would add resilience but is out of scope here).
-  test("returns 500 when an LLM batch returns JSON truncated at max_tokens", async () => {
+  // ── Bug regression: response truncated at finish_reason=length ───────────
+  test("returns 500 when an OpenAI batch returns JSON truncated at max_tokens", async () => {
     const truncated =
       '{"questions":[{"type":"multiple_choice","content":"Q1","options":["A","B","C","D"],"answer":"A","explanation":"e",';
-    mockCreate_llm.mockResolvedValue({
-      content: [{ type: "text", text: truncated }],
-      usage: { input_tokens: 10, output_tokens: 20 },
-      stop_reason: "max_tokens",
+    mockOpenAICreate.mockResolvedValue({
+      choices: [{ message: { content: truncated }, finish_reason: "length" }],
+      usage: { prompt_tokens: 10, completion_tokens: 20 },
     });
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
     expect(res.status).toBe(500);
-  });
-
-  // ── Bug regression: LLM wraps JSON in ```json ... ``` markdown fence ────────
-  test("parses LLM response wrapped in markdown code fence", async () => {
-    const fenced = "```json\n" + JSON.stringify({ questions: [makeLLMQuestion()] }) + "\n```";
-    mockCreate_llm.mockResolvedValue({
-      content: [{ type: "text", text: fenced }],
-      usage: { input_tokens: 10, output_tokens: 20 },
-    });
-
-    const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
-    expect(res.status).toBe(200);
   });
 
   test("handles invalid teachingProfile JSON (still generates questions)", async () => {
@@ -425,7 +429,6 @@ describe("generation path", () => {
       },
     });
 
-    mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
     expect(res.status).toBe(200);
   });
@@ -449,7 +452,6 @@ describe("generation path", () => {
       },
     });
 
-    mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
     expect(res.status).toBe(200);
   });
@@ -474,11 +476,11 @@ describe("generation path", () => {
       { pageNumber: 20, text: "Power BI Desktop can connect to multiple data sources." },
     ]);
 
-    mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
+    mockOpenAICreate.mockResolvedValue(makeOpenAIResponse([makeLLMQuestion()]));
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
 
     expect(res.status).toBe(200);
-    const firstPrompt = mockCreate_llm.mock.calls[0][0].messages[0].content;
+    const firstPrompt = mockOpenAICreate.mock.calls[0][0].messages[0].content;
     expect(firstPrompt).toContain("SOURCE MATERIAL FROM THE USER'S UPLOADED BOOK");
     expect(firstPrompt).toContain("Book: \"Introducing Power BI\"");
     expect(firstPrompt).toContain("[Page 19]");
@@ -493,9 +495,10 @@ describe("generation path", () => {
     );
   });
 
-  test("returns 500 when Claude returns non-text content", async () => {
-    mockCreate_llm.mockResolvedValue({
-      content: [{ type: "tool_use", id: "x" }],
+  test("returns 500 when OpenAI returns null content", async () => {
+    mockOpenAICreate.mockResolvedValue({
+      choices: [{ message: { content: null }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 10, completion_tokens: 0 },
     });
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
@@ -503,17 +506,18 @@ describe("generation path", () => {
   });
 
   test("logs post-generation background warmup failure after successful generation", async () => {
-    // First call: awaited generation for `count`
-    mockCreate_llm.mockResolvedValueOnce(makeLLMResponse([makeLLMQuestion()]));
-    // Second call: background warmup fails
-    mockCreate_llm.mockRejectedValueOnce(new Error("Warmup LLM down"));
+    // First call: awaited generation for `count` (+ validation call)
+    mockOpenAICreate.mockResolvedValueOnce(makeOpenAIResponse([makeLLMQuestion()]));
+    mockOpenAICreate.mockResolvedValueOnce(makeOpenAIResponse([])); // validation
+    // Background warmup fails
+    mockOpenAICreate.mockRejectedValueOnce(new Error("Warmup LLM down"));
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
     expect(res.status).toBe(200);
 
     // Let the background promise run so the `.catch(...)` branch can execute.
     await new Promise((r) => setTimeout(r, 10));
-    expect(mockCreate_llm.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(mockOpenAICreate.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });
 
@@ -521,23 +525,22 @@ describe("generation path", () => {
 
 describe("prefetch warmup", () => {
   test("returns 202 without charging rate limit when cache is already full", async () => {
-    // 16 cached >= PREFETCH_CACHE_TARGET (15) → no LLM call, no quota charge
+    // 31 cached >= PREFETCH_CACHE_TARGET (30) → no LLM call, no quota charge
     mockFindMany.mockResolvedValue(
-      Array.from({ length: 16 }, (_, i) => makeDbQuestion({ id: `q-${i + 1}` }))
+      Array.from({ length: 31 }, (_, i) => makeDbQuestion({ id: `q-${i + 1}` }))
     );
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 5, prefetch: true }));
 
     expect(res.status).toBe(202);
     expect(mockCheckRateLimit).not.toHaveBeenCalled();
-    expect(mockCreate_llm).not.toHaveBeenCalled();
+    expect(mockOpenAICreate).not.toHaveBeenCalled();
     const body = await res.json();
     expect(body.prefetched).toBe(true);
   });
 
   test("fires background generation when cache is below target, without charging quota", async () => {
     mockFindMany.mockResolvedValue([]); // empty cache
-    mockCreate_llm.mockResolvedValue(makeLLMResponse([makeLLMQuestion()]));
 
     const res = await POST(makeRequest({ subItemId: "sub-1", count: 5, prefetch: true }));
 
@@ -545,7 +548,7 @@ describe("prefetch warmup", () => {
     expect(mockCheckRateLimit).not.toHaveBeenCalled();
 
     await new Promise((r) => setTimeout(r, 10));
-    expect(mockCreate_llm).toHaveBeenCalled();
+    expect(mockOpenAICreate).toHaveBeenCalled();
   });
 
   test("non-prefetch request still charges rate limit", async () => {
