@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { requireUser } from "@/lib/authGuard";
@@ -12,20 +13,29 @@ import {
 } from "@/lib/bookSourceText";
 import { getDifficultyDescription, getLearningStage } from "@/lib/learningStage";
 
-const GENERATION_MODEL_HARD = "claude-sonnet-4-6";
-const GENERATION_MODEL_EASY = "claude-haiku-4-5-20251001";
-const VALIDATION_MODEL = "claude-haiku-4-5-20251001";
+// Primary provider: OpenAI (cheaper). Fallback: Anthropic for hard questions.
+// Easy (d0-2): gpt-4o-mini  ~$0.15/$0.60 per MTok
+// Hard (d3-5): claude-sonnet ~$3/$15 per MTok (needs nuance/reasoning)
+const OPENAI_MODEL_EASY = "gpt-4o-mini";
+const ANTHROPIC_MODEL_HARD = "claude-sonnet-4-6";
+const OPENAI_MODEL_VALIDATION = "gpt-4o-mini";
 
-function getGenerationModel(difficulty: number): string {
-  return difficulty <= 2 ? GENERATION_MODEL_EASY : GENERATION_MODEL_HARD;
+function getProviderAndModel(difficulty: number): { provider: "openai" | "anthropic"; model: string } {
+  return difficulty <= 2
+    ? { provider: "openai", model: OPENAI_MODEL_EASY }
+    : { provider: "anthropic", model: ANTHROPIC_MODEL_HARD };
 }
 
-const client = new Anthropic({
+const openaiClient = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const anthropicClient = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-function hasAnthropicApiKey(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+function hasGenerationApiKey(): boolean {
+  return Boolean(process.env.OPENAI_API_KEY?.trim()) || Boolean(process.env.ANTHROPIC_API_KEY?.trim());
 }
 
 class QuestionGenerationConfigError extends Error {
@@ -47,8 +57,10 @@ const REFILL_BATCH = 20;
 // Cap per-subItem cache depth on prefetch warmups to avoid runaway LLM spend
 const PREFETCH_CACHE_TARGET = 30;
 const MAX_GENERATION_ATTEMPTS = 3;
-// Budget for generation output — must be above JSON payload for REFILL_BATCH questions.
-const GENERATION_MAX_TOKENS = 8000;
+// OpenAI: 8K is enough for 20 easy questions (short stems, simple options).
+// Anthropic: hard questions (d3-5) are longer — 16K prevents truncation on REFILL_BATCH.
+const GENERATION_MAX_TOKENS_OPENAI = 8000;
+const GENERATION_MAX_TOKENS_ANTHROPIC = 16000;
 
 interface GeneratedQuestion {
   type: "multiple_choice" | "single_choice" | "fill_blank" | "true_false";
@@ -360,15 +372,45 @@ Rules:
 }
 
 async function requestQuestionBatch(prompt: string, userId: string, difficulty: number): Promise<GeneratedQuestion[]> {
-  const model = getGenerationModel(difficulty);
-  const message = await client.messages.create({
+  const { provider, model } = getProviderAndModel(difficulty);
+
+  if (provider === "openai") {
+    const response = await openaiClient.chat.completions.create({
+      model,
+      max_tokens: GENERATION_MAX_TOKENS_OPENAI,
+      response_format: { type: "json_object" },
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    if (response.choices[0].finish_reason === "length") {
+      logger.warn("generate-questions", "OpenAI generation hit max_tokens — response likely truncated");
+    }
+
+    logLLMUsage({
+      userId,
+      model,
+      endpoint: "generate-questions",
+      inputTokens: response.usage?.prompt_tokens ?? 0,
+      outputTokens: response.usage?.completion_tokens ?? 0,
+    });
+
+    const raw = response.choices[0].message.content ?? "{}";
+    const parsed = JSON.parse(raw) as { questions?: GeneratedQuestion[] };
+    if (!Array.isArray(parsed.questions)) {
+      throw new Error("OpenAI response did not include a questions array");
+    }
+    return parsed.questions;
+  }
+
+  // Anthropic path (hard questions, d3–5)
+  const message = await anthropicClient.messages.create({
     model,
-    max_tokens: GENERATION_MAX_TOKENS,
+    max_tokens: GENERATION_MAX_TOKENS_ANTHROPIC,
     messages: [{ role: "user", content: prompt }],
   });
 
   if (message.stop_reason === "max_tokens") {
-    logger.warn("generate-questions", "Generation hit max_tokens — response likely truncated");
+    logger.warn("generate-questions", "Anthropic generation hit max_tokens — response likely truncated");
   }
 
   logLLMUsage({
@@ -381,9 +423,8 @@ async function requestQuestionBatch(prompt: string, userId: string, difficulty: 
 
   const parsed = parseJsonPayload<{ questions?: GeneratedQuestion[] }>(extractTextContent(message));
   if (!Array.isArray(parsed.questions)) {
-    throw new Error("LLM response did not include a questions array");
+    throw new Error("Anthropic response did not include a questions array");
   }
-
   return parsed.questions;
 }
 
@@ -426,21 +467,22 @@ ${JSON.stringify(
 )}`;
 
   try {
-    const message = await client.messages.create({
-      model: VALIDATION_MODEL,
+    const response = await openaiClient.chat.completions.create({
+      model: OPENAI_MODEL_VALIDATION,
       max_tokens: Math.max(500, normalizedEntries.length * 140),
+      response_format: { type: "json_object" },
       messages: [{ role: "user", content: validationPrompt }],
     });
 
     logLLMUsage({
       userId,
-      model: VALIDATION_MODEL,
+      model: OPENAI_MODEL_VALIDATION,
       endpoint: "generate-questions-verify",
-      inputTokens: message.usage.input_tokens,
-      outputTokens: message.usage.output_tokens,
+      inputTokens: response.usage?.prompt_tokens ?? 0,
+      outputTokens: response.usage?.completion_tokens ?? 0,
     });
 
-    const parsed = parseJsonPayload<ValidationBatchResponse>(extractTextContent(message));
+    const parsed = JSON.parse(response.choices[0].message.content ?? "{}") as ValidationBatchResponse;
     const resultMap = new Map<number, { consistent: boolean; reason?: string }>();
 
     if (Array.isArray(parsed.results)) {
@@ -520,7 +562,7 @@ async function generateAndSaveQuestions(
   count: number,
   sourceContext: BookSourceContext | null = null
 ): Promise<SavedQuestion[]> {
-  if (!hasAnthropicApiKey()) {
+  if (!hasGenerationApiKey()) {
     throw new QuestionGenerationConfigError();
   }
 

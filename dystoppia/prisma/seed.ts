@@ -49,6 +49,25 @@ async function main() {
       unit: "token",
       notes: "Haiku 4.5 dated variant",
     },
+    // OpenAI LLM
+    {
+      provider: "openai",
+      model: "gpt-4o-mini",
+      serviceType: "llm",
+      inputPricePerUnit: 0.15 / 1_000_000,   // $0.15 per 1M input tokens
+      outputPricePerUnit: 0.60 / 1_000_000,  // $0.60 per 1M output tokens
+      unit: "token",
+      notes: "OpenAI GPT-4o mini — primary for question generation d0-d2",
+    },
+    {
+      provider: "openai",
+      model: "gpt-4o",
+      serviceType: "llm",
+      inputPricePerUnit: 2.50 / 1_000_000,
+      outputPricePerUnit: 10.0 / 1_000_000,
+      unit: "token",
+      notes: "OpenAI GPT-4o",
+    },
     // OpenAI TTS
     {
       provider: "openai",

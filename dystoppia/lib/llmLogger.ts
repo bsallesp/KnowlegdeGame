@@ -8,6 +8,8 @@ const FALLBACK_COSTS: Record<string, { input: number; output: number }> = {
   "claude-sonnet-4-6": { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
   "claude-haiku-4-5": { input: 0.80 / 1_000_000, output: 4.0 / 1_000_000 },
   "claude-haiku-4-5-20251001": { input: 0.80 / 1_000_000, output: 4.0 / 1_000_000 },
+  "gpt-4o-mini": { input: 0.15 / 1_000_000, output: 0.60 / 1_000_000 },
+  "gpt-4o": { input: 2.50 / 1_000_000, output: 10.0 / 1_000_000 },
 };
 
 const FALLBACK_TTS_COSTS: Record<string, number> = {
@@ -31,11 +33,8 @@ async function calculateCostFromSnapshot(
   }
 
   // Fallback to hardcoded prices
-  if (model.startsWith("claude")) {
-    const pricing = FALLBACK_COSTS[model];
-    if (!pricing) return 0;
-    return pricing.input * inputTokens + pricing.output * outputTokens;
-  }
+  const pricing = FALLBACK_COSTS[model];
+  if (pricing) return pricing.input * inputTokens + pricing.output * outputTokens;
 
   const ttsCost = FALLBACK_TTS_COSTS[model];
   if (ttsCost) return ttsCost * characters;
