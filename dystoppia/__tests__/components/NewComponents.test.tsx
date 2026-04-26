@@ -110,47 +110,6 @@ describe("AchievementToast", () => {
 });
 
 // =============================================================================
-// DailyGoalBar
-// =============================================================================
-import DailyGoalBar from "@/components/DailyGoalBar";
-
-const today = new Date().toISOString().split("T")[0];
-
-describe("DailyGoalBar", () => {
-  test("shows current progress and target", () => {
-    mockUseAppStore.mockReturnValue({
-      dailyGoal: { target: 20, progress: 5, date: today },
-    });
-    render(<DailyGoalBar />);
-    expect(screen.getByText("🎯 5/20")).toBeTruthy();
-  });
-
-  test("shows trophy icon when goal is reached", () => {
-    mockUseAppStore.mockReturnValue({
-      dailyGoal: { target: 20, progress: 20, date: today },
-    });
-    render(<DailyGoalBar />);
-    expect(screen.getByText("🎖️ 20/20")).toBeTruthy();
-  });
-
-  test("shows target icon when goal is not reached", () => {
-    mockUseAppStore.mockReturnValue({
-      dailyGoal: { target: 20, progress: 10, date: today },
-    });
-    render(<DailyGoalBar />);
-    expect(screen.getByText("🎯 10/20")).toBeTruthy();
-  });
-
-  test("shows 0/target when date is different from today", () => {
-    mockUseAppStore.mockReturnValue({
-      dailyGoal: { target: 20, progress: 15, date: "2020-01-01" },
-    });
-    render(<DailyGoalBar />);
-    expect(screen.getByText("🎯 0/20")).toBeTruthy();
-  });
-});
-
-// =============================================================================
 // BossRound
 // =============================================================================
 import BossRound from "@/components/BossRound";

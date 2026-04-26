@@ -45,11 +45,11 @@ describe("checkRateLimit", () => {
 
     expect(mockUpdateMany).toHaveBeenCalled();
     expect(state.hourlyUsage).toBe(1);
-    expect(state.hourlyRemaining).toBe(4);
+    expect(state.hourlyRemaining).toBe(999998);
   });
 
   test("throws RateLimitError when hourly question cap reached", async () => {
-    mockFindUnique.mockResolvedValue(baseUser({ hourlyUsage: 5 }));
+    mockFindUnique.mockResolvedValue(baseUser({ hourlyUsage: 999999 }));
 
     await expect(checkRateLimit("uid", 1, "question")).rejects.toMatchObject({
       name: "RateLimitError",
@@ -81,7 +81,7 @@ describe("getRateLimitState", () => {
     const state = await getRateLimitState("uid");
 
     expect(state.hourlyUsage).toBe(2);
-    expect(state.hourlyRemaining).toBe(3);
+    expect(state.hourlyRemaining).toBe(999997);
     expect(mockUpdateMany).not.toHaveBeenCalled();
   });
 

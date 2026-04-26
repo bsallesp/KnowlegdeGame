@@ -38,6 +38,8 @@ vi.mock("framer-motion", () => ({
   motion: {
     div: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <div {...props}>{children}</div>,
     span: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <span {...props}>{children}</span>,
+    aside: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <aside {...props}>{children}</aside>,
+    p: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <p {...props}>{children}</p>,
   },
   AnimatePresence: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));

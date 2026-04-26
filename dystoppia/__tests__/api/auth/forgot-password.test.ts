@@ -6,7 +6,7 @@ const mockSendOtpEmail = vi.hoisted(() => vi.fn());
 const mockFindUnique   = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/otp",   () => ({ createOtp: mockCreateOtp }));
-vi.mock("@/lib/email", () => ({ sendOtpEmail: mockSendOtpEmail }));
+vi.mock("@/lib/email", () => ({ sendOtpEmail: mockSendOtpEmail, getDevOtp: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({
   prisma: { user: { findUnique: mockFindUnique } },
 }));

@@ -17,6 +17,17 @@ const FALLBACK_TTS_COSTS: Record<string, number> = {
   "azure-tts": 0.016 / 1_000,
 };
 
+export function calculateAnthropicCost(model: string, inputTokens: number, outputTokens: number): number {
+  const rates = FALLBACK_COSTS[model];
+  if (!rates) return 0;
+  return rates.input * inputTokens + rates.output * outputTokens;
+}
+
+export function calculateTTSCost(provider: string, characters: number): number {
+  const rate = FALLBACK_TTS_COSTS[provider] ?? 0;
+  return rate * characters;
+}
+
 async function calculateCostFromSnapshot(
   model: string,
   inputTokens: number,
