@@ -40,7 +40,6 @@ export default function NeuralTransition({ visible, topic }: NeuralTransitionPro
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
   const particlesRef = useRef<Particle[]>([]);
-  const connectionsRef = useRef<Connection[]>([]);
   const [phraseIndex, setPhraseIndex] = useState(0);
 
   useEffect(() => {

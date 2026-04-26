@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { headers } from "next/headers";
 
 type DatabaseState = "up" | "down" | "unknown";
@@ -183,13 +184,13 @@ export default async function TestPage() {
               >
                 Open raw health JSON
               </a>
-              <a
+              <Link
                 href="/"
                 className="rounded-xl border px-4 py-2 text-sm font-medium no-underline transition-opacity hover:opacity-90"
                 style={{ borderColor: "#2E2E40", color: "#EEEEFF" }}
               >
                 Back home
-              </a>
+              </Link>
             </div>
           </div>
         </section>

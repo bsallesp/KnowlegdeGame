@@ -5,6 +5,7 @@ import { verify } from "@/lib/cookieToken";
 export const ANON_USER_ID = "anon-default-user";
 
 export async function requireUser(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _req: NextRequest
 ): Promise<{ userId: string } | NextResponse> {
   if (process.env.DISABLE_AUTH === "1") {

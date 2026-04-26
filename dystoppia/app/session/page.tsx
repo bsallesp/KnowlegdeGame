@@ -225,7 +225,6 @@ export default function SessionPage() {
   const recoveryFetchesRef = useRef<Set<string>>(new Set());
   const reportedQuestionIdsRef = useRef<Set<string>>(new Set());
   const preflightTriggeredRef = useRef<Set<string>>(new Set());
-  const factTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const syncTopicFromServer = useCallback(async () => {
     const res = await fetch(`/api/topics?slug=${encodeURIComponent(GED_SLUG)}`);

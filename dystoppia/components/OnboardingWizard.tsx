@@ -32,9 +32,8 @@ export default function OnboardingWizard({
   const [error, setError] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    fetchNextTurn([]);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchNextTurn([]); }, []);
 
   const fetchNextTurn = async (msgs: OnboardingMessage[]) => {
     setIsLoading(true);

@@ -79,7 +79,7 @@ export default function BooksShell() {
           return;
         }
         await refresh();
-      } catch (err) {
+      } catch {
         setError("delete_failed");
       }
     },

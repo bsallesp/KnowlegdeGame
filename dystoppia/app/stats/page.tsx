@@ -146,7 +146,7 @@ function MetricCard({ label, value, sub }: { label: string; value: string; sub?:
   );
 }
 
-function DayBar({ day, maxCost, totalCalls }: { day: DayRow; maxCost: number; totalCalls: number }) {
+function DayBar({ day, maxCost }: { day: DayRow; maxCost: number; totalCalls?: number }) {
   const heightPct = maxCost > 0 ? (day.costUsd / maxCost) * 100 : 0;
   const label = day.date.slice(5); // MM-DD
 

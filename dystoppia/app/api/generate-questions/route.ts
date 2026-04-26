@@ -196,25 +196,6 @@ function normalizeQuestion(raw: GeneratedQuestion): GeneratedQuestion | null {
   };
 }
 
-function buildPrimerInstruction(resolvedDifficulty: number, correctRate: number): string {
-  // Level band derived from difficulty + recent performance.
-  // Beginner: struggling OR difficulty 1-2; Intermediate: difficulty 3 or middling rate;
-  // Advanced: difficulty 4-5 and confident learner.
-  const strugglingOrEasy = correctRate < 55 || resolvedDifficulty <= 2;
-  const confidentAndHard = correctRate >= 70 && resolvedDifficulty >= 4;
-
-  if (strugglingOrEasy) {
-    return `LEVEL = BEGINNER (struggling or easy difficulty).
-  The primer must be 3-5 sentences. Teach the underlying principle step-by-step using a DIFFERENT worked example than the one in the question (different numbers, different wording, different scenario). State the invariant or rule in plain language. End with a one-line generalization the learner should apply — without ever revealing or paraphrasing the final answer of the actual question.`;
-  }
-  if (confidentAndHard) {
-    return `LEVEL = ADVANCED (confident learner, hard difficulty).
-  The primer must be 1-2 sentences. State only the abstract principle, invariant, or edge-case name. Do NOT include any worked example. Assume the learner has mastered basics and just needs the conceptual framing. Never hint at the specific answer.`;
-  }
-  return `LEVEL = INTERMEDIATE.
-  The primer must be 2-3 sentences. Briefly name the principle and give a compact analogy or mini-example using DIFFERENT surface details than the question (different numbers/scenario). Do not walk through a full solution. Never reveal or paraphrase the answer to the actual question.`;
-}
-
 function buildStagePrimerInstruction(resolvedDifficulty: number, correctRate: number): string {
   const stage = getLearningStage(resolvedDifficulty, correctRate);
   return `LEARNING STAGE = ${stage.label.toUpperCase()}.
