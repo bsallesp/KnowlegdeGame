@@ -1,0 +1,56 @@
+name: Deploy to VM
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "dystoppia/**"
+      - "infra/**"
+      - ".github/workflows/deploy-vm.yml"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: dystoppia/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: dystoppia
+      - name: Build app
+        run: npm run build
+        working-directory: dystoppia
+      - name: Docker login (ACR)
+        run: echo ${{ secrets.ACR_PASSWORD }} | docker login dystoppiaacr.azurecr.io -u dystoppiaacr --password-stdin
+      - name: Build and push image
+        run: |
+          docker build -t dystoppiaacr.azurecr.io/dystoppia:latest .
+          docker push dystoppiaacr.azurecr.io/dystoppia:latest
+        working-directory: dystoppia
+
+  deploy-vm:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy on VM via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            sudo docker login dystoppiaacr.azurecr.io -u dystoppiaacr --password-stdin <<< "${{ secrets.ACR_PASSWORD }}"
+            sudo docker pull dystoppiaacr.azurecr.io/dystoppia:latest
+            sudo docker stop dystoppia || true
+            sudo docker rm dystoppia || true
+            sudo docker run -d \
+              --name dystoppia \
+              --restart unless-stopped \
+              --env-file /etc/dystoppia.env \
+              -p 8080:8080 \
+              dystoppiaacr.azurecr.io/dystoppia:latest

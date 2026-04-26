@@ -20,7 +20,22 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Learn More
+
+## Deploy manual na VM (Azure)
+
+1. Acesse a VM via SSH:
+	```sh
+	ssh azureuser@20.14.148.143
+	```
+2. Execute o script de setup (ajuste conforme necessário):
+	```sh
+	# Salve como setup-dystoppia.sh e rode:
+	chmod +x setup-dystoppia.sh
+	./setup-dystoppia.sh
+	```
+3. O app estará disponível em: http://20.14.148.143:8080
+
+Veja scripts/ para automação e limpeza de recursos antigos.
 
 To learn more about Next.js, take a look at the following resources:
 

@@ -6,6 +6,7 @@ import { logger } from "@/lib/logger";
 import { requireUser } from "@/lib/authGuard";
 import { checkRateLimit, RateLimitError } from "@/lib/rateLimit";
 import { logLLMUsage } from "@/lib/llmLogger";
+import { Prisma } from "@prisma/client";
 import {
   SourceContextAccessError,
   getSourceContextForSubItem,
@@ -55,16 +56,21 @@ function shuffleOptions(options: string[] | null, type: string): string[] | null
 }
 
 // Minimum cached questions before background refill kicks in
-const REFILL_THRESHOLD = 25;
+const REFILL_THRESHOLD = 12;
 // How many questions to generate per background refill
-const REFILL_BATCH = 20;
+const REFILL_BATCH = 8;
 // Cap per-subItem cache depth on prefetch warmups to avoid runaway LLM spend
 const PREFETCH_CACHE_TARGET = 30;
 const MAX_GENERATION_ATTEMPTS = 3;
+const REFILL_DEDUPE_MS = 45_000;
+const MAX_ACTIVE_GENERATIONS_PER_USER = 1;
 // OpenAI: 8K is enough for 20 easy questions (short stems, simple options).
 // Anthropic: hard questions (d3-5) are longer — 16K prevents truncation on REFILL_BATCH.
 const GENERATION_MAX_TOKENS_OPENAI = 8000;
 const GENERATION_MAX_TOKENS_ANTHROPIC = 16000;
+const refillInFlight = new Map<string, Promise<void>>();
+const refillCooldownUntil = new Map<string, number>();
+const activeGenerationsByUser = new Map<string, number>();
 
 interface GeneratedQuestion {
   type: "multiple_choice" | "single_choice" | "fill_blank" | "true_false";
@@ -90,6 +96,57 @@ interface ValidationBatchResponse {
     consistent: boolean;
     reason?: string;
   }>;
+}
+
+function isMissingColumnError(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2022";
+}
+
+function tryAcquireGenerationSlot(userId: string): boolean {
+  const active = activeGenerationsByUser.get(userId) ?? 0;
+  if (active >= MAX_ACTIVE_GENERATIONS_PER_USER) return false;
+  activeGenerationsByUser.set(userId, active + 1);
+  return true;
+}
+
+function releaseGenerationSlot(userId: string): void {
+  const active = activeGenerationsByUser.get(userId) ?? 0;
+  if (active <= 1) {
+    activeGenerationsByUser.delete(userId);
+    return;
+  }
+  activeGenerationsByUser.set(userId, active - 1);
+}
+
+function scheduleBackgroundRefill(
+  refillKey: string,
+  userId: string,
+  taskFactory: () => Promise<unknown>,
+  reason: string
+): void {
+  const now = Date.now();
+  const cooldownUntil = refillCooldownUntil.get(refillKey) ?? 0;
+  if (cooldownUntil > now) {
+    logger.debug("generate-questions", `Skip refill (${reason}) — cooldown active`, { refillKey });
+    return;
+  }
+  if (refillInFlight.has(refillKey)) {
+    logger.debug("generate-questions", `Skip refill (${reason}) — already in-flight`, { refillKey });
+    return;
+  }
+
+  const task = taskFactory()
+    .catch((error) => logger.warn("generate-questions", `Background refill failed (${reason})`, error))
+    .finally(() => {
+      refillInFlight.delete(refillKey);
+      refillCooldownUntil.set(refillKey, Date.now() + REFILL_DEDUPE_MS);
+    });
+
+  refillInFlight.set(refillKey, task.then(() => undefined));
+  logger.debug("generate-questions", `Started background refill (${reason})`, {
+    refillKey,
+    userId,
+  });
 }
 
 type TeachingProfile = {
@@ -290,6 +347,12 @@ Question design rules by stage:
 
 PRIMER (pre-question teaching text) — required for every question:
 ${primerInstruction}
+Primer format (ADHD-friendly readability):
+- Write 3-5 very short sentences.
+- One idea per sentence.
+- Keep each sentence <= 12 words.
+- Prefer plain words and direct structure.
+- Avoid long subordinate clauses and dense paragraphs.
 Pearson-VUE style: the primer teaches the principle so the learner can REASON toward the answer, never hands the answer over. If the question uses specific numbers, entities, or a scenario, the primer's example must use DIFFERENT ones.
 
 FACT — required for every question:
@@ -647,6 +710,7 @@ Apply this pedagogical approach when writing all questions. The questions should
 }
 
 export async function POST(req: NextRequest) {
+  let generationSlotUserId: string | null = null;
   try {
     const auth = await requireUser(req);
     if (auth instanceof NextResponse) return auth;
@@ -735,6 +799,8 @@ export async function POST(req: NextRequest) {
 
     // Prefetch path: warm up the cache in the background and return 202 immediately.
     // Does not block on generation and does not return questions (client discards).
+    const refillKey = `${subItemId}:${resolvedDifficulty}`;
+
     if (prefetch) {
       if (validQuestions.length < PREFETCH_CACHE_TARGET) {
         const needed = Math.min(REFILL_BATCH, PREFETCH_CACHE_TARGET - validQuestions.length);
@@ -742,16 +808,20 @@ export async function POST(req: NextRequest) {
           "generate-questions",
           `Prefetch warmup — generating ${needed} in background (cached=${validQuestions.length})`
         );
-        generateAndSaveQuestions(
+        scheduleBackgroundRefill(
+          refillKey,
           auth.userId,
-          subItemId,
-          subItem,
-          resolvedDifficulty,
-          correctRate,
-          needed,
-          sourceContext
-        ).catch((error) =>
-          logger.warn("generate-questions", "Prefetch warmup failed", error)
+          () =>
+            generateAndSaveQuestions(
+              auth.userId,
+              subItemId,
+              subItem,
+              resolvedDifficulty,
+              correctRate,
+              needed,
+              sourceContext
+            ),
+          "prefetch"
         );
       }
       return NextResponse.json({ prefetched: true, cached: validQuestions.length }, { status: 202 });
@@ -764,8 +834,11 @@ export async function POST(req: NextRequest) {
 
       if (validQuestions.length < REFILL_THRESHOLD) {
         logger.debug("generate-questions", `Cache low (${validQuestions.length}), refilling ${REFILL_BATCH} in background`);
-        generateAndSaveQuestions(auth.userId, subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH, sourceContext).catch((error) =>
-          logger.warn("generate-questions", "Background refill failed", error)
+        scheduleBackgroundRefill(
+          refillKey,
+          auth.userId,
+          () => generateAndSaveQuestions(auth.userId, subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH, sourceContext),
+          "cache-low"
         );
       }
 
@@ -780,8 +853,11 @@ export async function POST(req: NextRequest) {
     if (validQuestions.length > 0) {
       logger.debug("generate-questions", `Partial cache (${validQuestions.length}) — returning now, generating ${REFILL_BATCH} in background`);
 
-      generateAndSaveQuestions(auth.userId, subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH, sourceContext).catch((error) =>
-        logger.warn("generate-questions", "Background refill failed", error)
+      scheduleBackgroundRefill(
+        refillKey,
+        auth.userId,
+        () => generateAndSaveQuestions(auth.userId, subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH, sourceContext),
+        "cache-partial"
       );
 
       return NextResponse.json({
@@ -793,6 +869,17 @@ export async function POST(req: NextRequest) {
     }
 
     logger.info("generate-questions", `Cache empty — generating ${count} questions synchronously`);
+    if (!tryAcquireGenerationSlot(auth.userId)) {
+      return NextResponse.json(
+        {
+          error: "generation_in_progress",
+          message: "Another generation is already running for this user. Please try again in a few seconds.",
+        },
+        { status: 429 }
+      );
+    }
+    generationSlotUserId = auth.userId;
+
     const generated = await generateAndSaveQuestions(
       auth.userId,
       subItemId,
@@ -803,8 +890,11 @@ export async function POST(req: NextRequest) {
       sourceContext
     );
 
-    generateAndSaveQuestions(auth.userId, subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH, sourceContext).catch((error) =>
-      logger.warn("generate-questions", "Post-generation background warmup failed", error)
+    scheduleBackgroundRefill(
+      refillKey,
+      auth.userId,
+      () => generateAndSaveQuestions(auth.userId, subItemId, subItem, resolvedDifficulty, correctRate, REFILL_BATCH, sourceContext),
+      "post-generation"
     );
 
     return NextResponse.json({
@@ -824,6 +914,18 @@ export async function POST(req: NextRequest) {
       })),
     });
   } catch (error) {
+    if (isMissingColumnError(error)) {
+      logger.error("generate-questions", "Database schema mismatch (missing column)", error);
+      return NextResponse.json(
+        {
+          error: "database_schema_mismatch",
+          message: "Database schema is outdated. Apply the latest migrations and retry.",
+          retryable: false,
+        },
+        { status: 503 }
+      );
+    }
+
     if (error instanceof QuestionGenerationConfigError) {
       logger.error("generate-questions", "ANTHROPIC_API_KEY is not configured");
       return NextResponse.json(
@@ -845,5 +947,9 @@ export async function POST(req: NextRequest) {
       },
       { status: 500 }
     );
+  } finally {
+    if (generationSlotUserId) {
+      releaseGenerationSlot(generationSlotUserId);
+    }
   }
 }

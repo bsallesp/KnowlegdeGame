@@ -1,5 +1,6 @@
 import { describe, test, expect, vi, beforeEach, afterAll } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 
@@ -204,14 +205,14 @@ describe("input validation", () => {
 
 describe("cache hit", () => {
   function fullCachePool(overrides: Partial<ReturnType<typeof makeDbQuestion>> = {}) {
-    // REFILL_THRESHOLD = 25 — produce 26 so background refill does NOT trigger.
+    // REFILL_THRESHOLD = 12 — produce 26 so background refill does NOT trigger.
     return Array.from({ length: 26 }, (_, i) => makeDbQuestion({ id: `q-${i + 1}`, ...overrides }));
   }
 
   test("returns cached questions without calling the LLM", async () => {
     mockFindMany.mockResolvedValue(fullCachePool());
 
-    const res = await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
+    const res = await POST(makeRequest({ subItemId: "sub-refill-low", count: 3 }));
     expect(res.status).toBe(200);
     expect(mockCreate_llm).not.toHaveBeenCalled();
     const { questions } = await res.json();
@@ -222,7 +223,7 @@ describe("cache hit", () => {
     delete process.env.ANTHROPIC_API_KEY;
     mockFindMany.mockResolvedValue(fullCachePool());
 
-    const res = await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
+    const res = await POST(makeRequest({ subItemId: "sub-refill-low", count: 3 }));
 
     expect(res.status).toBe(200);
     expect(mockCreate_llm).not.toHaveBeenCalled();
@@ -231,7 +232,7 @@ describe("cache hit", () => {
   test("parses options JSON string into array on cache hit", async () => {
     mockFindMany.mockResolvedValue(fullCachePool({ options: '["A","B","C","D"]' }));
 
-    const res = await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
+    const res = await POST(makeRequest({ subItemId: "sub-refill-low", count: 3 }));
     const { questions } = await res.json();
     for (const q of questions) {
       expect(Array.isArray(q.options)).toBe(true);
@@ -266,7 +267,7 @@ describe("cache hit", () => {
   });
 
   test("triggers background refill when cache is low (< REFILL_THRESHOLD)", async () => {
-    // validQuestions.length = 4 >= count(3), but still < REFILL_THRESHOLD(15)
+    // validQuestions.length = 4 >= count(3), but still < REFILL_THRESHOLD(12)
     mockFindMany.mockResolvedValue([
       makeDbQuestion({ id: "q-1", type: "multiple_choice", options: '["A","B","C","D"]' }),
       makeDbQuestion({ id: "q-2", type: "multiple_choice", options: '["A","B","C","D"]' }),
@@ -277,7 +278,7 @@ describe("cache hit", () => {
     // Background refill fails -> covers logger.warn inside `.catch(...)`.
     mockOpenAICreate.mockRejectedValueOnce(new Error("Background LLM down"));
 
-    const res = await POST(makeRequest({ subItemId: "sub-1", count: 3 }));
+    const res = await POST(makeRequest({ subItemId: "sub-refill-low-trigger", count: 3 }));
     expect(res.status).toBe(200);
 
     // Let the background promise run.
@@ -347,6 +348,8 @@ describe("generation path", () => {
     const firstPrompt = mockOpenAICreate.mock.calls[0][0].messages[0].content;
     expect(firstPrompt).toContain("Current learning stage: Recognize");
     expect(firstPrompt).toContain("Difficulty 1-2 must feel welcoming and low-friction");
+    expect(firstPrompt).toContain("Primer format (ADHD-friendly readability)");
+    expect(firstPrompt).toContain("One idea per sentence.");
   });
 
   test("saves timeLimit as null when not provided by LLM", async () => {
@@ -392,6 +395,20 @@ describe("generation path", () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBeDefined();
+  });
+
+  test("returns 503 when Prisma reports missing column (P2022)", async () => {
+    const prismaError = new Prisma.PrismaClientKnownRequestError(
+      "The column does not exist in the current database.",
+      { code: "P2022", clientVersion: "test" }
+    );
+    mockFindMany.mockRejectedValue(prismaError);
+
+    const res = await POST(makeRequest({ subItemId: "sub-1", count: 1 }));
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.error).toBe("database_schema_mismatch");
+    expect(body.retryable).toBe(false);
   });
 
   test("returns 500 when OpenAI response is not valid JSON", async () => {
@@ -519,6 +536,33 @@ describe("generation path", () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(mockOpenAICreate.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
+
+  test("returns 429 when another generation is already in progress for the same user", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockOpenAICreate.mockReset();
+    let releaseFirst: (() => void) | null = null;
+    const firstCallGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+
+    mockOpenAICreate
+      .mockImplementationOnce(() =>
+        firstCallGate.then(() => makeOpenAIResponse([makeLLMQuestion()]))
+      )
+      .mockResolvedValue(makeOpenAIResponse([makeLLMQuestion()]));
+
+    const firstReq = POST(makeRequest({ subItemId: "sub-concurrency", count: 1 }));
+    await new Promise((r) => setTimeout(r, 5));
+
+    const secondRes = await POST(makeRequest({ subItemId: "sub-concurrency", count: 1 }));
+    expect(secondRes.status).toBe(429);
+    const secondBody = await secondRes.json();
+    expect(secondBody.error).toBe("generation_in_progress");
+
+    releaseFirst?.();
+    const firstRes = await firstReq;
+    expect(firstRes.status).toBe(200);
+  });
 });
 
 // ─── Prefetch warmup ──────────────────────────────────────────────────────────
@@ -542,13 +586,38 @@ describe("prefetch warmup", () => {
   test("fires background generation when cache is below target, without charging quota", async () => {
     mockFindMany.mockResolvedValue([]); // empty cache
 
-    const res = await POST(makeRequest({ subItemId: "sub-1", count: 5, prefetch: true }));
+    const res = await POST(makeRequest({ subItemId: "sub-prefetch-1", count: 5, prefetch: true }));
 
     expect(res.status).toBe(202);
     expect(mockCheckRateLimit).not.toHaveBeenCalled();
 
     await new Promise((r) => setTimeout(r, 10));
     expect(mockOpenAICreate).toHaveBeenCalled();
+  });
+
+  test("dedupes prefetch warmup when repeated quickly for same subitem+difficulty", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockOpenAICreate.mockResolvedValue(
+      makeOpenAIResponse(
+        Array.from({ length: 8 }, (_, i) =>
+          makeLLMQuestion({
+            content: `Prefetch question ${i + 1}?`,
+            answer: "Email fraud",
+            options: ["Email fraud", "Malware", "Firewall", "VPN"],
+          })
+        )
+      )
+    );
+
+    const first = await POST(makeRequest({ subItemId: "sub-prefetch-dedupe", count: 5, prefetch: true }));
+    const second = await POST(makeRequest({ subItemId: "sub-prefetch-dedupe", count: 5, prefetch: true }));
+
+    expect(first.status).toBe(202);
+    expect(second.status).toBe(202);
+    await new Promise((r) => setTimeout(r, 20));
+    // One background refill => one generation call + one validation call.
+    expect(mockOpenAICreate.mock.calls.length).toBeLessThanOrEqual(2);
+    expect(mockOpenAICreate.mock.calls.length).toBeGreaterThanOrEqual(1);
   });
 
   test("non-prefetch request still charges rate limit", async () => {
