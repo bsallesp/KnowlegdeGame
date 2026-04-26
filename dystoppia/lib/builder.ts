@@ -12,9 +12,11 @@ import type {
 } from "@/types";
 import { logLLMUsage } from "@/lib/llmLogger";
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+let client: Anthropic | null = null;
+function getClient(): Anthropic {
+  if (!client) client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  return client;
+}
 
 const BUILDER_MODEL = "claude-sonnet-4-6";
 
@@ -201,7 +203,7 @@ async function runAuditPass(args: {
   outputTokens: number;
 }> {
   try {
-    const response = await client.messages.create({
+    const response = await getClient().messages.create({
       model: BUILDER_MODEL,
       max_tokens: 2200,
       system: AUDITOR_SYSTEM_PROMPT,
@@ -299,7 +301,7 @@ export async function buildStructuredBuilderResult({
       : [];
 
   try {
-    const generationResponse = await client.messages.create({
+    const generationResponse = await getClient().messages.create({
       model: BUILDER_MODEL,
       max_tokens: 16000,
       system: SYSTEM_PROMPT,

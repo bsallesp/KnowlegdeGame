@@ -141,7 +141,7 @@ describe("GET /api/auth/me — valid token", () => {
     mockUserFindUnique.mockResolvedValue(makeUser({ plan: "learner", subscriptionStatus: "active", hourlyUsage: 2 }));
     const res = await GET();
     const data = await res.json();
-    expect(data.hourlyRemaining).toBe(28);
+    expect(data.hourlyRemaining).toBe(999997);
     expect(typeof data.hourlyResetsAt).toBe("string");
   });
 

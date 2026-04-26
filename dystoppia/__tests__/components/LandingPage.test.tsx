@@ -26,13 +26,6 @@ vi.mock("framer-motion", () => ({
   AnimatePresence: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
 
-vi.mock("@/components/PricingTable", () => ({
-  default: () => <div data-testid="pricing-table" />,
-}));
-vi.mock("@/components/WaitlistForm", () => ({
-  default: () => <div data-testid="waitlist-form" />,
-}));
-
 import LandingPage from "@/components/LandingPage";
 
 describe("LandingPage", () => {
@@ -41,15 +34,15 @@ describe("LandingPage", () => {
     expect(screen.getAllByText("Dystoppia").length).toBeGreaterThanOrEqual(1);
     const logins = screen.getAllByRole("link", { name: /log in/i });
     expect(logins[0]).toHaveAttribute("href", "/login");
-    expect(screen.getByRole("link", { name: /start free/i })).toHaveAttribute("href", "/register");
+    expect(screen.getByRole("link", { name: /sign up/i })).toHaveAttribute("href", "/register");
   });
 
-  test("renders an LLM-style prompt composer and suggestions", () => {
+  test("renders chat-style composer and suggestion chips", () => {
     render(<LandingPage />);
-    expect(screen.getByRole("heading", { name: /what do you want to learn today/i })).toBeTruthy();
-    expect(screen.getByRole("textbox", { name: /learning prompt/i })).toBeTruthy();
-    expect(screen.getByText(/build a learning plan/i)).toBeTruthy();
-    expect(screen.getByTestId("pricing-table")).toBeTruthy();
-    expect(screen.getByTestId("waitlist-form")).toBeTruthy();
+    expect(screen.getByText(/what can i help you with/i)).toBeTruthy();
+    expect(screen.getByPlaceholderText(/message dystoppia/i)).toBeTruthy();
+    expect(screen.getByRole("link", { name: /start/i })).toHaveAttribute("href", "/register");
+    const chips = screen.getAllByRole("link", { name: /help me learn/i });
+    expect(chips.length).toBeGreaterThanOrEqual(1);
   });
 });
