@@ -8,7 +8,12 @@ RUN npm ci
 
 COPY . .
 RUN npx prisma generate
-RUN npm run build
+
+# Placeholder keys satisfy SDK constructors during static analysis at build time.
+# They are never embedded in the final image — runtime values come from Key Vault.
+ARG OPENAI_API_KEY=build-placeholder
+ARG ANTHROPIC_API_KEY=build-placeholder
+RUN OPENAI_API_KEY=$OPENAI_API_KEY ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY npm run build
 
 # ─── Runner ───────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner

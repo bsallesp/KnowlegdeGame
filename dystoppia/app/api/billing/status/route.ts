@@ -5,9 +5,9 @@ import { getCurrentCreditBalance } from "@/lib/credits";
 import { CREDIT_PACKAGES } from "@/lib/stripe";
 
 const PLAN_LIMITS: Record<string, { hourly: number }> = {
-  free: { hourly: 5 },
-  learner: { hourly: 30 },
-  master: { hourly: 100 },
+  free: { hourly: 999999 },
+  learner: { hourly: 999999 },
+  master: { hourly: 999999 },
 };
 
 const HOUR_MS = 60 * 60 * 1000;

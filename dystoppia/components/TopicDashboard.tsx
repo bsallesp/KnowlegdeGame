@@ -120,12 +120,13 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute, onSo
             >
               {/* Item header */}
               <div
-                className="flex items-center gap-2 py-2 px-3 rounded-lg cursor-pointer group"
+                className="flex items-center gap-2 pt-3 pb-1.5 px-3 rounded-lg group"
                 style={{
-                  backgroundColor: item.muted ? "transparent" : "#1C1C28",
                   opacity: item.muted ? 0.5 : 1,
+                  borderBottom: "1px solid #2E2E40",
                 }}
               >
+                {/* Chevron + title — full width, never truncated */}
                 <button
                   onClick={() => toggleExpand(item.id)}
                   className="flex-1 flex items-center gap-2 text-left min-w-0"
@@ -133,7 +134,7 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute, onSo
                   <motion.span
                     animate={{ rotate: isExpanded ? 90 : 0 }}
                     transition={{ duration: 0.2 }}
-                    style={{ color: "#9494B8" }}
+                    style={{ color: "#6060A0" }}
                     className="flex-shrink-0"
                   >
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -141,49 +142,53 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute, onSo
                     </svg>
                   </motion.span>
                   <span
-                    className="text-xs font-semibold uppercase tracking-wide truncate"
-                    style={{ color: "#9494B8" }}
+                    className="text-xs font-bold uppercase tracking-widest"
+                    style={{ color: "#BBBBD4" }}
                   >
                     {item.name}
                   </span>
                 </button>
-                {onOpenAudiobooks && (
+
+                {/* Action buttons — dim at rest, full on hover */}
+                <div className="flex items-center gap-0.5 flex-shrink-0 opacity-30 group-hover:opacity-100 transition-opacity">
+                  {onOpenAudiobooks && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onOpenAudiobooks(item.id, "item", item.name); }}
+                      className="p-1 rounded hover:bg-white/5"
+                      style={{ color: "#818CF8" }}
+                      title="Audiobooks for this chapter"
+                      aria-label="Open chapter audiobooks"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 18v-6a9 9 0 0118 0v6" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
+                      </svg>
+                    </button>
+                  )}
+                  {onSolo && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onSolo(item.id, "item"); }}
+                      className="px-1.5 py-1 rounded"
+                      style={{
+                        backgroundColor: itemSoloActive ? "rgba(250,204,21,0.14)" : "transparent",
+                        border: `1px solid ${itemSoloActive ? "rgba(250,204,21,0.35)" : "#2E2E40"}`,
+                      }}
+                      title={itemSoloActive ? "Show all chapters again" : "Solo this chapter"}
+                      aria-label={itemSoloActive ? "Exit item solo" : "Solo item"}
+                    >
+                      <SoloBadge active={itemSoloActive} />
+                    </button>
+                  )}
                   <button
-                    onClick={(e) => { e.stopPropagation(); onOpenAudiobooks(item.id, "item", item.name); }}
-                    className="flex-shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ color: "#818CF8" }}
-                    title="Audiobooks for this chapter"
-                    aria-label="Open chapter audiobooks"
+                    onClick={(e) => { e.stopPropagation(); onToggleMute(item.id, "item"); }}
+                    className="p-1 rounded hover:bg-white/5"
+                    style={{ color: item.muted ? "#F97316" : "#9494B8" }}
+                    title={item.muted ? "Unmute" : "Mute"}
+                    aria-label={item.muted ? "Unmute item" : "Mute item"}
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 18v-6a9 9 0 0118 0v6" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
-                    </svg>
+                    <MuteIcon muted={item.muted} />
                   </button>
-                )}
-                {onSolo && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onSolo(item.id, "item"); }}
-                    className="flex-shrink-0 px-1.5 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{
-                      backgroundColor: itemSoloActive ? "rgba(250,204,21,0.14)" : "transparent",
-                      border: `1px solid ${itemSoloActive ? "rgba(250,204,21,0.35)" : "#2E2E40"}`,
-                    }}
-                    title={itemSoloActive ? "Show all chapters again" : "Solo this chapter"}
-                    aria-label={itemSoloActive ? "Exit item solo" : "Solo item"}
-                  >
-                    <SoloBadge active={itemSoloActive} />
-                  </button>
-                )}
-                <button
-                  onClick={() => onToggleMute(item.id, "item")}
-                  className="flex-shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ color: item.muted ? "#F97316" : "#9494B8" }}
-                  title={item.muted ? "Unmute" : "Mute"}
-                  aria-label={item.muted ? "Unmute item" : "Mute item"}
-                >
-                  <MuteIcon muted={item.muted} />
-                </button>
+                </div>
               </div>
 
               {/* SubItems */}
@@ -204,6 +209,13 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute, onSo
                       const proficiencyLabel = PROFICIENCY_LABELS[difficulty] || "Beginner";
                       const subItemSoloActive = isSubItemSoloActive(items, sub.id);
 
+                      const rate = stats && stats.totalCount >= 3 ? stats.correctCount / stats.totalCount : null;
+                      const isWeak = rate !== null && rate < 0.5;
+                      const isMastered = rate !== null && rate >= 0.8 && stats!.totalCount >= 10;
+                      const borderColor = sub.muted ? "#2E2E40" : isWeak ? "#F97316" : isMastered ? "#60A5FA" : "#818CF8";
+                      const badgeBg = isWeak ? "rgba(249,115,22,0.12)" : isMastered ? "rgba(96,165,250,0.12)" : "rgba(129,140,248,0.12)";
+                      const badgeColor = isWeak ? "#F97316" : isMastered ? "#60A5FA" : "#818CF8";
+
                       return (
                         <motion.div
                           key={sub.id}
@@ -212,95 +224,80 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute, onSo
                           transition={{ delay: subIndex * 0.04 }}
                           className="ml-4 mb-1 group"
                         >
-                          {/* Weak spot / mastery indicator */}
-                          {(() => {
-                            const rate = stats && stats.totalCount >= 3 ? stats.correctCount / stats.totalCount : null;
-                            const isWeak = rate !== null && rate < 0.5;
-                            const isMastered = rate !== null && rate >= 0.8 && stats!.totalCount >= 10;
-                            const borderColor = sub.muted ? "#2E2E40" : isWeak ? "#F97316" : isMastered ? "#60A5FA" : "#818CF8";
-                            return (
                           <div
-                            className="flex items-start gap-2 px-3 py-2 rounded-lg"
+                            className="flex flex-col gap-1.5 px-3 py-2 rounded-lg"
                             style={{
                               backgroundColor: sub.muted ? "transparent" : isWeak ? "rgba(249,115,22,0.05)" : "rgba(28,28,40,0.5)",
                               opacity: sub.muted ? 0.4 : 1,
                               borderLeft: `2px solid ${borderColor}`,
                             }}
                           >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start flex-col gap-1">
-                                <span
-                                  className="text-xs"
-                                  style={{ color: sub.muted ? "#9494B8" : "#EEEEFF", wordBreak: "break-word" }}
-                                >
-                                  {(() => {
-                                    const rate = stats && stats.totalCount >= 3 ? stats.correctCount / stats.totalCount : null;
-                                    if (rate !== null && rate < 0.5) return "⚠ ";
-                                    if (rate !== null && rate >= 0.8 && stats!.totalCount >= 10) return "✓ ";
-                                    return "";
-                                  })()}{sub.name}
-                                </span>
-                                <div className="flex items-center gap-1 mt-1">
-                                  {onOpenAudiobooks && (
-                                    <button
-                                      onClick={() => onOpenAudiobooks(sub.id, "subitem", sub.name)}
-                                      className="flex-shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                                      style={{ color: "#818CF8" }}
-                                      title="Audiobooks for this concept"
-                                      aria-label="Open concept audiobooks"
-                                    >
-                                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 18v-6a9 9 0 0118 0v6" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
-                                      </svg>
-                                    </button>
-                                  )}
-                                  {onSolo && (
-                                    <button
-                                      onClick={() => onSolo(sub.id, "subitem")}
-                                      className="flex-shrink-0 px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                                      style={{
-                                        backgroundColor: subItemSoloActive ? "rgba(250,204,21,0.14)" : "transparent",
-                                        border: `1px solid ${subItemSoloActive ? "rgba(250,204,21,0.35)" : "#2E2E40"}`,
-                                      }}
-                                      title={subItemSoloActive ? "Show all concepts again" : "Solo this concept"}
-                                      aria-label={subItemSoloActive ? "Exit subitem solo" : "Solo subitem"}
-                                    >
-                                      <SoloBadge active={subItemSoloActive} />
-                                    </button>
-                                  )}
-                                  <button
-                                    onClick={() => onToggleMute(sub.id, "subitem")}
-                                    className="flex-shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                                    style={{ color: sub.muted ? "#F97316" : "#9494B8" }}
-                                    title={sub.muted ? "Unmute" : "Mute"}
-                                    aria-label={sub.muted ? "Unmute subitem" : "Mute subitem"}
-                                  >
-                                    <MuteIcon muted={sub.muted} />
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <DifficultyDots level={difficulty} />
-                                <span
-                                  className="text-xs font-medium"
-                                  style={{ color: "#818CF8", fontSize: "0.6rem" }}
-                                >
-                                  {proficiencyLabel}
-                                </span>
-                                {totalCount > 0 && (
-                                  <span className="text-xs ml-auto" style={{ color: "#9494B8" }}>
-                                    {correctCount}/{totalCount}
-                                  </span>
-                                )}
-                              </div>
+                            {/* Row 1: title */}
+                            <span
+                              className="text-sm leading-snug"
+                              style={{ color: sub.muted ? "#9494B8" : "#EEEEFF" }}
+                            >
+                              {isWeak ? "⚠ " : isMastered ? "✓ " : ""}{sub.name}
+                            </span>
+
+                            {/* Row 2: badge + score + buttons */}
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="text-[0.6rem] font-semibold px-1.5 py-0.5 rounded-full"
+                                style={{ backgroundColor: badgeBg, color: badgeColor }}
+                              >
+                                {proficiencyLabel}
+                              </span>
+
                               {totalCount > 0 && (
-                                <ProgressBar correctCount={correctCount} totalCount={totalCount} />
+                                <span className="text-xs tabular-nums" style={{ color: "#9494B8" }}>
+                                  {correctCount}/{totalCount}
+                                </span>
                               )}
+
+                              <div className="flex items-center gap-0.5 ml-auto opacity-30 group-hover:opacity-100 transition-opacity">
+                                {onOpenAudiobooks && (
+                                  <button
+                                    onClick={() => onOpenAudiobooks(sub.id, "subitem", sub.name)}
+                                    className="p-1 rounded hover:bg-white/5"
+                                    style={{ color: "#818CF8" }}
+                                    title="Audiobooks for this concept"
+                                    aria-label="Open concept audiobooks"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 18v-6a9 9 0 0118 0v6" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
+                                    </svg>
+                                  </button>
+                                )}
+                                {onSolo && (
+                                  <button
+                                    onClick={() => onSolo(sub.id, "subitem")}
+                                    className="px-1 py-0.5 rounded"
+                                    style={{
+                                      backgroundColor: subItemSoloActive ? "rgba(250,204,21,0.14)" : "transparent",
+                                      border: `1px solid ${subItemSoloActive ? "rgba(250,204,21,0.35)" : "#2E2E40"}`,
+                                    }}
+                                    title={subItemSoloActive ? "Show all concepts again" : "Solo this concept"}
+                                    aria-label={subItemSoloActive ? "Exit subitem solo" : "Solo subitem"}
+                                  >
+                                    <SoloBadge active={subItemSoloActive} />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => onToggleMute(sub.id, "subitem")}
+                                  className="p-1 rounded hover:bg-white/5"
+                                  style={{ color: sub.muted ? "#F97316" : "#9494B8" }}
+                                  title={sub.muted ? "Unmute" : "Mute"}
+                                  aria-label={sub.muted ? "Unmute subitem" : "Mute subitem"}
+                                >
+                                  <MuteIcon muted={sub.muted} />
+                                </button>
+                              </div>
                             </div>
+
+                            {totalCount > 0 && <ProgressBar correctCount={correctCount} totalCount={totalCount} />}
                           </div>
-                            );
-                          })()}
                         </motion.div>
                       );
                     })}

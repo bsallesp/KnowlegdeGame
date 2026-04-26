@@ -21,12 +21,86 @@ import { selectNextSubItem, selectTopNSubItems } from "@/lib/adaptive";
 import { logger } from "@/lib/clientLogger";
 import type { Question } from "@/types";
 
+const LOADING_FACTS = [
+  "Spaced repetition can improve long-term retention by up to 200% compared to massed practice.",
+  "The brain consolidates memories during sleep — studying before bed boosts recall the next day.",
+  "Retrieval practice (testing yourself) is more effective than re-reading the same material.",
+  "Interleaving different topics in one session leads to deeper understanding than blocked practice.",
+  "The 'generation effect': information you produce yourself is remembered far better than passively read text.",
+  "Taking brief breaks every 25–30 minutes keeps focus sharp and prevents cognitive fatigue.",
+  "Teaching a concept to someone else is one of the strongest ways to solidify your own understanding.",
+  "Handwriting notes activates deeper processing than typing, even if you write less.",
+  "Connecting new knowledge to something you already know speeds up encoding by up to 40%.",
+  "Curiosity releases dopamine, which acts as a natural memory enhancer — stay curious!",
+];
+
+function LoadingFactCard({ error, onRetry }: { error?: string; onRetry?: () => void }) {
+  const [idx, setIdx] = useState(() => Math.floor(Math.random() * LOADING_FACTS.length));
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    if (error) return;
+    const cycle = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => {
+        setIdx((i) => (i + 1) % LOADING_FACTS.length);
+        setVisible(true);
+      }, 400);
+    }, 6000);
+    return () => clearInterval(cycle);
+  }, [error]);
+
+  return (
+    <motion.div key="loading-fact" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full max-w-2xl mx-auto">
+      <div
+        className="rounded-xl p-8 flex flex-col items-center gap-5"
+        style={{ backgroundColor: "#12121A", border: "1px solid rgba(129,140,248,0.3)" }}
+      >
+        <span className="text-3xl select-none">{error ? "⚠️" : "💡"}</span>
+        <motion.p
+          key={idx}
+          animate={{ opacity: visible ? 1 : 0 }}
+          transition={{ duration: 0.35 }}
+          className="text-center text-base leading-relaxed max-w-md"
+          style={{ color: "#C7C7E0" }}
+        >
+          {error ?? LOADING_FACTS[idx]}
+        </motion.p>
+        {error ? (
+          onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mt-1 px-5 py-2 rounded-lg text-sm font-semibold"
+              style={{ backgroundColor: "#818CF8", color: "white" }}
+            >
+              Try Again
+            </button>
+          )
+        ) : (
+          <div className="mt-1 flex items-center gap-2" style={{ color: "#6060A0" }}>
+            <motion.span animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }} className="inline-block text-xs">✦</motion.span>
+            <span className="text-xs">Generating questions…</span>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 interface XPPopup {
   id: number;
   amount: number;
 }
 
-function FactOverlay({ fact, onDismiss }: { fact: string; onDismiss: () => void }) {
+function FactOverlay({ fact, onDismiss, ready }: { fact: string; onDismiss: () => void; ready: boolean }) {
+  const [elapsed, setElapsed] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setElapsed(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
+  const canContinue = ready && elapsed;
+
   return (
     <motion.div
       key="fact-overlay"
@@ -44,13 +118,23 @@ function FactOverlay({ fact, onDismiss }: { fact: string; onDismiss: () => void 
         <p className="text-center text-base leading-relaxed max-w-md" style={{ color: "#C7C7E0" }}>
           {fact}
         </p>
-        <button
-          onClick={onDismiss}
-          className="mt-1 text-xs px-5 py-2 rounded-lg transition-colors"
-          style={{ color: "#9494B8", border: "1px solid #2E2E40", backgroundColor: "#1C1C28" }}
-        >
-          Continue
-        </button>
+        {canContinue ? (
+          <button
+            onClick={onDismiss}
+            className="mt-1 text-xs px-5 py-2 rounded-lg transition-colors"
+            style={{ color: "#9494B8", border: "1px solid #2E2E40", backgroundColor: "#1C1C28" }}
+          >
+            Continue
+          </button>
+        ) : (
+          <div className="mt-1 flex items-center gap-2" style={{ color: "#6060A0" }}>
+            <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+            </svg>
+            <span className="text-xs">Loading next question…</span>
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -351,9 +435,14 @@ export default function SessionPage() {
         logger.warn("session", "Stats hydration failed");
       }
       if (questionQueue.length === 0) await fillQueue();
+
+      // Pre-warm next subItems so questions are ready before the user needs them.
+      const subItems = currentTopic.items.flatMap((item) => (item.muted ? [] : item.subItems));
+      const nextIds = subItems.slice(0, 4).map((s) => s.id);
+      if (nextIds.length > 0) prefetchSubItems(nextIds);
     };
     init();
-  }, [currentTopic, isInitialized, questionQueue.length, fillQueue, hydrateSubItemStats]);
+  }, [currentTopic, isInitialized, questionQueue.length, fillQueue, hydrateSubItemStats, prefetchSubItems]);
 
   // Auto-advance to first question
   useEffect(() => {
@@ -595,11 +684,8 @@ export default function SessionPage() {
       setShowBossIntro(true);
     } else {
       advanceQueue();
-      // Show the fact from the just-answered question during the loading transition
       if (fact) {
         setDisplayingFact(fact);
-        if (factTimeoutRef.current) clearTimeout(factTimeoutRef.current);
-        factTimeoutRef.current = setTimeout(() => setDisplayingFact(null), 2800);
       }
     }
     setUserAnswer("");
@@ -849,22 +935,6 @@ export default function SessionPage() {
             </div>
           )}
 
-          {/* Session accuracy */}
-          {totalCount > 0 && (
-            <div className="flex items-center gap-2 text-xs">
-              <span style={{ color: "#9494B8" }}>Session:</span>
-              <span className="font-semibold" style={{ color: overallRate >= 70 ? "#60A5FA" : overallRate >= 40 ? "#FACC15" : "#F97316" }}>
-                {overallRate}%
-              </span>
-              <span style={{ color: "#9494B8" }}>({totalCount} answered)</span>
-              <InfoButton
-                title="Session Accuracy"
-                content="Percentage of correct answers so far this session. The app uses this — along with time spent — to adapt question difficulty per concept."
-                side="below"
-              />
-            </div>
-          )}
-
           {/* Summary button */}
           {answerCount >= 5 && (
             <button
@@ -931,13 +1001,6 @@ export default function SessionPage() {
               {sessionXP > 0 && (
                 <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: "#FACC15" }}>
                   <span>⚡</span><span>{sessionXP} XP</span>
-                </div>
-              )}
-              {totalCount > 0 && (
-                <div className="flex items-center gap-1 text-xs">
-                  <span style={{ color: "#9494B8" }}>Session:</span>
-                  <span className="font-semibold" style={{ color: overallRate >= 70 ? "#60A5FA" : overallRate >= 40 ? "#FACC15" : "#F97316" }}>{overallRate}%</span>
-                  <span style={{ color: "#9494B8" }}>({totalCount})</span>
                 </div>
               )}
               {answerCount >= 5 && (
@@ -1122,10 +1185,8 @@ export default function SessionPage() {
                 <FactOverlay
                   key="fact-overlay"
                   fact={displayingFact}
-                  onDismiss={() => {
-                    if (factTimeoutRef.current) clearTimeout(factTimeoutRef.current);
-                    setDisplayingFact(null);
-                  }}
+                  ready={!!currentQuestion}
+                  onDismiss={() => setDisplayingFact(null)}
                 />
               ) : showFlashCard && pendingQuestion?.subItem ? (
                 /* Flashcard before new subItem */
@@ -1182,32 +1243,10 @@ export default function SessionPage() {
                   </AnimatePresence>
                 </div>
               ) : !displayingFact && !showFlashCard ? (
-                <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full max-w-2xl space-y-4">
-                  <div className="p-6 rounded-xl space-y-3" style={{ backgroundColor: "#12121A", border: "1px solid #2E2E40" }}>
-                    <SkeletonBlock width="30%" height="1.25rem" />
-                    <SkeletonBlock width="100%" height="1.5rem" />
-                    <SkeletonBlock width="80%" height="1.5rem" />
-                  </div>
-                  {[0, 1, 2, 3].map((i) => <SkeletonBlock key={i} height="3rem" className="rounded-lg" />)}
-                  <div className="flex justify-center pt-4">
-                    <motion.p className="text-sm flex items-center gap-2" style={{ color: sessionError ? "#F97316" : "#9494B8" }}>
-                      <motion.span animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }} className="inline-block">✦</motion.span>
-                      {sessionError || (isPending ? "Loading topic..." : isGenerating ? "Generating questions..." : "Loading...")}
-                    </motion.p>
-                  </div>
-                  {sessionError && (
-                    <div className="flex justify-center pt-2">
-                      <button
-                        type="button"
-                        onClick={() => void fillQueue()}
-                        className="px-4 py-2 rounded-lg text-sm font-semibold"
-                        style={{ backgroundColor: "#818CF8", color: "white" }}
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  )}
-                </motion.div>
+                <LoadingFactCard
+                  error={sessionError || undefined}
+                  onRetry={sessionError ? () => void fillQueue() : undefined}
+                />
               ) : null}
             </AnimatePresence>
           </div>

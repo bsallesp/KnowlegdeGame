@@ -44,9 +44,9 @@ export async function GET() {
     }
 
     const PLAN_LIMITS: Record<string, { hourly: number }> = {
-      free: { hourly: 5 },
-      learner: { hourly: 30 },
-      master: { hourly: 100 },
+      free: { hourly: 999999 },
+      learner: { hourly: 999999 },
+      master: { hourly: 999999 },
     };
     const limits = PLAN_LIMITS[user.plan] ?? PLAN_LIMITS.free;
 

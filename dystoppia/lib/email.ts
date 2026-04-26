@@ -2,7 +2,7 @@ import { EmailClient } from "@azure/communication-email";
 
 const FROM_ADDRESS =
   process.env.AZURE_COMM_FROM_ADDRESS ??
-  "DoNotReply@49056c6a-2022-4812-8cdd-a9617428d269.azurecomm.net";
+  "DoNotReply@ba0edab7-f474-4ace-a484-cb8557f76020.azurecomm.net";
 
 export function isOtpEmailConfigured() {
   return Boolean(process.env.AZURE_COMM_CONNECTION_STRING);

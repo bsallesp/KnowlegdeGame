@@ -474,22 +474,22 @@ describe("SessionPage — gamification display", () => {
     expect(screen.queryByText(/Session:/)).toBeNull();
   });
 
-  test("shows accuracy percentage when answers exist", async () => {
+  test("does not show accuracy percentage when answers exist", async () => {
     storeState.currentTopic = sampleTopic;
     storeState.subItemStats = {
       "sub-1": { correctCount: 8, totalCount: 10, difficulty: 1 },
     };
     render(<SessionPage />);
-    expect(screen.getByText(/80%/)).toBeTruthy();
+    expect(screen.queryByText(/80%/)).toBeNull();
   });
 
-  test("shows answer count when answers exist", async () => {
+  test("does not show answer count when answers exist", async () => {
     storeState.currentTopic = sampleTopic;
     storeState.subItemStats = {
       "sub-1": { correctCount: 5, totalCount: 10, difficulty: 1 },
     };
     render(<SessionPage />);
-    expect(screen.getByText(/10 answered/)).toBeTruthy();
+    expect(screen.queryByText(/10 answered/)).toBeNull();
   });
 });
 

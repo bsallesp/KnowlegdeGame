@@ -116,17 +116,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "topicId is required" }, { status: 400 });
     }
 
-    // Audiobook is a paid-only feature
-    const user = await prisma.user.findUnique({
-      where: { id: auth.userId },
-      select: { plan: true },
-    });
-    if (!user || user.plan === "free") {
-      return NextResponse.json(
-        { error: "audiobook_locked", upgradeUrl: "/pricing" },
-        { status: 403 }
-      );
-    }
 
     const topic = await prisma.topic.findUnique({
       where: { id: topicId },

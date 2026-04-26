@@ -26,9 +26,9 @@ const PLAN_LIMITS: Record<
     hourlyCurriculum: number;
   }
 > = {
-  free: { hourly: 5, hourlyCurriculum: 1 },
-  learner: { hourly: 30, hourlyCurriculum: 5 },
-  master: { hourly: 100, hourlyCurriculum: 20 },
+  free: { hourly: 999999, hourlyCurriculum: 999999 },
+  learner: { hourly: 999999, hourlyCurriculum: 999999 },
+  master: { hourly: 999999, hourlyCurriculum: 999999 },
 };
 
 function planLimits(plan: string) {
