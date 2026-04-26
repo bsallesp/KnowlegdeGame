@@ -26,13 +26,17 @@ function getProviderAndModel(difficulty: number): { provider: "openai" | "anthro
     : { provider: "anthropic", model: ANTHROPIC_MODEL_HARD };
 }
 
-const openaiClient = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let openaiClient: OpenAI | null = null;
+function getOpenaiClient(): OpenAI {
+  if (!openaiClient) openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return openaiClient;
+}
 
-const anthropicClient = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+let anthropicClient: Anthropic | null = null;
+function getAnthropicClient(): Anthropic {
+  if (!anthropicClient) anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  return anthropicClient;
+}
 
 function hasGenerationApiKey(): boolean {
   return Boolean(process.env.OPENAI_API_KEY?.trim()) || Boolean(process.env.ANTHROPIC_API_KEY?.trim());
@@ -356,7 +360,7 @@ async function requestQuestionBatch(prompt: string, userId: string, difficulty: 
   const { provider, model } = getProviderAndModel(difficulty);
 
   if (provider === "openai") {
-    const response = await openaiClient.chat.completions.create({
+    const response = await getOpenaiClient().chat.completions.create({
       model,
       max_tokens: GENERATION_MAX_TOKENS_OPENAI,
       response_format: { type: "json_object" },
@@ -384,7 +388,7 @@ async function requestQuestionBatch(prompt: string, userId: string, difficulty: 
   }
 
   // Anthropic path (hard questions, d3–5)
-  const message = await anthropicClient.messages.create({
+  const message = await getAnthropicClient().messages.create({
     model,
     max_tokens: GENERATION_MAX_TOKENS_ANTHROPIC,
     messages: [{ role: "user", content: prompt }],
@@ -448,7 +452,7 @@ ${JSON.stringify(
 )}`;
 
   try {
-    const response = await openaiClient.chat.completions.create({
+    const response = await getOpenaiClient().chat.completions.create({
       model: OPENAI_MODEL_VALIDATION,
       max_tokens: Math.max(500, normalizedEntries.length * 140),
       response_format: { type: "json_object" },
