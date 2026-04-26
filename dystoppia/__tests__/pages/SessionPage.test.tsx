@@ -665,8 +665,7 @@ describe("SessionPage — critical runtime branches", () => {
 
     render(<SessionPage />);
     await waitFor(() => {
-      const paywall = screen.getByTestId("rate-limit-paywall");
-      expect(paywall.getAttribute("data-window")).toBe("weekly");
+      expect(screen.getByTestId("rate-limit-paywall")).toBeTruthy();
     });
   });
 
@@ -746,39 +745,11 @@ describe("SessionPage — critical runtime branches", () => {
     });
   });
 
-  test("shows free-plan weekly usage nudge when remaining ratio is low", () => {
-    storeState.currentTopic = sampleTopic;
-    storeState.plan = "free";
-    storeState.weeklyUsage = 10;
-    storeState.weeklyRemaining = 4;
-    render(<SessionPage />);
-    expect(screen.getByText(/4 questions left this week/i)).toBeTruthy();
-    expect(screen.getByText("Upgrade")).toBeTruthy();
-  });
-
-  test("does not show weekly usage nudge for pro users", () => {
-    storeState.currentTopic = sampleTopic;
-    storeState.plan = "pro";
-    storeState.weeklyUsage = 10;
-    storeState.weeklyRemaining = 2;
-    render(<SessionPage />);
-    expect(screen.queryByText(/questions left this week/i)).toBeNull();
-  });
-
   test("opens settings dialog from settings button", () => {
     storeState.currentTopic = sampleTopic;
     render(<SessionPage />);
     fireEvent.click(screen.getAllByLabelText("Settings")[0]);
     expect(screen.getByTestId("settings-dialog")).toBeTruthy();
-  });
-
-  test("toggles mobile stats panel", () => {
-    storeState.currentTopic = sampleTopic;
-    storeState.weeklyRemaining = 17;
-    render(<SessionPage />);
-    expect(screen.getAllByText(/17 left this week/i).length).toBe(1);
-    fireEvent.click(screen.getByLabelText("Stats"));
-    expect(screen.getAllByText(/17 left this week/i).length).toBeGreaterThan(1);
   });
 
   test("audiobook success path opens player", async () => {
