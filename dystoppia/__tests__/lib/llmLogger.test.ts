@@ -3,7 +3,15 @@ import { describe, test, expect, vi, beforeEach } from "vitest";
 const mockCreate = vi.hoisted(() => vi.fn(() => Promise.resolve({})));
 
 vi.mock("@/lib/prisma", () => ({
-  prisma: { lLMUsageLog: { create: mockCreate } },
+  prisma: {
+    lLMUsageLog: { create: mockCreate },
+    aIModelPrice: { findFirst: vi.fn().mockResolvedValue(null) },
+  },
+}));
+
+vi.mock("@/lib/pricing", () => ({
+  getActivePrice: vi.fn().mockResolvedValue(null),
+  calculateRawCost: vi.fn().mockReturnValue(0),
 }));
 
 import {
@@ -24,7 +32,8 @@ describe("calculateAnthropicCost", () => {
   test("applies Haiku rates", () => {
     const oneMIn = 1_000_000;
     const c = calculateAnthropicCost("claude-haiku-4-5", oneMIn, oneMIn);
-    expect(c).toBeCloseTo(0.25 + 1.25, 5);
+    // 0.80/1M input + 4.0/1M output = 0.80 + 4.0 = 4.80
+    expect(c).toBeCloseTo(0.80 + 4.0, 5);
   });
 });
 

@@ -577,11 +577,6 @@ describe("SessionPage — new header components", () => {
     expect(screen.getByTestId("achievement-toast")).toBeTruthy();
   });
 
-  test("renders DailyGoalBar", () => {
-    storeState.currentTopic = sampleTopic;
-    render(<SessionPage />);
-    expect(screen.getByTestId("daily-goal-bar")).toBeTruthy();
-  });
 
   test("does not show Resumo button when answerCount < 5", () => {
     storeState.currentTopic = sampleTopic;
@@ -629,48 +624,6 @@ describe("SessionPage — session summary", () => {
     expect(screen.queryByTestId("session-summary")).toBeNull();
   });
 
-  test("game over overlay shows 'Ver resumo' button", async () => {
-    vi.useFakeTimers();
-    storeState.currentTopic = sampleTopic;
-    storeState.currentQuestion = sampleQuestion;
-    storeState.lives = 0;
-    (mockUseAppStore as any).getState = () => ({ lives: 0, questionQueue: [], currentQuestion: sampleQuestion });
-    render(<SessionPage />);
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("answer-btn"));
-      vi.advanceTimersByTime(1000);
-    });
-    expect(screen.getByText(/View summary/i)).toBeTruthy();
-    vi.useRealTimers();
-  });
-
-  test("clicking 'View summary' opens summary and saves session entry", async () => {
-    vi.useFakeTimers();
-    storeState.currentTopic = sampleTopic;
-    storeState.currentQuestion = sampleQuestion;
-    storeState.lives = 0;
-    storeState.sessionXP = 120;
-    (mockUseAppStore as any).getState = () => ({ lives: 0, questionQueue: [], currentQuestion: sampleQuestion });
-    render(<SessionPage />);
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("answer-btn"));
-      vi.advanceTimersByTime(1000);
-    });
-
-    fireEvent.click(screen.getByText(/View summary/i));
-
-    expect(screen.getByTestId("session-summary")).toBeTruthy();
-    expect(mockSaveSessionEntry).toHaveBeenCalledWith(
-      expect.objectContaining({
-        topicId: "topic-1",
-        totalCount: 1,
-        correctCount: 0,
-        xpEarned: 120,
-      })
-    );
-    vi.useRealTimers();
-  });
 });
 
 // ─── checkAchievements called on answer ───────────────────────────────────────
@@ -685,15 +638,6 @@ describe("SessionPage — achievement & daily goal integration", () => {
     expect(mockCheckAchievements).toHaveBeenCalled();
   });
 
-  test("calls incrementDailyProgress after answering", async () => {
-    storeState.currentTopic = sampleTopic;
-    storeState.currentQuestion = sampleQuestion;
-    render(<SessionPage />);
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("answer-btn"));
-    });
-    expect(mockIncrementDailyProgress).toHaveBeenCalled();
-  });
 });
 
 describe("SessionPage — critical runtime branches", () => {

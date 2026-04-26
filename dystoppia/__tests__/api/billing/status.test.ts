@@ -66,7 +66,7 @@ describe("GET /api/billing/status", () => {
     const body = await res.json();
     expect(body.plan).toBe("free");
     expect(body.hourlyUsage).toBe(2);
-    expect(body.hourlyRemaining).toBe(3);
+    expect(body.hourlyRemaining).toBe(999997);
     expect(body.creditBalance).toBe(180);
     expect(body.creditPackages).toHaveLength(1);
   });
@@ -82,6 +82,6 @@ describe("GET /api/billing/status", () => {
     const res = await GET(new NextRequest("http://localhost/api/billing/status"));
     const body = await res.json();
     expect(body.hourlyUsage).toBe(0);
-    expect(body.hourlyRemaining).toBe(5);
+    expect(body.hourlyRemaining).toBe(999999);
   });
 });

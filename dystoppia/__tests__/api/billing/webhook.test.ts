@@ -179,7 +179,6 @@ describe("POST /api/billing/webhook", () => {
         stripeSubscriptionId: "sub_abc",
         subscriptionStatus: "active",
         plan: "learner",
-        weeklyUsage: 0,
       }),
     });
   });

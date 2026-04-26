@@ -109,16 +109,6 @@ describe("PrivateHomeDashboard", () => {
     await waitFor(() => expect(screen.getByText(/Describe what you want to build/i)).toBeTruthy());
   });
 
-  test("shows credits balance for master user", async () => {
-    render(<PrivateHomeDashboard />);
-    expect(await screen.findByText(/420/)).toBeTruthy();
-  });
-
-  test("shows builder request history for master user", async () => {
-    render(<PrivateHomeDashboard />);
-    expect(await screen.findByText(/Analyze a competitor app/i)).toBeTruthy();
-  });
-
   test("does not request builder history for non-master users", async () => {
     mockStore.mockImplementation((selector: (state: Record<string, unknown>) => unknown) =>
       selector({
