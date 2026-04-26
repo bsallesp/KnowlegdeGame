@@ -25,12 +25,6 @@ interface Particle {
   color: string;
 }
 
-interface Connection {
-  from: number;
-  to: number;
-  opacity: number;
-}
-
 interface NeuralTransitionProps {
   visible: boolean;
   topic?: string;
