@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import useAppStore from "@/store/useAppStore";
 import InfoButton from "@/components/InfoButton";
@@ -30,7 +30,7 @@ export default function SessionSummary({
   }, {});
 
   const rate = answerCount > 0 ? Math.round((correctCount / answerCount) * 100) : 0;
-  const now = useMemo(() => Date.now(), []);
+  const [now] = useState<number>(() => Date.now());
   const unlockedThisSession = achievements.filter(
     (achievement) =>
       achievement.unlockedAt &&
