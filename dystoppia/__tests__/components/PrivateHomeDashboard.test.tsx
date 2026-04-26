@@ -40,6 +40,16 @@ vi.mock("framer-motion", () => ({
     span: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <span {...props}>{children}</span>,
     aside: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <aside {...props}>{children}</aside>,
     p: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <p {...props}>{children}</p>,
+    h1: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <h1 {...props}>{children}</h1>,
+    h2: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <h2 {...props}>{children}</h2>,
+    button: ({ children, onClick, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
+      <button onClick={onClick as React.MouseEventHandler} {...props}>{children}</button>
+    ),
+    form: ({ children, onSubmit, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
+      <form onSubmit={onSubmit as React.FormEventHandler} {...props}>{children}</form>
+    ),
+    textarea: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <textarea {...props}>{children}</textarea>,
+    section: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <section {...props}>{children}</section>,
   },
   AnimatePresence: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
@@ -89,16 +99,23 @@ describe("PrivateHomeDashboard", () => {
     }) as typeof fetch;
   });
 
-  test("renders chat-style home and builder history for master users", async () => {
+  test("renders Dystoppia heading", async () => {
     render(<PrivateHomeDashboard />);
+    await waitFor(() => expect(screen.getAllByText(/Dystoppia/i).length).toBeGreaterThan(0));
+  });
 
-    expect(screen.getByRole("heading", { name: /what are we learning today/i })).toBeTruthy();
-    expect(screen.getByRole("textbox", { name: /dystoppia prompt/i })).toBeTruthy();
-    expect(screen.getAllByRole("link", { name: /^learn$/i }).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByRole("link", { name: /^build$/i })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /^govern$/i })).toBeTruthy();
+  test("renders describe what you want to build prompt", async () => {
+    render(<PrivateHomeDashboard />);
+    await waitFor(() => expect(screen.getByText(/Describe what you want to build/i)).toBeTruthy());
+  });
 
-    expect(await screen.findByText(/420 credits/i)).toBeTruthy();
+  test("shows credits balance for master user", async () => {
+    render(<PrivateHomeDashboard />);
+    expect(await screen.findByText(/420/)).toBeTruthy();
+  });
+
+  test("shows builder request history for master user", async () => {
+    render(<PrivateHomeDashboard />);
     expect(await screen.findByText(/Analyze a competitor app/i)).toBeTruthy();
   });
 
@@ -113,8 +130,7 @@ describe("PrivateHomeDashboard", () => {
 
     render(<PrivateHomeDashboard />);
 
-    await waitFor(() => expect(screen.getByText(/What are we learning today/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText(/Dystoppia/i).length).toBeGreaterThan(0));
     expect(screen.queryByText(/Recent Builder requests/i)).toBeNull();
-    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 });

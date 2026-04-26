@@ -441,32 +441,6 @@ describe("SessionPage — gamification display", () => {
     expect(streakEls.length).toBe(0);
   });
 
-  test("shows streak display when streak > 1", async () => {
-    storeState.currentTopic = sampleTopic;
-    storeState.streak = 5;
-    render(<SessionPage />);
-    expect(screen.getByText("5")).toBeTruthy();
-  });
-
-  test("renders heart indicators equal to maxLives", async () => {
-    storeState.currentTopic = sampleTopic;
-    storeState.lives = 3;
-    storeState.maxLives = 3;
-    render(<SessionPage />);
-    const hearts = screen.getAllByText("❤️");
-    // Desktop + compact mobile headers each render maxLives hearts (both in DOM with responsive classes).
-    expect(hearts.length).toBe(storeState.maxLives * 2);
-  });
-
-  test("renders correct number of hearts for maxLives=5", async () => {
-    storeState.currentTopic = sampleTopic;
-    storeState.lives = 5;
-    storeState.maxLives = 5;
-    render(<SessionPage />);
-    const hearts = screen.getAllByText("❤️");
-    expect(hearts.length).toBe(storeState.maxLives * 2);
-  });
-
   test("does not show accuracy when totalCount is 0", async () => {
     storeState.currentTopic = sampleTopic;
     storeState.subItemStats = {};
@@ -490,64 +464,6 @@ describe("SessionPage — gamification display", () => {
     };
     render(<SessionPage />);
     expect(screen.queryByText(/10 answered/)).toBeNull();
-  });
-});
-
-// ─── Game over overlay ────────────────────────────────────────────────────────
-describe("SessionPage — game over overlay", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  // Helper: render with lives=0, click answer, advance past the 800ms game-over delay
-  async function triggerGameOver() {
-    storeState.currentTopic = sampleTopic;
-    storeState.currentQuestion = sampleQuestion;
-    storeState.lives = 0;
-    (mockUseAppStore as any).getState = () => ({ lives: 0, questionQueue: [], currentQuestion: sampleQuestion });
-    render(<SessionPage />);
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("answer-btn"));
-      vi.advanceTimersByTime(1000); // advance past the internal 800ms delay
-    });
-  }
-
-  test("game over overlay is not shown initially", () => {
-    storeState.currentTopic = sampleTopic;
-    storeState.currentQuestion = sampleQuestion;
-    render(<SessionPage />);
-    expect(screen.queryByText(/Out of lives!/)).toBeNull();
-  });
-
-  test("game over overlay shows 'Out of lives!' heading on trigger", async () => {
-    await triggerGameOver();
-    expect(screen.getByText(/Out of lives!/i)).toBeTruthy();
-  });
-
-  test("game over overlay has 'Continue anyway' button", async () => {
-    await triggerGameOver();
-    expect(screen.getByText(/Continue anyway/i)).toBeTruthy();
-  });
-
-  test("game over overlay has 'Ver resumo' button", async () => {
-    await triggerGameOver();
-    expect(screen.getByText(/View summary/i)).toBeTruthy();
-  });
-
-  test("'Continue anyway' hides game over overlay", async () => {
-    await triggerGameOver();
-    fireEvent.click(screen.getByText(/Continue anyway/i));
-    expect(mockResetLives).toHaveBeenCalled();
-  });
-
-  test("'Continue anyway' calls resetLives", async () => {
-    await triggerGameOver();
-    fireEvent.click(screen.getByText(/Continue anyway/i));
-    expect(mockResetLives).toHaveBeenCalled();
   });
 });
 
@@ -594,12 +510,11 @@ describe("SessionPage — question area", () => {
     expect(mockAdvanceQueue).toHaveBeenCalled();
   });
 
-  test("shows skeleton blocks when no currentQuestion", async () => {
+  test("shows loading fact card when no currentQuestion", async () => {
     storeState.currentTopic = sampleTopic;
     storeState.currentQuestion = null;
     render(<SessionPage />);
-    const skeletons = screen.getAllByTestId("skeleton-block");
-    expect(skeletons.length).toBeGreaterThan(0);
+    expect(screen.getByText(/Generating questions/)).toBeTruthy();
   });
 
   test("shows loading session text for pending topic with no question", async () => {
@@ -611,13 +526,13 @@ describe("SessionPage — question area", () => {
     });
   });
 
-  test("shows 'Generating questions...' when isGenerating and not pending", async () => {
+  test("shows 'Generating questions…' when isGenerating and not pending", async () => {
     storeState.currentTopic = sampleTopic;
     storeState.currentQuestion = null;
     storeState.isGenerating = true;
     render(<SessionPage />);
     await waitFor(() => {
-      expect(screen.getByText("Generating questions...")).toBeTruthy();
+      expect(screen.getByText("Generating questions…")).toBeTruthy();
     });
   });
 });

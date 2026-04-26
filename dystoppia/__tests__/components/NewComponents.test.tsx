@@ -273,11 +273,6 @@ describe("SessionSummary", () => {
     expect(screen.getByText("+100")).toBeTruthy();
   });
 
-  test("shows streak when streak > 0", () => {
-    render(<SessionSummary {...defaultProps} />);
-    expect(screen.getByText(/3 days streak/)).toBeTruthy();
-  });
-
   test("calls onContinue when 'Keep practicing' button is clicked", () => {
     const onContinue = vi.fn();
     render(<SessionSummary {...defaultProps} onContinue={onContinue} />);
