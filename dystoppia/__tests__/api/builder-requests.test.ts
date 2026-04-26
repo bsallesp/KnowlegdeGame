@@ -10,6 +10,19 @@ const mockFindMany = vi.hoisted(() => vi.fn());
 const mockFindFirst = vi.hoisted(() => vi.fn());
 const mockUsageCreate = vi.hoisted(() => vi.fn());
 const mockApprovalCreate = vi.hoisted(() => vi.fn());
+const mockBuildStructuredBuilderResult = vi.hoisted(() => vi.fn());
+const mockEstimateCredits = vi.hoisted(() => vi.fn());
+const mockSettleCredits = vi.hoisted(() => vi.fn());
+const mockUpdate = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/builder", () => ({
+  buildStructuredBuilderResult: mockBuildStructuredBuilderResult,
+}));
+
+vi.mock("@/lib/pricing", () => ({
+  estimateCredits: mockEstimateCredits,
+  settleCredits: mockSettleCredits,
+}));
 
 vi.mock("@/lib/authorization", () => ({
   requireRole: mockRequireRole,
@@ -30,6 +43,7 @@ vi.mock("@/lib/prisma", () => ({
       create: mockCreate,
       findMany: mockFindMany,
       findFirst: mockFindFirst,
+      update: mockUpdate,
     },
     usageEvent: {
       create: mockUsageCreate,
@@ -91,6 +105,7 @@ describe("POST /api/builder/requests", () => {
       status: "active",
       isInternal: true,
     });
+    mockEstimateCredits.mockResolvedValue({ bufferedCredits: 50, rawCostUsd: 0.01, multiplier: 1, chargedCostUsd: 0.01, creditValueUsd: 0.001, rawCredits: 10, floorCredits: 10, finalCredits: 10, bufferFraction: 0.25 });
     mockGetCurrentCreditBalance.mockResolvedValue(0);
     mockCreate.mockResolvedValue({ id: "req-1", status: "rejected" });
 
@@ -107,9 +122,14 @@ describe("POST /api/builder/requests", () => {
       status: "active",
       isInternal: true,
     });
+    mockEstimateCredits.mockResolvedValue({ bufferedCredits: 10, rawCostUsd: 0.005, multiplier: 1, chargedCostUsd: 0.005, creditValueUsd: 0.001, rawCredits: 5, floorCredits: 5, finalCredits: 5, bufferFraction: 0.25 });
     mockGetCurrentCreditBalance.mockResolvedValue(100);
-    mockCreate.mockResolvedValue({ id: "req-1", status: "completed" });
-    mockAppendCreditLedgerEvent.mockResolvedValue({ balanceAfter: 82 });
+    mockCreate.mockResolvedValue({ id: "req-1", status: "processing" });
+    mockAppendCreditLedgerEvent.mockResolvedValue({ balanceAfter: 90 });
+    mockBuildStructuredBuilderResult.mockResolvedValue({ costSummary: { _realTokens: null }, warnings: [], result: {} });
+    mockSettleCredits.mockResolvedValue({ action: "exact", difference: 0, realCostUsd: 0.005, realCredits: 5, settledCredits: 5 });
+    mockUpdate.mockResolvedValue({ id: "req-1", status: "completed" });
+    mockUsageCreate.mockResolvedValue({});
 
     const res = await POST(
       req({ prompt: "Create a scoped Builder plan for a SaaS that analyzes app competitors." })

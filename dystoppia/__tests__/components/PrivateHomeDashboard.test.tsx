@@ -37,7 +37,9 @@ vi.mock("next/link", () => ({
 vi.mock("framer-motion", () => ({
   motion: {
     div: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <div {...props}>{children}</div>,
+    span: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <span {...props}>{children}</span>,
   },
+  AnimatePresence: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
 
 import PrivateHomeDashboard from "@/components/PrivateHomeDashboard";

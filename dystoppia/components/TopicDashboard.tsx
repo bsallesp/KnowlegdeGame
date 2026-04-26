@@ -59,6 +59,21 @@ function MuteIcon({ muted }: { muted: boolean }) {
   );
 }
 
+function DifficultyDots({ level }: { level: number }) {
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((d) => (
+        <div
+          key={d}
+          className="w-1.5 h-1.5 rounded-full"
+          data-testid="topic-difficulty-dot"
+          style={{ backgroundColor: d <= level ? "#818CF8" : "#2E2E40" }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function SoloBadge({ active }: { active: boolean }) {
   return (
     <span
@@ -231,6 +246,8 @@ export default function TopicDashboard({ items, subItemStats, onToggleMute, onSo
                               >
                                 {proficiencyLabel}
                               </span>
+
+                              <DifficultyDots level={difficulty} />
 
                               {totalCount > 0 && (
                                 <span className="text-xs tabular-nums" style={{ color: "#9494B8" }}>
