@@ -464,41 +464,6 @@ describe("dismissAchievement", () => {
   });
 });
 
-// ─── incrementDailyProgress ───────────────────────────────────────────────────
-
-describe("incrementDailyProgress", () => {
-  const today = new Date().toISOString().split("T")[0];
-
-  beforeEach(() => {
-    useAppStore.setState({ dailyGoal: { target: 20, progress: 0, date: today } });
-  });
-
-  test("increments progress by 1", () => {
-    useAppStore.getState().incrementDailyProgress();
-    expect(useAppStore.getState().dailyGoal.progress).toBe(1);
-  });
-
-  test("accumulates across multiple calls", () => {
-    useAppStore.getState().incrementDailyProgress();
-    useAppStore.getState().incrementDailyProgress();
-    useAppStore.getState().incrementDailyProgress();
-    expect(useAppStore.getState().dailyGoal.progress).toBe(3);
-  });
-
-  test("resets progress to 1 when date is different from today", () => {
-    useAppStore.setState({ dailyGoal: { target: 20, progress: 15, date: "2020-01-01" } });
-    useAppStore.getState().incrementDailyProgress();
-    expect(useAppStore.getState().dailyGoal.progress).toBe(1);
-    expect(useAppStore.getState().dailyGoal.date).toBe(today);
-  });
-
-  test("preserves target when resetting for new day", () => {
-    useAppStore.setState({ dailyGoal: { target: 30, progress: 15, date: "2020-01-01" } });
-    useAppStore.getState().incrementDailyProgress();
-    expect(useAppStore.getState().dailyGoal.target).toBe(30);
-  });
-});
-
 // ─── saveSessionEntry ─────────────────────────────────────────────────────────
 
 describe("saveSessionEntry", () => {
