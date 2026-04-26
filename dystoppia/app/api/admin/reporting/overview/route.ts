@@ -20,10 +20,9 @@ export async function GET(req: NextRequest) {
     const auth = await requireRole(req, "master");
     if (auth instanceof NextResponse) return auth;
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [
       ownBalance,
-      _ownLedger,
+      , // ownLedger unused
       ownRequestCount,
       ownUsage,
       ownPendingApprovals,
