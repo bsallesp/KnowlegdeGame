@@ -63,7 +63,7 @@ export default function PricingTable({ onUpgrade, currentPlan = "free" }: Pricin
 
     if (res.ok) {
       const { url } = await res.json();
-      window.location.href = url;
+      window.location.assign(url);
     }
   };
 

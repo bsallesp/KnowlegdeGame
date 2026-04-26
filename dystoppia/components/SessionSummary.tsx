@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import useAppStore from "@/store/useAppStore";
 import InfoButton from "@/components/InfoButton";
@@ -29,10 +30,11 @@ export default function SessionSummary({
   }, {});
 
   const rate = answerCount > 0 ? Math.round((correctCount / answerCount) * 100) : 0;
+  const now = useMemo(() => Date.now(), []);
   const unlockedThisSession = achievements.filter(
     (achievement) =>
       achievement.unlockedAt &&
-      Date.now() - new Date(achievement.unlockedAt).getTime() < 60 * 60 * 1000
+      now - new Date(achievement.unlockedAt).getTime() < 60 * 60 * 1000
   );
 
   const weakSpots = Object.entries(subItemStats)
